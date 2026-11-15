@@ -1,0 +1,18 @@
+{
+  "name": "@tandem/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@octokit/graphql": "^9.0.5",
+    "@octokit/rest": "^22.0.1",
+    "gray-matter": "^4.0.3",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6"
+  }
+}
