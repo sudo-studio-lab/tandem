@@ -147,8 +147,8 @@ tests/agents/                        相容性測試
 
 ## 人工前置步驟（需要 @jielle2453 做）
 
-1. **在這台電腦安裝 Codex**（`npm install -g @openai/codex`）並登入，才能實測和跑相容性測試。
-2. **同意 Anthropic 的商業條款**：在 Claude Console（https://platform.claude.com/）用 sudo-studio-lab 建組織時會同意。規定寫「在產品裡執行 Claude Code 需要同意商業條款」。這是照文件字面的讀法，不是法律意見。
+1. **Codex 由 @theroyatlas 實測**：這台電腦不裝 Codex。Codex 的實機驗證和相容性測試在 Roy 的電腦上跑；這台先做 Claude，Codex 的 adapter 照文件寫好，交給 Roy 測。
+2. **同意 Anthropic 的商業條款**：在 Claude Console（https://platform.claude.com/）建組織時會同意。規定寫「在產品裡執行 Claude Code 需要同意商業條款」。這是照文件字面的讀法，不是法律意見。可以等到要給我們兩個以外的人用之前再做；組織名稱之後可以改，不必等正式名字定案。
 
 ## 原則檢查
 
