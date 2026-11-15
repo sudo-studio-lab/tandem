@@ -1,18 +1,18 @@
 ---
-id: D-20261115-d05
-status: active
-area: 功能：房間
-owner: jielle2453
-strength: preference
+id: D-20261115-heqh
+title: 要有一個像 Omnigent 那樣、大家都能輸入的共用「房間」，用主持人的訂閱
 date: 2026-11-15
-supersedes:
+deciders: [jielle2453]
+area: 功能：房間
+strength: preference
+source: chat
 ---
 
 ## 原話
 
-> 「可能是主持人自己的訂閱 但我希望大家都可以在session裡輸入 但是他能加進google meet嗎 還是會是主持人另外開 這樣就算沒開會也能用這個協作功能」 — @jielle2453（與 Claude 的討論）
+> 「可能是主持人自己的訂閱 但我希望大家都可以在session裡輸入 但是他能加進google meet嗎 還是會是主持人另外開 這樣就算沒開會也能用這個協作功能」 — @jielle2453（chat）
 
-> 「但是Omnigent就做得到 我們可以學他」 — @jielle2453（與 Claude 的討論）
+> 「但是Omnigent就做得到 我們可以學他」 — @jielle2453（chat）
 
 ## 決定
 

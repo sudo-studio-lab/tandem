@@ -1,16 +1,16 @@
 ---
-id: D-20261115-0e4
-status: active
-area: 設計原則
-owner: jielle2453
-strength: hard
+id: D-20261115-r6x9
+title: Tandem 最重要的標準是輕鬆
 date: 2026-11-15
-supersedes:
+deciders: [jielle2453]
+area: 設計原則
+strength: hard
+source: chat
 ---
 
 ## 原話
 
-> 「我覺得最主要是要很輕鬆 我可以用邀請地就開始協作 不用再去建這些規矩架構 可以直接看到專案進展 各自在做些甚麼之類的 我覺得就是差在最一開始我們不知道該怎麼做」 — @jielle2453（與 Claude 的討論）
+> 「我覺得最主要是要很輕鬆 我可以用邀請地就開始協作 不用再去建這些規矩架構 可以直接看到專案進展 各自在做些甚麼之類的 我覺得就是差在最一開始我們不知道該怎麼做」 — @jielle2453（chat）
 
 ## 決定
 

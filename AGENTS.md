@@ -1,3 +1,15 @@
+<!-- BEGIN TANDEM v:1 hash:12cc436d -->
+## Tandem（團隊協作）
+
+這個專案用 Tandem 讓每個人的 agent 共享決定和進度。
+
+- **每次對話開始**：如果還沒看到 Tandem 的報告，先執行 `tandem brief`，用五行以內把跟使用者有關的變動告訴使用者；沒有就不用講。
+- **使用者做了會影響別人的決定**：用 `tandem decide --dry-run` 產生紀錄，給使用者看「我記成這樣，對嗎？」，確認後再正式執行。原話必須逐字，不能改寫。
+- **需要別人回答才做得下去**：`tandem ask`。可以先做、之後再改的事，直接記決定，不要開問題。
+- **結束工作前**：用 `tandem status` 更新使用者自己的狀態。
+- 詳細做法：`tandem brief` 的輸出。不要改別人的狀態檔和別人的決定。
+<!-- END TANDEM -->
+
 # Tandem：給 agent 的工作規則
 
 這個 repo 是 Tandem 的開發 repo，同時也是 Tandem 的第一個使用案例：我們用這裡的紀錄方式來開發 Tandem 本身。

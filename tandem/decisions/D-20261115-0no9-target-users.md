@@ -1,16 +1,16 @@
 ---
-id: D-20261115-a3f
-status: active
-area: 目標使用者
-owner: jielle2453
-strength: preference
+id: D-20261115-0no9
+title: 目標使用者是像我們這樣、臨時一起做專案的小團隊（朋友的副業、黑客松隊伍）
 date: 2026-11-15
-supersedes:
+deciders: [jielle2453]
+area: 目標使用者
+strength: preference
+source: chat
 ---
 
 ## 原話
 
-> 「另外我覺得我們可能不是主要for公司 因為他們就用team方案就好 而是我們的target user可能是像我們這樣有時會一起做專案 參加黑客松的人」 — @jielle2453（與 Claude 的討論）
+> 「另外我覺得我們可能不是主要for公司 因為他們就用team方案就好 而是我們的target user可能是像我們這樣有時會一起做專案 參加黑客松的人」 — @jielle2453（chat）
 
 ## 決定
 

@@ -1,18 +1,18 @@
 ---
-id: D-20261115-6d7
-status: active
-area: 功能：介面
-owner: jielle2453
-strength: preference
+id: D-20261115-0lzf
+title: 要做一個介面，看得到每個人的進度、專案狀態、待辦，而且能點到成品
 date: 2026-11-15
-supersedes:
+deciders: [jielle2453]
+area: 功能：介面
+strength: preference
+source: chat
 ---
 
 ## 原話
 
-> 「我們還要做介面 這樣才能清楚看到對方的進度 這個專案的狀態 有哪些代辦清單之類的」 — @jielle2453（與 Claude 的討論）
+> 「我們還要做介面 這樣才能清楚看到對方的進度 這個專案的狀態 有哪些代辦清單之類的」 — @jielle2453（chat）
 
-> 「也要可以點到成品查看」 — @jielle2453（與 Claude 的討論）
+> 「也要可以點到成品查看」 — @jielle2453（chat）
 
 ## 決定
 

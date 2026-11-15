@@ -1,16 +1,16 @@
 ---
-id: D-20261115-7c2
-status: active
-area: 產品範圍
-owner: jielle2453
-strength: preference
+id: D-20261115-v6de
+title: 先只做我們自己的系統加上 GitHub
 date: 2026-11-15
-supersedes:
+deciders: [jielle2453]
+area: 產品範圍
+strength: preference
+source: chat
 ---
 
 ## 原話
 
-> 「我覺得要接discord slack都之後再說 我們先專注在我們自己加上github」 — @jielle2453（與 Claude 的討論）
+> 「我覺得要接discord slack都之後再說 我們先專注在我們自己加上github」 — @jielle2453（chat）
 
 ## 決定
 

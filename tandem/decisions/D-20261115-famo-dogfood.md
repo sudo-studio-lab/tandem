@@ -1,16 +1,16 @@
 ---
-id: D-20261115-2e6
-status: superseded
-area: 開發方式
-owner: jielle2453
-strength: preference
+id: D-20261115-famo
+title: 用這套系統開發它自己
 date: 2026-11-15
-supersedes:
+deciders: [jielle2453]
+area: 開發方式
+strength: preference
+source: chat
 ---
 
 ## 原話
 
-> 「那我們可以先做好這個基底 然後直接用這套系統來開發這套系統嗎 這樣會不會亂掉」 — @jielle2453（與 Claude 的討論）
+> 「那我們可以先做好這個基底 然後直接用這套系統來開發這套系統嗎 這樣會不會亂掉」 — @jielle2453（chat）
 
 ## 決定
 

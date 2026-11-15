@@ -1,18 +1,18 @@
 ---
-id: D-20261115-8a2
-status: active
-area: 架構
-owner: jielle2453
-strength: preference
+id: D-20261115-dqle
+title: 學 T3 Code：一個本機核心加一套網頁介面
 date: 2026-11-15
-supersedes:
+deciders: [jielle2453]
+area: 架構
+strength: preference
+source: chat
 ---
 
 ## 原話
 
-> 「好 那你要開始寫spec嗎」 — @jielle2453（與 Claude 的討論，回答 Claude 的提問「先做本機網頁，之後再包成桌面版和雲端版，可以嗎？」）
+> 「好 那你要開始寫spec嗎」 — @jielle2453（chat）
 
-> 「t3code是怎麼做的 如果網頁版會不會對使用者來說比較不方便 有一些限制之類的 還是不用下載所以更輕鬆了」 — @jielle2453（與 Claude 的討論，提問的脈絡）
+> 「t3code是怎麼做的 如果網頁版會不會對使用者來說比較不方便 有一些限制之類的 還是不用下載所以更輕鬆了」 — @jielle2453（chat）
 
 ## 決定
 

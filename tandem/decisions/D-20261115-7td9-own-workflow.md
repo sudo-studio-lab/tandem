@@ -1,16 +1,16 @@
 ---
-id: D-20261115-58e
-status: active
-area: 開發方式
-owner: jielle2453
-strength: preference
+id: D-20261115-7td9
+title: 這個 repo 不沿用 studio repo 的流程規則，自己設計一套
 date: 2026-11-15
-supersedes:
+deciders: [jielle2453]
+area: 開發方式
+strength: preference
+source: chat
 ---
 
 ## 原話
 
-> 「然後我覺得你不用太在意原本在組織裡的規定 因為我們就是覺得不太好用 或是我們根本就覺得太麻煩沒有導入 才決定要自己做一套的」 — @jielle2453（與 Claude 的討論）
+> 「然後我覺得你不用太在意原本在組織裡的規定 因為我們就是覺得不太好用 或是我們根本就覺得太麻煩沒有導入 才決定要自己做一套的」 — @jielle2453（chat）
 
 ## 決定
 

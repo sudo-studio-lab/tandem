@@ -1,16 +1,16 @@
 ---
-id: D-20261115-f3c
-status: active
-area: 開發方式
-owner: jielle2453
-strength: preference
+id: D-20261115-0gh5
+title: 先只開一個私人 repo，開發紀錄和之後的程式碼都放這裡
 date: 2026-11-15
-supersedes:
+deciders: [jielle2453]
+area: 開發方式
+strength: preference
+source: chat
 ---
 
 ## 原話
 
-> 「但我們一開始還不需要公開產品的repo吧 先一個開始用就好」 — @jielle2453（與 Claude 的討論）
+> 「但我們一開始還不需要公開產品的repo吧 先一個開始用就好」 — @jielle2453（chat）
 
 ## 決定
 

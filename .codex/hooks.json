@@ -1,0 +1,53 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "tandem hook session-start --agent codex",
+            "commandWindows": "tandem hook session-start --agent codex",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "tandem hook stop --agent codex",
+            "commandWindows": "tandem hook stop --agent codex",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "tandem hook post-compact --agent codex",
+            "commandWindows": "tandem hook post-compact --agent codex",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "tandem hook user-prompt --agent codex",
+            "commandWindows": "tandem hook user-prompt --agent codex",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

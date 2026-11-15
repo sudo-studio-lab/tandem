@@ -1,18 +1,18 @@
 ---
-id: D-20261115-b40
-status: active
-area: 命名
-owner: jielle2453
-strength: hunch
+id: D-20261115-pph4
+title: repo 建在 sudo-studio-lab 組織下，暫定名稱 Tandem
 date: 2026-11-15
-supersedes:
+deciders: [jielle2453]
+area: 命名
+strength: hunch
+source: chat
 ---
 
 ## 原話
 
-> 「那Tandem呢 或是乘法之類的」 — @jielle2453（與 Claude 的討論）
+> 「那Tandem呢 或是乘法之類的」 — @jielle2453（chat）
 
-> 「好 你先用吧」 — @jielle2453（與 Claude 的討論）
+> 「好 你先用吧」 — @jielle2453（chat）
 
 ## 決定
 
