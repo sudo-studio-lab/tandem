@@ -23,7 +23,7 @@ export default defineConfig([
     banner: { js: "#!/usr/bin/env node" },
     onSuccess: async () => copyClient("dist")(),
   },
-  // Desktop build (research S9): one self-contained file run by Electron's Node.
+  // Desktop build: one self-contained file run by Electron's Node.
   // Everything is inlined except the native keyring module, which ships next to it.
   {
     ...common,

@@ -1,5 +1,5 @@
 /**
- * Public Client ID of Tandem's GitHub OAuth App (research S5). A client id is not a secret.
+ * Public Client ID of Tandem's GitHub OAuth App. A client id is not a secret.
  * Registered under sudo-studio-lab; override with env TANDEM_GITHUB_CLIENT_ID.
  */
 export const GITHUB_OAUTH_CLIENT_ID = "Ov23liwi6szBzIMQhjKo";

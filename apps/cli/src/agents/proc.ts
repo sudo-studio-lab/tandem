@@ -9,7 +9,7 @@ export function agentEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv 
 
 /**
  * Resolve how to run a command. The native Claude build is an .exe and runs directly; npm installs
- * are .cmd shims, which Node can only start through cmd.exe (research A9).
+ * are .cmd shims, which Node can only start through cmd.exe.
  */
 export function resolveCommand(cmd: string): { file: string; prefix: string[] } | null {
   if (process.platform !== "win32") {
@@ -72,7 +72,7 @@ export function runCapture(cmd: string, args: string[], timeoutMs = 15_000): Pro
   });
 }
 
-/** Kill a process and its children (research A5: on Windows this is how a turn is stopped). */
+/** Kill a process and its children (on Windows this is how a turn is stopped). */
 export function killTree(child: ChildProcess): void {
   if (child.exitCode !== null || child.pid === undefined) return;
   if (process.platform === "win32") {

@@ -1,6 +1,6 @@
 /**
- * Chats with the user's own agent (spec 003 情境 1). Kept only on this computer, in
- * <app folder>/chats/<id>.json (FR-008). Turns adapter events into chat items and pushes updates
+ * Chats with the user's own agent. Kept only on this computer, in
+ * <app folder>/chats/<id>.json. Turns adapter events into chat items and pushes updates
  * to the UI; holds approvals until the user clicks.
  */
 import { randomUUID } from "node:crypto";

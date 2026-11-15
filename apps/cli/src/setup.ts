@@ -1,6 +1,6 @@
 /**
  * Starting, joining and setting up projects. Shared by the CLI (`init`, `join`) and the
- * desktop server (spec 002 stories 1–2). Never touches the user's code: the only commit on the
+ * desktop server. Never touches the user's code: the only commit on the
  * user's branch is the agent setup files, and only on explicit setup.
  */
 import { existsSync, readdirSync } from "node:fs";
@@ -67,7 +67,7 @@ export async function setupProject(
     `if command -v ${PRODUCT.command} >/dev/null 2>&1; then ${PRODUCT.command} check --quiet; fi`,
   );
 
-  // Discussions (research R18): changing a repo setting needs consent; without it, fall back to Issues.
+  // Discussions: changing a repo setting needs consent; without it, fall back to Issues.
   try {
     const d = await ctx.gh.getDiscussionsInfo();
     if (d.enabled) out.discussions = "enabled";

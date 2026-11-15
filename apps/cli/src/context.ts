@@ -30,9 +30,9 @@ export interface Context {
   saveState(): Promise<void>;
   /** GitHub token; only ever passed to child processes through `gitEnv`. */
   token: string;
-  /** Env for git network commands (research S5): token as an extra header, never in config or argv. */
+  /** Env for git network commands: token as an extra header, never in config or argv. */
   gitEnv: Record<string, string>;
-  /** Records live on the remote default branch (research S1). */
+  /** Records live on the remote default branch. */
   store: DataStore;
 }
 

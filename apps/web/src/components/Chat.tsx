@@ -44,7 +44,7 @@ export function useAgents() {
 }
 
 // ---------------------------------------------------------------------------
-// AI settings: login / logout per agent (spec 003 情境 2)
+// AI settings: login / logout per agent
 // ---------------------------------------------------------------------------
 export function AgentSettingsDialog({ onClose }: { onClose: () => void }) {
   const { agents, error, reload } = useAgents();

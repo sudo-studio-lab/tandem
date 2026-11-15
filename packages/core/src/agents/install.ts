@@ -323,7 +323,7 @@ function planHooksRemove(rel: string, before: string | null): Op {
 }
 
 // ---------------------------------------------------------------------------
-// MCP registration (spec 003 FR-002): project files only, never the user's global config.
+// MCP registration: project files only, never the user's global config.
 //   Claude Code: .mcp.json  {"mcpServers": {"tandem": {"command", "args"}}}
 //     (verified 2026-11-15 on Windows: a bare "tandem" resolves to tandem.cmd, no `cmd /c` needed)
 //   Codex: .codex/config.toml  [mcp_servers.tandem]  (only read when the project is trusted)

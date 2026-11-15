@@ -1,4 +1,4 @@
-/* Rooms (spec 004). Builds on the chat layout classes in styles.css. */
+/* Rooms. Builds on the chat layout classes in styles.css. */
 .room {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;

@@ -603,7 +603,7 @@ export function createGitHubClient(opts: GitHubClientOptions) {
     );
   }
 
-  // ---- rooms (spec 004): a discussion whose body starts with the room marker ----
+  // ---- rooms: a discussion whose body starts with the room marker ----
   async function createRoom(title: string, host: string, notes = ""): Promise<RoomRef> {
     const info = await getDiscussionsInfo();
     if (!info.enabled) {

@@ -100,7 +100,7 @@ export async function buildBrief(ctx: Context, gh: GitHubData | null): Promise<{
 
 const sameLogin = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
-/** `extraLogins`: collaborators and people seen in activity, so nobody with access is missing (spec 002 story 3). */
+/** `extraLogins`: collaborators and people seen in activity, so nobody with access is missing. */
 export async function buildBoard(ctx: Context, gh: GitHubData, sync: SyncState, extraLogins: string[] = []): Promise<BoardData> {
   const local = await gatherLocal(ctx);
   const waiting = computeWaiting(gh);

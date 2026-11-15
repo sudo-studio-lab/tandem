@@ -1,5 +1,5 @@
 /**
- * Agent conformance (spec 003 FR-010, plan "相容性測試"): the same scenarios against Claude and Codex.
+ * Agent conformance: the same scenarios against Claude and Codex.
  * Run with `npm run test:agents` (uses real usage). An agent that isn't installed or signed in is
  * skipped and reported as such, never counted as passing.
  * Env: TANDEM_CONF_AGENTS=claude,codex  TANDEM_CONF_CLAUDE_MODEL=haiku  TANDEM_CONF_CODEX_MODEL=

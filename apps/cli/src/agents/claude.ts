@@ -1,5 +1,5 @@
 /**
- * Claude adapter (research A1–A9, verified results at the end of research.md).
+ * Claude adapter.
  * Runs the user's own, unmodified `claude` in print mode with stream-json in and out. One process
  * per chat stays alive between messages; stopping kills it and the next message resumes with
  * `--resume <session_id>`. Approvals go through `tandem mcp`'s approve tool.
@@ -54,7 +54,7 @@ export const claudeAdapter: AgentAdapter = {
   },
 
   async login(method, cwd): Promise<AgentLoginStart> {
-    // Claude Code's own login flow, in a real terminal (research A8). Tandem never sees the result.
+    // Claude Code's own login flow, in a real terminal. Tandem never sees the result.
     openTerminal(cwd, method === "apiKey" ? ["claude", "auth", "login", "--console"] : ["claude", "auth", "login"]);
     return {
       terminal: true,
@@ -217,7 +217,7 @@ class ClaudeSession implements AgentSession {
   }
 }
 
-/** FR-012: plain words for the errors people actually hit; the raw text stays in `detail`. */
+/** Plain words for the errors people actually hit; the raw text stays in `detail`. */
 function plainError(raw: string): string {
   if (/usage limit|rate limit|limit reached|hit your limit/i.test(raw)) return `Claude 的額度用完了，請稍後再試。（${raw.slice(0, 120)}）`;
   if (/not logged in|login|authenticat|invalid api key/i.test(raw)) return "Claude 還沒登入，或登入已經過期。請到「AI 設定」重新登入。";

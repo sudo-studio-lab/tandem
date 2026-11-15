@@ -199,7 +199,7 @@ export function renderBrief(brief: Brief, now: Date = new Date()): string {
 }
 
 /**
- * Text injected into the agent's context at session start (research R8, R10).
+ * Text injected into the agent's context at session start.
  * Kept well under Codex's ~2,500-token SessionStart limit.
  */
 export function renderAgentContext(brief: Brief, now: Date = new Date()): string {

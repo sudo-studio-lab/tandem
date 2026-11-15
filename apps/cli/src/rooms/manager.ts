@@ -1,5 +1,5 @@
 /**
- * Rooms (spec 004): several teammates talk with one agent that runs on the host's computer.
+ * Rooms: several teammates talk with one agent that runs on the host's computer.
  * The room is a GitHub Discussion: everyone's messages are comments (so each line has an author
  * and a URL), the AI's replies are comments starting with 🤖, and the meeting notes are the body.
  * The host's app polls the discussion, feeds new messages to a local chat (ChatManager), and

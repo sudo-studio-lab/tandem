@@ -1,5 +1,5 @@
 /**
- * `tandem` command for agent hooks (research S4). Writes %LOCALAPPDATA%\Tandem\bin\tandem.cmd
+ * `tandem` command for agent hooks. Writes %LOCALAPPDATA%\Tandem\bin\tandem.cmd
  * and an extensionless `tandem` sh script that run the app's exe in node mode on the CLI bundle,
  * then adds that folder to the user's PATH. No electron import: usable from a plain node script.
  */

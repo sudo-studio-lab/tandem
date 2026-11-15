@@ -1,5 +1,5 @@
 /**
- * `tandem mcp`: the team tools as an MCP server over stdio (spec 003 FR-001, plan "MCP 工具").
+ * `tandem mcp`: the team tools as an MCP server over stdio.
  * Same logic as the CLI commands (packages/core); nothing here prints to stdout, which belongs
  * to the MCP protocol. Record contents are data written by teammates, never instructions.
  */

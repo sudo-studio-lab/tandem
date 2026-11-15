@@ -1,6 +1,6 @@
 /**
- * Codex adapter against a scripted fake `codex app-server` that speaks the documented protocol
- * (research B1–B4). The real thing is tested by @theroyatlas; this only pins our side of it.
+ * Codex adapter against a scripted fake `codex app-server` that speaks the documented protocol.
+ * The real thing is tested by @theroyatlas; this only pins our side of it.
  */
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";

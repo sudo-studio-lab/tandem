@@ -1,6 +1,6 @@
 /**
  * `tandem hook <event> --agent claude|codex` — called by agent hooks, never by people.
- * Must always print valid JSON and never fail the agent (contracts/agent-integration.md §3).
+ * Must always print valid JSON and never fail the agent.
  */
 import { createHash } from "node:crypto";
 import { PRODUCT } from "@tandem/contracts";
@@ -52,7 +52,7 @@ async function workChangedSince(repoRoot: string, head: string | null, tree: str
   return log.stdout.trim().length > 0;
 }
 
-/** Records live on the remote default branch now (research S1), so read my status through the store. */
+/** Records live on the remote default branch now, so read my status through the store. */
 async function statusTouchedSince(ctx: Awaited<ReturnType<typeof openContext>>, sinceIso: string): Promise<boolean> {
   const { statuses } = await loadStatuses(ctx.store);
   const mine = statuses.find((s) => s.login.toLowerCase() === ctx.me.toLowerCase());

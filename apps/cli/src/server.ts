@@ -1,7 +1,7 @@
 /**
- * Local app server (002 plan §伺服器 API): one process serves every project on this computer.
- * Used by `tandem` (browser) and by the desktop app (`tandem serve`, research S9).
- * Binds 127.0.0.1 only; a one-time token becomes a cookie (001 R13); the desktop main process
+ * Local app server: one process serves every project on this computer.
+ * Used by `tandem` (browser) and by the desktop app (`tandem serve`).
+ * Binds 127.0.0.1 only; a one-time token becomes a cookie; the desktop main process
  * may also send it as a Bearer header. Updates go out over Server-Sent Events.
  */
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
@@ -322,7 +322,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
   const app = new Hono();
   let port = opts.port ?? DEFAULT_PORT;
 
-  // --- chats with the user's own agent (spec 003) -------------------------------
+  // --- chats with the user's own agent -------------------------------
   // A second secret, only for `tandem mcp`'s approve tool; never the session token.
   const approveToken = randomBytes(24).toString("base64url");
   const chats = new ChatManager({
@@ -353,7 +353,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
     await next();
   });
 
-  // Approval bridge for Claude chats (research A4). Registered before the session check: the caller
+  // Approval bridge for Claude chats. Registered before the session check: the caller
   // is `tandem mcp` inside the agent, which holds only the approve token.
   app.post("/internal/approve", async (c) => {
     const bearer = c.req.header("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
@@ -410,7 +410,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
 
   app.get("/api/session", handle(async (c) => c.json(await session())));
 
-  // Login (research S5)
+  // Login
   const logins = new Map<string, { deviceCode: string; interval: number; nextPollAt: number; expiresAt: number; state: DeviceLoginState }>();
   app.post(
     "/api/login/device",
@@ -670,7 +670,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
       return c.json({ ok: true });
     }),
   );
-  // Rooms (spec 004)
+  // Rooms
   const roomNo = (c: HonoContext) => {
     const n = Number(c.req.param("n"));
     if (!Number.isInteger(n) || n <= 0) throw new TandemError("usage", "房間編號不對");
@@ -814,7 +814,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
 }
 
 // ---------------------------------------------------------------------------
-// Agents and folders (research S10)
+// Agents and folders
 // ---------------------------------------------------------------------------
 const INSTALL_URLS: Record<AgentKind, string> = {
   claude: "https://code.claude.com/docs/en/setup",

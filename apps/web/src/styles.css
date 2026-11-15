@@ -1193,7 +1193,7 @@ dialog.modal::backdrop {
 }
 
 /* ===========================================================================
-   Chat with your own agent (spec 003)
+   Chat with your own agent
    =========================================================================== */
 .chat-page {
   display: grid;

@@ -1,6 +1,6 @@
 /**
- * Chatting with the user's own agent inside Tandem (spec 003). Shared by the local server and the UI.
- * Chats live only on this computer (FR-008); nothing here is ever written to the repo.
+ * Chatting with the user's own agent inside Tandem. Shared by the local server and the UI.
+ * Chats live only on this computer; nothing here is ever written to the repo.
  */
 import type { AgentKind } from "./app.ts";
 
@@ -11,12 +11,12 @@ export interface ModelChoice {
   isDefault?: boolean;
 }
 
-/** How the user signed in to an agent. Tandem never sees the credentials themselves (FR-005). */
+/** How the user signed in to an agent. Tandem never sees the credentials themselves. */
 export type AgentAuth = "subscription" | "apiKey" | "none" | "unknown";
 
 export interface AgentStatus {
   agent: AgentKind;
-  /** Shown in menus ("Claude", "Codex"); never used as the name of a Tandem feature (FR-011). */
+  /** Shown in menus ("Claude", "Codex"); never used as the name of a Tandem feature. */
   label: string;
   installed: boolean;
   version?: string;
@@ -73,7 +73,7 @@ export interface ChatSummary {
   agentSessionId?: string;
   running: boolean;
   costUsd?: number;
-  /** Set when this chat is the host side of a room (spec 004): the agent answers the whole room. */
+  /** Set when this chat is the host side of a room: the agent answers the whole room. */
   room?: { number: number; url: string };
 }
 
@@ -98,7 +98,7 @@ export interface AgentLoginStart {
 }
 
 /**
- * A room (spec 004): several teammates talk with one agent that runs on the host's computer.
+ * A room: several teammates talk with one agent that runs on the host's computer.
  * Messages travel through a GitHub Discussion, so every line has an author and a URL.
  */
 export interface RoomRef {

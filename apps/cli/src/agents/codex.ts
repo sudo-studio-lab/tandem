@@ -1,5 +1,5 @@
 /**
- * Codex adapter (research B1–B8): `codex app-server`, JSON-RPC over stdio, one JSON object per line
+ * Codex adapter: `codex app-server`, JSON-RPC over stdio, one JSON object per line
  * with the "jsonrpc" field left out. Written from the docs; not yet run against a real Codex here
  * (plan: tested by @theroyatlas). Everything protocol-specific is in this file.
  */

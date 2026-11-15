@@ -1,5 +1,5 @@
 /**
- * Rooms (spec 004): the team talks with one AI that runs on the host's computer. Messages travel
+ * Rooms: the team talks with one AI that runs on the host's computer. Messages travel
  * through a GitHub Discussion; the host additionally sees the AI's live work (tools, approvals).
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";

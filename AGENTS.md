@@ -16,7 +16,7 @@
 這個 repo 是 Tandem 的開發 repo，也用 Tandem 來開發 Tandem 本身。上面的區塊由 `tandem init` 管理，不要手動改；這裡寫的是這個 repo 特有的規則。
 所有 agent（Claude Code、Codex 或其他工具）都讀這一份。`CLAUDE.md` 只引用這份。
 
-規則刻意寫得很少。覺得哪條麻煩、沒人照做，就記一筆到 `notes/friction/`，而不是硬撐。
+規則刻意寫得很少。現在是 prototype，背景和現況在 `notes/` 的三份文件（`why-and-ideas.md`、`research.md`、`design.md`）。
 
 ## 安裝 `tandem`
 
