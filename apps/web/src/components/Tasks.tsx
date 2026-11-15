@@ -1,32 +1,30 @@
 import type { TaskSummary } from "@tandem/contracts";
-import { Ext, Section } from "./Ext.tsx";
+import { Ext } from "./Ext.tsx";
+import { Panel } from "./ui.tsx";
 
 export function Tasks({ items }: { items: TaskSummary[] }) {
   const open = items.filter((t) => t.state === "open");
   return (
-    <Section title="任務" count={open.length}>
+    <Panel title="任務" icon="☑" count={open.length}>
       {open.length === 0 ? (
-        <p className="muted">目前沒有開著的任務</p>
+        <p className="muted empty">目前沒有開著的任務</p>
       ) : (
-        <ul className="list card">
+        <ul className="rows card">
           {open.map((t) => (
             <li key={t.number}>
-              <Ext href={t.url}>
-                #{t.number} {t.title}
-              </Ext>
-              {t.blockedBy.length > 0 && (
-                <>
-                  {" "}
-                  <span className="badge badge-bad">被卡住：{t.blockedBy.map((n) => `#${n}`).join("、")}</span>
-                </>
-              )}
-              <div className="meta muted">
-                {t.assignees.length > 0 ? `負責：${t.assignees.map((l) => `@${l}`).join("、")}` : "還沒有人負責"}
-              </div>
+              <span className="grow">
+                <Ext href={t.url} className="row-title">
+                  <span className="muted">#{t.number}</span> {t.title}
+                </Ext>
+                <span className="row-meta">
+                  {t.blockedBy.length > 0 && <span className="tag tag-bad">被 {t.blockedBy.map((n) => `#${n}`).join("、")} 卡住</span>}{" "}
+                  {t.assignees.length > 0 ? t.assignees.map((l) => `@${l}`).join("、") : "還沒有人負責"}
+                </span>
+              </span>
             </li>
           ))}
         </ul>
       )}
-    </Section>
+    </Panel>
   );
 }

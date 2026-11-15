@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api.ts";
 import { useApp } from "./useApp.ts";
 import { useNow } from "./time.ts";
-import { Header } from "./components/Header.tsx";
+import { Header, type View } from "./components/Header.tsx";
 import { Mine } from "./components/Mine.tsx";
 import { People } from "./components/People.tsx";
 import { Waiting } from "./components/Waiting.tsx";
@@ -14,6 +14,8 @@ import { SignIn } from "./components/SignIn.tsx";
 import { Picker, type StartOp } from "./components/Picker.tsx";
 import { ProgressView } from "./components/Progress.tsx";
 import { InviteDialog, SettingsDialog } from "./components/Dialogs.tsx";
+import { AgentSettingsDialog, ChatView } from "./components/Chat.tsx";
+import { RoomView } from "./components/Room.tsx";
 import { Spinner, errMsg } from "./components/ui.tsx";
 
 interface Op {
@@ -31,7 +33,8 @@ export function App() {
   const now = useNow();
   const [showPicker, setShowPicker] = useState(false);
   const [op, setOp] = useState<Op | null>(null);
-  const [dialog, setDialog] = useState<"invite" | "settings" | null>(null);
+  const [dialog, setDialog] = useState<"invite" | "settings" | "agents" | null>(null);
+  const [view, setView] = useState<View>("board");
   const [toast, setToast] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const handledDone = useRef<string | null>(null);
@@ -167,6 +170,8 @@ export function App() {
       onInvite={() => setDialog("invite")}
       onSettings={() => setDialog("settings")}
       onError={notify}
+      view={view}
+      onView={setView}
     />
   );
 
@@ -198,6 +203,10 @@ export function App() {
             </button>
           </div>
         </main>
+      ) : view === "room" ? (
+        <RoomView projectId={project.id} me={session.login} now={now} onOpenSettings={() => setDialog("agents")} />
+      ) : view === "chat" ? (
+        <ChatView projectId={project.id} now={now} onOpenSettings={() => setDialog("agents")} />
       ) : !board ? (
         <main className="page">
           {app.boardError ? (
@@ -212,22 +221,29 @@ export function App() {
           )}
         </main>
       ) : (
-        <main className="page">
+        <main className="page board">
           {app.boardError && (
             <p className="banner banner-error" role="alert">
               {app.boardError}
             </p>
           )}
           <Mine items={board.waiting} me={board.me} now={now} />
-          <People board={board} now={now} />
-          <Waiting items={board.waiting} now={now} />
-          <Discussions items={board.discussions} now={now} />
-          <Tasks items={board.tasks} />
-          <Decisions board={board} />
+          <div className="board-grid">
+            <div className="board-main">
+              <People board={board} now={now} />
+              <Waiting items={board.waiting} now={now} />
+            </div>
+            <aside className="board-side" aria-label="決定、討論和任務">
+              <Decisions board={board} />
+              <Discussions items={board.discussions} now={now} />
+              <Tasks items={board.tasks} />
+            </aside>
+          </div>
           <Problems items={board.problems} />
         </main>
       )}
       {dialog === "invite" && project && <InviteDialog projectId={project.id} onClose={() => setDialog(null)} />}
+      {dialog === "agents" && <AgentSettingsDialog onClose={() => setDialog(null)} />}
       {dialog === "settings" && <SettingsDialog session={session} onClose={() => setDialog(null)} onSignOut={signOut} />}
     </>
   );

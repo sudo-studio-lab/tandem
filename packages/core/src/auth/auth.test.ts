@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { TandemError } from "@tandem/contracts";
 import { getGitHubToken } from "../github/token.ts";
 import { pollDeviceLogin, startDeviceLogin } from "./device.ts";
-import { getGitHubClientId } from "./config.ts";
+import { GITHUB_OAUTH_CLIENT_ID, getGitHubClientId } from "./config.ts";
 
 function fakeFetch(json: unknown, status = 200) {
   const calls: { url: string; body: any; headers: any }[] = [];
@@ -14,16 +13,9 @@ function fakeFetch(json: unknown, status = 200) {
 }
 
 describe("device flow", () => {
-  it("refuses with a plain message when no client id is configured", async () => {
-    const saved = process.env.TANDEM_GITHUB_CLIENT_ID;
-    delete process.env.TANDEM_GITHUB_CLIENT_ID;
-    try {
-      await expect(startDeviceLogin()).rejects.toMatchObject({ code: "auth" });
-      await expect(startDeviceLogin()).rejects.toBeInstanceOf(TandemError);
-      expect(await pollDeviceLogin("dc")).toMatchObject({ state: "error" });
-    } finally {
-      if (saved !== undefined) process.env.TANDEM_GITHUB_CLIENT_ID = saved;
-    }
+  it("uses the built-in public client id when env is unset", () => {
+    expect(getGitHubClientId({})).toBe(GITHUB_OAUTH_CLIENT_ID);
+    expect(getGitHubClientId({ TANDEM_GITHUB_CLIENT_ID: "  " })).toBe(GITHUB_OAUTH_CLIENT_ID);
   });
 
   it("env overrides the client id", () => {

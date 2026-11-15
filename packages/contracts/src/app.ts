@@ -1,12 +1,11 @@
 /**
  * 002-desktop contracts: the app-level (multi-project) API shared by the local server,
  * the web UI and the Electron shell. Types only — no runtime code, so the web bundle stays small.
- * See specs/002-desktop/plan.md §API.
  */
 import type { BoardData, SyncState } from "./index.ts";
 
 // ---------------------------------------------------------------------------
-// Activity (spec FR-008, research S2): derived from GitHub, never stored in the repo.
+// Activity: derived from GitHub, never stored in the repo.
 // ---------------------------------------------------------------------------
 export type ActivityKind = "commit" | "pr_opened" | "pr_merged" | "comment";
 
@@ -30,7 +29,7 @@ export interface ProjectBoard extends BoardData {
   projectId: string;
   /** login → newest-first activity of the last 7 days (at most 10 per member). */
   activity: Record<string, ActivityItem[]>;
-  /** Default branch the records are written to (research S1). */
+  /** Default branch the records are written to. */
   defaultBranch: string;
   /** Writes waiting in the local outbox (not yet pushed). */
   pendingWrites: number;
@@ -68,7 +67,7 @@ export interface AppSession {
 }
 
 // ---------------------------------------------------------------------------
-// GitHub login (research S5): OAuth device flow driven by the server.
+// GitHub login: OAuth device flow driven by the server.
 // ---------------------------------------------------------------------------
 export interface DeviceLoginStart {
   /** Opaque id to poll with. */
@@ -129,7 +128,7 @@ export interface ProjectProgress {
 }
 
 // ---------------------------------------------------------------------------
-// Notifications (spec FR-009)
+// Notifications
 // ---------------------------------------------------------------------------
 export type NotificationKind = "waiting" | "review" | "task";
 
@@ -151,7 +150,7 @@ export interface AppSettings {
 }
 
 // ---------------------------------------------------------------------------
-// Opening the user's agent (research S10)
+// Opening the user's agent
 // ---------------------------------------------------------------------------
 export type AgentKind = "claude" | "codex";
 
@@ -170,9 +169,11 @@ export type AppEvent =
   | { type: "sync"; data: SyncState & { projectId: string } }
   | { type: "progress"; data: ProjectProgress }
   | { type: "notify"; data: AppNotification }
+  | { type: "chat"; data: import("./agent.ts").ChatUpdate }
+  | { type: "agents"; data: import("./agent.ts").AgentStatus[] }
   | { type: "ping"; data: "" };
 
-/** First line the server prints on stdout when started with `tandem serve` (research S9). */
+/** First line the server prints on stdout when started with `tandem serve`. */
 export interface ServeReadyLine {
   ready: true;
   port: number;

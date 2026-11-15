@@ -1,7 +1,8 @@
 /**
  * `tandem hook <event> --agent claude|codex` — called by agent hooks, never by people.
- * Must always print valid JSON and never fail the agent (contracts/agent-integration.md §3).
+ * Must always print valid JSON and never fail the agent.
  */
+import { createHash } from "node:crypto";
 import { PRODUCT } from "@tandem/contracts";
 import { formatHookOutput, headCommit, loadStatuses, readHookInput, renderAgentContext, runGit, syncData } from "@tandem/core";
 import { openContext, withTimeout } from "./context.ts";
@@ -21,10 +22,28 @@ async function sessionContext(ctx: Awaited<ReturnType<typeof openContext>>): Pro
   return renderAgentContext(brief);
 }
 
+/**
+ * Fingerprint of uncommitted work outside the data folder: tracked changes (content) plus the list of
+ * untracked files. Read-only. Lets the stop hook tell "changed during this session" from "was
+ * already dirty when the session started".
+ */
+async function workingTreePrint(repoRoot: string): Promise<string> {
+  const spec = ["--", ".", `:(exclude)${PRODUCT.dataDir}`];
+  const [diff, status] = await Promise.all([
+    runGit(["diff", "HEAD", "--no-ext-diff", ...spec], { cwd: repoRoot, allowFail: true }),
+    runGit(["status", "--porcelain", "--untracked-files=all", ...spec], { cwd: repoRoot, allowFail: true }),
+  ]);
+  return createHash("sha256").update(diff.stdout).update("\0").update(status.stdout).digest("hex").slice(0, 16);
+}
+
 /** Did the user's work change anything since the session started (outside the data folder)? */
-async function workChangedSince(repoRoot: string, head: string | null): Promise<boolean> {
-  const dirty = await runGit(["status", "--porcelain", "--", ".", `:(exclude)${PRODUCT.dataDir}`], { cwd: repoRoot, allowFail: true });
-  if (dirty.stdout.trim()) return true;
+async function workChangedSince(repoRoot: string, head: string | null, tree: string | undefined): Promise<boolean> {
+  const print = await workingTreePrint(repoRoot);
+  // Older sessions (no fingerprint): any uncommitted change counts, as before.
+  if (tree === undefined) {
+    const dirty = await runGit(["status", "--porcelain", "--", ".", `:(exclude)${PRODUCT.dataDir}`], { cwd: repoRoot, allowFail: true });
+    if (dirty.stdout.trim()) return true;
+  } else if (print !== tree) return true;
   if (!head) return false;
   const log = await runGit(["log", "--format=%H", `${head}..HEAD`, "--", ".", `:(exclude)${PRODUCT.dataDir}`], {
     cwd: repoRoot,
@@ -33,7 +52,7 @@ async function workChangedSince(repoRoot: string, head: string | null): Promise<
   return log.stdout.trim().length > 0;
 }
 
-/** Records live on the remote default branch now (research S1), so read my status through the store. */
+/** Records live on the remote default branch now, so read my status through the store. */
 async function statusTouchedSince(ctx: Awaited<ReturnType<typeof openContext>>, sinceIso: string): Promise<boolean> {
   const { statuses } = await loadStatuses(ctx.store);
   const mine = statuses.find((s) => s.login.toLowerCase() === ctx.me.toLowerCase());
@@ -54,7 +73,11 @@ async function handle(event: HookEvent, agent: Agent, stdin: string): Promise<st
       case "session-start": {
         const context = await sessionContext(ctx);
         const existing = ctx.state.sessions[sessionId];
-        ctx.state.sessions[sessionId] = existing ?? { startedAt: new Date().toISOString(), head: await headCommit(ctx.repoRoot) };
+        ctx.state.sessions[sessionId] = existing ?? {
+          startedAt: new Date().toISOString(),
+          head: await headCommit(ctx.repoRoot),
+          tree: await workingTreePrint(ctx.repoRoot),
+        };
         return formatHookOutput(agent, "session-start", { context });
       }
       case "post-compact": {
@@ -73,12 +96,12 @@ async function handle(event: HookEvent, agent: Agent, stdin: string): Promise<st
       case "stop": {
         const s = ctx.state.sessions[sessionId];
         if (input.stopHookActive || !s || s.nudged) return formatHookOutput(agent, "stop", {});
-        const worked = await workChangedSince(ctx.repoRoot, s.head);
+        const worked = await workChangedSince(ctx.repoRoot, s.head, s.tree);
         if (!worked) return formatHookOutput(agent, "stop", {});
         if (await statusTouchedSince(ctx, s.startedAt)) return formatHookOutput(agent, "stop", {});
         s.nudged = true;
         return formatHookOutput(agent, "stop", {
-          blockReason: `這次有做事，但 @${ctx.me} 的 ${PRODUCT.displayName} 狀態還沒更新。請用 \`${PRODUCT.command} status --doing … --next … [--deliverable 標題=網址]\` 更新後再結束（只提醒這一次）。`,
+          blockReason: `這次有做事，但 @${ctx.me} 的 ${PRODUCT.displayName} 狀態還沒更新。請用 \`${PRODUCT.command}_status\` 工具（沒有的話用 \`${PRODUCT.command} status --doing … --next … [--deliverable 標題=網址]\`）更新後再結束（只提醒這一次）。`,
         });
       }
     }

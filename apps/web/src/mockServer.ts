@@ -6,8 +6,11 @@
  * Repo names containing "fail" make the progress run fail, to show the error state.
  */
 import type {
-  AgentAvailability,
+  AgentStatus,
+  Chat,
+  ChatItem,
   AppEvent,
+  Room,
   AppSession,
   AppSettings,
   DeviceLoginState,
@@ -63,10 +66,80 @@ const owners: OwnerChoice[] = [
   { login: "sudo-studio-lab", kind: "org" },
 ];
 
-const agents: AgentAvailability[] = [
-  { agent: "claude", installed: true, installUrl: "https://claude.com/claude-code" },
-  { agent: "codex", installed: false, installUrl: "https://developers.openai.com/codex" },
+const agents: AgentStatus[] = [
+  {
+    agent: "claude",
+    label: "Claude",
+    installed: true,
+    version: "2.1.0",
+    auth: "subscription",
+    plan: "pro",
+    models: [
+      { id: "", label: "預設", isDefault: true },
+      { id: "sonnet", label: "Sonnet" },
+    ],
+    installUrl: "https://code.claude.com/docs/en/setup",
+  },
+  { agent: "codex", label: "Codex", installed: false, auth: "none", models: [], installUrl: "https://developers.openai.com/codex" },
 ];
+
+/** Fake chats: the agent answers with a canned reply and one approval card. */
+const chats: Chat[] = [];
+function mockChatReply(chat: Chat, text: string) {
+  const at = () => new Date().toISOString();
+  const push = (item: ChatItem) => {
+    chat.items.push(item);
+    emit({ type: "chat", data: { chatId: chat.id, type: "item", item } });
+  };
+  const summary = () => emit({ type: "chat", data: { chatId: chat.id, type: "summary", chat: { ...chat, items: undefined } as never } });
+  chat.running = true;
+  summary();
+  setTimeout(() => {
+    push({ kind: "assistant", id: `a${chat.items.length}`, at: at(), text: `（範例回覆）收到：「${text}」。我先看一下專案。` });
+    push({ kind: "tool", id: `t${chat.items.length}`, at: at(), name: "Read", summary: "README.md", status: "done", output: "# 範例" });
+    push({ kind: "approval", id: `p${chat.items.length}`, at: at(), name: "Bash", summary: "npm test", state: "pending" });
+  }, 600);
+}
+
+/** Fake rooms: one hosted by a teammate (guest view), plus any you start (host view). */
+const rooms: Room[] = [
+  {
+    number: 21,
+    url: "https://github.com/sudo-studio-lab/tandem/discussions/21",
+    title: "登入流程要怎麼做",
+    host: "theroyatlas",
+    closed: false,
+    updatedAt: ago(4 * 60_000),
+    notes: ["## 重點", "- 第一版先做 GitHub 登入", "- Google 登入等有使用者再說", "", "## 待辦", "- @theroyatlas 畫登入流程圖"].join("\n"),
+    messages: [
+      { id: "r1", by: "theroyatlas", text: "登入要不要一開始就支援 Google？", url: "#r1", at: ago(20 * 60_000), ai: false },
+      { id: "r2", by: ME, text: "我覺得先只做 GitHub 就好，我們的使用者都有 GitHub", url: "#r2", at: ago(18 * 60_000), ai: false },
+      { id: "r3", by: "theroyatlas", text: "（範例回覆）同意先只做 GitHub 登入。D-20261115-za46 已經記了「假設使用者都會用 GitHub」，跟這個方向一致。要我把「第一版只做 GitHub 登入」記成決定嗎？", url: "#r3", at: ago(17 * 60_000), ai: true },
+    ],
+  },
+];
+function mockRoomSay(room: Room, text: string) {
+  const at = () => new Date().toISOString();
+  room.messages.push({ id: `r${room.messages.length + 1}`, by: ME, text, url: "#", at: at(), ai: false });
+  const chat = room.chatId ? chats.find((c) => c.id === room.chatId) : undefined;
+  if (chat) {
+    const item: ChatItem = { kind: "user", id: `u${chat.items.length}`, at: at(), text, by: ME, url: "#" };
+    chat.items.push(item);
+    emit({ type: "chat", data: { chatId: chat.id, type: "item", item } });
+    chat.running = true;
+  }
+  setTimeout(() => {
+    const reply = `（範例回覆）收到 @${ME} 的「${text}」。大家還有其他想法嗎？`;
+    room.messages.push({ id: `r${room.messages.length + 1}`, by: room.host, text: reply, url: "#", at: at(), ai: true });
+    if (chat) {
+      const item: ChatItem = { kind: "assistant", id: `a${chat.items.length}`, at: at(), text: reply };
+      chat.items.push(item);
+      emit({ type: "chat", data: { chatId: chat.id, type: "item", item } });
+      chat.running = false;
+      emit({ type: "chat", data: { chatId: chat.id, type: "summary", chat: { ...chat, items: undefined } as never } });
+    }
+  }, 1500);
+}
 
 // --- events -----------------------------------------------------------------
 const listeners = new Set<(e: AppEvent) => void>();
@@ -215,6 +288,37 @@ export async function handle(method: string, path: string, body: unknown): Promi
   }
 
   if (method === "GET" && p === "/api/agents") return agents;
+  if ((m = p.match(/^\/api\/chats\/([^/]+)(\/.*)?$/))) {
+    const chat = chats.find((c) => c.id === m![1]);
+    if (!chat) throw new ApiError("找不到這段對話", "usage");
+    const tail = m[2] ?? "";
+    if (method === "GET" && !tail) return chat;
+    if (method === "DELETE" && !tail) {
+      chats.splice(chats.indexOf(chat), 1);
+      emit({ type: "chat", data: { chatId: chat.id, type: "deleted" } });
+      return { ok: true };
+    }
+    if (method === "POST" && tail === "/messages") {
+      const text = String((body as { text?: string })?.text ?? "");
+      const item: ChatItem = { kind: "user", id: `u${chat.items.length}`, at: new Date().toISOString(), text };
+      chat.items.push(item);
+      if (chat.title === "新對話") chat.title = text.slice(0, 40);
+      emit({ type: "chat", data: { chatId: chat.id, type: "item", item } });
+      mockChatReply(chat, text);
+      return { ok: true };
+    }
+    if (method === "POST" && (tail === "/interrupt" || tail.startsWith("/approvals/"))) {
+      for (const it of chat.items) {
+        if (it.kind === "approval" && it.state === "pending") {
+          it.state = tail === "/interrupt" || (body as { decision?: string })?.decision === "deny" ? "denied" : "allowed";
+          emit({ type: "chat", data: { chatId: chat.id, type: "item", item: it } });
+        }
+      }
+      chat.running = false;
+      emit({ type: "chat", data: { chatId: chat.id, type: "summary", chat: { ...chat, items: undefined } as never } });
+      return { ok: true };
+    }
+  }
   if (method === "GET" && p === "/api/settings") return settings;
   if (method === "PUT" && p === "/api/settings") {
     Object.assign(settings, body);
@@ -258,7 +362,41 @@ export async function handle(method: string, path: string, body: unknown): Promi
       };
     }
     if (method === "POST" && tail === "/open-agent") return { ok: true };
+    if (method === "GET" && tail === "/chats") return chats.filter((c) => c.projectId === id && !c.room).map(({ items: _i, ...c }) => c);
+    if (method === "POST" && tail === "/chats") {
+      const t = new Date().toISOString();
+      const c: Chat = { id: `chat${chats.length + 1}`, projectId: id, agent: "claude", model: String((b as { model?: string }).model ?? ""), title: "新對話", createdAt: t, updatedAt: t, running: false, items: [] };
+      chats.push(c);
+      return { ...c, items: undefined };
+    }
     if (method === "POST" && tail === "/open-folder") return { ok: true };
+    if (method === "GET" && tail === "/rooms") return rooms.map(({ messages: _m, notes: _n, chatId: _c, running: _r, ...r }) => r);
+    if (method === "POST" && tail === "/rooms") {
+      const t = new Date().toISOString();
+      const number = 30 + rooms.length;
+      const title = String((b as { title?: string }).title || "房間");
+      const c: Chat = { id: `chat${chats.length + 1}`, projectId: id, agent: "claude", model: "", title, createdAt: t, updatedAt: t, running: false, items: [], room: { number, url: "#" } };
+      chats.push(c);
+      const r: Room = { number, url: `https://github.com/${proj.owner}/${proj.name}/discussions/${number}`, title, host: ME, closed: false, updatedAt: t, notes: "", messages: [], chatId: c.id };
+      rooms.unshift(r);
+      return r;
+    }
+    if ((m = tail.match(/^\/rooms\/(\d+)(\/.*)?$/))) {
+      const room = rooms.find((r) => r.number === Number(m![1]));
+      if (!room) throw new ApiError("找不到這個房間", "usage");
+      const sub = m[2] ?? "";
+      if (method === "GET" && !sub) return { ...room, running: room.chatId ? chats.find((c) => c.id === room.chatId)?.running : undefined };
+      if (method === "POST" && sub === "/messages") {
+        mockRoomSay(room, String((body as { text?: string })?.text ?? ""));
+        return { ok: true };
+      }
+      if (method === "POST" && sub === "/notes") {
+        if (room.host !== ME) throw new ApiError("只有主持人的電腦能整理筆記和結束房間", "usage");
+        room.notes = ["## 重點", ...room.messages.filter((x) => !x.ai).map((x) => `- @${x.by}：${x.text}`)].join("\n");
+        if ((body as { end?: boolean })?.end) room.closed = true;
+        return { ok: true };
+      }
+    }
   }
 
   throw new ApiError(`mock：沒有實作 ${method} ${p}`, "internal");

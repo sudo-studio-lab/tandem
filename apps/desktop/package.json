@@ -1,6 +1,6 @@
 {
   "name": "@tandem/desktop",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Tandem desktop app (Windows)",
   "author": "sudo-studio-lab",
@@ -10,8 +10,8 @@
     "build": "node build.mjs",
     "start": "electron .",
     "icon": "node scripts/make-icon.mjs",
-    "dist": "npm run build && electron-builder --win --publish never",
-    "dist:dir": "npm run build && electron-builder --win --dir --publish never"
+    "dist": "npm --prefix ../.. run build && npm run build && electron-builder --win --publish never",
+    "dist:dir": "npm --prefix ../.. run build && npm run build && electron-builder --win --dir --publish never"
   },
   "dependencies": {
     "dugite": "^3.3.2",

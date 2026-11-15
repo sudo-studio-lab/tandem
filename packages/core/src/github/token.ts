@@ -19,7 +19,7 @@ function ghAuthToken(): Promise<string | undefined> {
 }
 
 /**
- * Order (research S5): env (TANDEM_TOKEN, then GH_TOKEN / GITHUB_TOKEN) → OS keyring → `gh auth token`.
+ * Order: env (TANDEM_TOKEN, then GH_TOKEN / GITHUB_TOKEN) → OS keyring → `gh auth token`.
  */
 export async function getGitHubToken(
   env: NodeJS.ProcessEnv = process.env,

@@ -1,10 +1,11 @@
 /**
- * Local app server (002 plan §伺服器 API): one process serves every project on this computer.
- * Used by `tandem` (browser) and by the desktop app (`tandem serve`, research S9).
- * Binds 127.0.0.1 only; a one-time token becomes a cookie (001 R13); the desktop main process
+ * Local app server: one process serves every project on this computer.
+ * Used by `tandem` (browser) and by the desktop app (`tandem serve`).
+ * Binds 127.0.0.1 only; a one-time token becomes a cookie; the desktop main process
  * may also send it as a Bearer header. Updates go out over Server-Sent Events.
  */
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import os from "node:os";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { spawn, spawnSync } from "node:child_process";
@@ -21,6 +22,7 @@ import {
   type ActivityItem,
   type AgentAvailability,
   type AgentKind,
+  type ApprovalDecision,
   type AppEvent,
   type AppSession,
   type AppSettings,
@@ -52,6 +54,10 @@ import { buildBoard, gatherGitHub, type GitHubData } from "./gather.ts";
 import { inviteLogin } from "./commands.ts";
 import { info } from "./io.ts";
 import { rememberProject, startProject, joinProject } from "./setup.ts";
+import { ADAPTERS, agentStatuses } from "./agents/index.ts";
+import type { McpLaunch } from "./agents/types.ts";
+import { ChatManager } from "./chats/manager.ts";
+import { RoomManager } from "./rooms/manager.ts";
 import pkg from "../package.json" with { type: "json" };
 
 const DEFAULT_PORT = 4318;
@@ -316,12 +322,65 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
   const app = new Hono();
   let port = opts.port ?? DEFAULT_PORT;
 
+  // --- chats with the user's own agent -------------------------------
+  // A second secret, only for `tandem mcp`'s approve tool; never the session token.
+  const approveToken = randomBytes(24).toString("base64url");
+  const chats = new ChatManager({
+    adapters: ADAPTERS,
+    emit: (u) => emit({ type: "chat", data: u }),
+    mcp: mcpLaunch,
+    approveBridge: () => ({ url: `http://127.0.0.1:${port}/internal/approve`, token: approveToken }),
+    onTurnDone: (chat, texts) => rooms.onTurnDone(chat, texts),
+  });
+  const rooms: RoomManager = new RoomManager({
+    chats,
+    project: async (id) => {
+      const rt = await openRuntime(id);
+      return { gh: rt.ctx.gh, me: rt.ctx.me, cwd: rt.ctx.repoRoot };
+    },
+    agentLabel: (kind) => (kind === "codex" ? "Codex" : "Claude"),
+  });
+  const projectPathOf = async (projectId: string) => {
+    const p = (await loadAppState()).projects.find((x) => x.id === projectId);
+    if (!p || !existsSync(path.join(p.path, ".git"))) throw new TandemError("usage", "找不到這段對話的專案資料夾");
+    return p.path;
+  };
+
   // DNS-rebinding guard: only our own host names.
   app.use("*", async (c, next) => {
     const host = (c.req.header("host") ?? "").toLowerCase();
     if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) return c.text("forbidden", 403);
     await next();
   });
+
+  // Approval bridge for Claude chats. Registered before the session check: the caller
+  // is `tandem mcp` inside the agent, which holds only the approve token.
+  app.post("/internal/approve", async (c) => {
+    const bearer = c.req.header("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+    const a = Buffer.from(bearer);
+    const b = Buffer.from(approveToken);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return c.json({ message: "forbidden" }, 403);
+    const req = (await c.req.json().catch(() => ({}))) as { chatId?: string; toolName?: string; input?: unknown; approvalId?: string };
+    try {
+      let id = req.approvalId;
+      let decision = id ? chats.pendingApproval(id) : undefined;
+      if (!decision) {
+        const r = await chats.requestApproval(String(req.chatId ?? ""), {
+          name: String(req.toolName ?? "工具"),
+          summary: summarizeTool(String(req.toolName ?? ""), req.input),
+          input: req.input,
+        });
+        id = r.id;
+        decision = r.decision;
+      }
+      const d = await Promise.race([decision, new Promise<null>((r) => setTimeout(() => r(null), 240_000))]);
+      if (d === null) return c.json({ pending: true, approvalId: id });
+      return c.json(d === "deny" ? { allow: false, message: "使用者拒絕了這個動作。" } : { allow: true });
+    } catch (e) {
+      return c.json({ allow: false, message: errMsg(e) });
+    }
+  });
+
   app.use("*", async (c, next) => {
     const t = c.req.query("t");
     if (t !== undefined) {
@@ -351,7 +410,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
 
   app.get("/api/session", handle(async (c) => c.json(await session())));
 
-  // Login (research S5)
+  // Login
   const logins = new Map<string, { deviceCode: string; interval: number; nextPollAt: number; expiresAt: number; state: DeviceLoginState }>();
   app.post(
     "/api/login/device",
@@ -542,7 +601,108 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
       return c.json(await inviteLogin(rt.ctx, b.login.replace(/^@/, "")));
     }),
   );
-  app.get("/api/agents", handle(async (c) => c.json(detectAgents())));
+  app.get("/api/agents", handle(async (c) => c.json(await agentStatuses(c.req.query("refresh") === "1"))));
+  app.post(
+    "/api/agents/:kind/login",
+    handle(async (c) => {
+      const kind = c.req.param("kind") as AgentKind;
+      const adapter = ADAPTERS[kind];
+      if (!adapter) throw new TandemError("usage", "不認得這個 agent");
+      const b = await body<{ method: "subscription" | "apiKey" }>(c);
+      const r = await adapter.login(b.method === "apiKey" ? "apiKey" : "subscription", os.homedir());
+      return c.json(r);
+    }),
+  );
+  app.post(
+    "/api/agents/:kind/logout",
+    handle(async (c) => {
+      const adapter = ADAPTERS[c.req.param("kind") as AgentKind];
+      if (!adapter) throw new TandemError("usage", "不認得這個 agent");
+      await adapter.logout();
+      const data = await agentStatuses(true);
+      emit({ type: "agents", data });
+      return c.json(data);
+    }),
+  );
+
+  // Chats
+  app.get("/api/projects/:id/chats", handle(async (c) => c.json(await chats.list(decodeURIComponent(c.req.param("id") ?? "")))));
+  app.post(
+    "/api/projects/:id/chats",
+    handle(async (c) => {
+      const id = decodeURIComponent(c.req.param("id") ?? "");
+      await projectPathOf(id);
+      const b = await body<{ agent: AgentKind; model: string }>(c);
+      if (!b.agent || !ADAPTERS[b.agent]) throw new TandemError("usage", "請選一個 agent");
+      return c.json(await chats.create(id, b.agent, typeof b.model === "string" ? b.model : ""));
+    }),
+  );
+  app.get("/api/chats/:chatId", handle(async (c) => c.json(await chats.get(c.req.param("chatId") ?? ""))));
+  app.post(
+    "/api/chats/:chatId/messages",
+    handle(async (c) => {
+      const chat = await chats.get(c.req.param("chatId") ?? "");
+      const b = await body<{ text: string }>(c);
+      await chats.send(chat.id, String(b.text ?? ""), await projectPathOf(chat.projectId));
+      return c.json({ ok: true });
+    }),
+  );
+  app.post(
+    "/api/chats/:chatId/interrupt",
+    handle(async (c) => {
+      await chats.interrupt(c.req.param("chatId") ?? "");
+      return c.json({ ok: true });
+    }),
+  );
+  app.post(
+    "/api/chats/:chatId/approvals/:approvalId",
+    handle(async (c) => {
+      const b = await body<{ decision: ApprovalDecision }>(c);
+      if (b.decision !== "allow" && b.decision !== "allowSession" && b.decision !== "deny") throw new TandemError("usage", "不認得這個選擇");
+      await chats.answer(c.req.param("chatId") ?? "", c.req.param("approvalId") ?? "", b.decision);
+      return c.json({ ok: true });
+    }),
+  );
+  app.delete(
+    "/api/chats/:chatId",
+    handle(async (c) => {
+      await chats.remove(c.req.param("chatId") ?? "");
+      return c.json({ ok: true });
+    }),
+  );
+  // Rooms
+  const roomNo = (c: HonoContext) => {
+    const n = Number(c.req.param("n"));
+    if (!Number.isInteger(n) || n <= 0) throw new TandemError("usage", "房間編號不對");
+    return n;
+  };
+  const pid = (c: HonoContext) => decodeURIComponent(c.req.param("id") ?? "");
+  app.get("/api/projects/:id/rooms", handle(async (c) => c.json(await rooms.list(pid(c)))));
+  app.post(
+    "/api/projects/:id/rooms",
+    handle(async (c) => {
+      const b = await body<{ title: string; agent: AgentKind; model: string }>(c);
+      if (!b.agent || !ADAPTERS[b.agent]) throw new TandemError("usage", "請選一個 agent");
+      return c.json(await rooms.create(pid(c), String(b.title ?? ""), b.agent, typeof b.model === "string" ? b.model : ""));
+    }),
+  );
+  app.get("/api/projects/:id/rooms/:n", handle(async (c) => c.json(await rooms.get(pid(c), roomNo(c)))));
+  app.post(
+    "/api/projects/:id/rooms/:n/messages",
+    handle(async (c) => {
+      const b = await body<{ text: string }>(c);
+      await rooms.post(pid(c), roomNo(c), String(b.text ?? ""));
+      return c.json({ ok: true });
+    }),
+  );
+  app.post(
+    "/api/projects/:id/rooms/:n/notes",
+    handle(async (c) => {
+      const b = await body<{ end?: boolean }>(c);
+      await rooms.notes(pid(c), roomNo(c), !!b.end);
+      return c.json({ ok: true });
+    }),
+  );
   app.post(
     "/api/projects/:id/open-agent",
     handle(async (c) => {
@@ -644,6 +804,8 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
 
   const close = async () => {
     clearInterval(poll);
+    rooms.closeAll();
+    await chats.closeAll();
     await new Promise<void>((resolve) => server!.close(() => resolve()));
   };
   process.once("SIGINT", () => void close().then(() => process.exit(0)));
@@ -652,12 +814,29 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
 }
 
 // ---------------------------------------------------------------------------
-// Agents and folders (research S10)
+// Agents and folders
 // ---------------------------------------------------------------------------
 const INSTALL_URLS: Record<AgentKind, string> = {
   claude: "https://code.claude.com/docs/en/setup",
   codex: "https://developers.openai.com/codex",
 };
+
+/** How the agent starts `tandem mcp`: this same program, so it works before PATH is updated (desktop). */
+function mcpLaunch(): McpLaunch {
+  return {
+    command: process.execPath,
+    args: [process.argv[1]!, "mcp"],
+    env: process.env.ELECTRON_RUN_AS_NODE ? { ELECTRON_RUN_AS_NODE: "1" } : {},
+  };
+}
+
+function summarizeTool(name: string, input: unknown): string {
+  const i = (input ?? {}) as Record<string, unknown>;
+  for (const k of ["command", "file_path", "path", "notebook_path", "url", "pattern", "title"]) {
+    if (typeof i[k] === "string" && i[k]) return String(i[k]).replace(/\s+/g, " ").slice(0, 160);
+  }
+  return name.startsWith("mcp__") ? name.split("__").slice(1).join(" · ") : "";
+}
 
 function onPath(cmd: string): boolean {
   const r = spawnSync(process.platform === "win32" ? "where" : "which", [cmd], { stdio: "ignore", windowsHide: true });

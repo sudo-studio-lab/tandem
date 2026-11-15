@@ -141,6 +141,13 @@ export function buildProgram(): Command {
     .option("--quiet")
     .option("--json")
     .action((o) => cmdCheck(o));
+  program
+    .command("mcp")
+    .description("給 agent 用的 MCP 伺服器（stdio）")
+    .action(async () => {
+      const { runMcpServer } = await import("./mcp.ts");
+      await runMcpServer();
+    });
   program.command("doctor").description("檢查環境設定").option("--json").action((o) => cmdDoctor(o));
   program
     .command("hook <event>")

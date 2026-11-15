@@ -1,0 +1,5 @@
+# BEGIN TANDEM（由 tandem init 管理，不要手動改）
+[mcp_servers.tandem]
+command = "tandem"
+args = ["mcp"]
+# END TANDEM

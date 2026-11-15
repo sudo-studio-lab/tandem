@@ -31,7 +31,7 @@ export function resolveGit(
 
 /**
  * Environment that lets a child git authenticate to GitHub over HTTPS without writing the
- * token to .git/config or the command line (research S5). Never log the returned values.
+ * token to .git/config or the command line. Never log the returned values.
  */
 export function gitAuthEnv(token: string, host = "github.com"): Record<string, string> {
   const basic = Buffer.from(`x-access-token:${token}`).toString("base64");

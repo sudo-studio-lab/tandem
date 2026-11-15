@@ -13,7 +13,9 @@
     "build": "npm run build -w @tandem/web && npm run build -w @tandem/cli",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "tandem": "node apps/cli/dist/bin.js"
+    "tandem": "node apps/cli/dist/bin.js",
+    "test:agents": "npm run build -w @tandem/cli && vitest run -c vitest.agents.config.ts",
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

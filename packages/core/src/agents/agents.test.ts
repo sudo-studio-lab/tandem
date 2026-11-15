@@ -164,7 +164,7 @@ describe("check", () => {
     await installAgentIntegration(dir);
     items = await checkAgentIntegration(dir);
     expect(items.every((i) => i.state === "current")).toBe(true);
-    expect(items.length).toBe(1 + 1 + 2 + 4 + 6);
+    expect(items.length).toBe(1 + 1 + 2 + 4 + 2 + 6);
 
     await put("AGENTS.md", (await read("AGENTS.md")).replace("v:1", "v:0"));
     await put(".codex/hooks.json", (await read(".codex/hooks.json")).replace("--agent codex", "--agent codex --old"));
@@ -179,6 +179,52 @@ describe("check", () => {
 
     await installAgentIntegration(dir);
     expect((await checkAgentIntegration(dir)).every((i) => i.state === "current")).toBe(true);
+  });
+});
+
+describe("MCP registration", () => {
+  it("writes .mcp.json and .codex/config.toml in a fresh repo", async () => {
+    await installAgentIntegration(dir);
+    expect(JSON.parse(await read(".mcp.json"))).toEqual({ mcpServers: { tandem: { command: "tandem", args: ["mcp"] } } });
+    const toml = await read(".codex/config.toml");
+    expect(toml).toMatch(/^# BEGIN TANDEM/);
+    expect(toml).toContain('[mcp_servers.tandem]\ncommand = "tandem"\nargs = ["mcp"]\n# END TANDEM\n');
+  });
+
+  it("keeps other servers and the file's style", async () => {
+    await put(".mcp.json", '{\r\n    "mcpServers": {\r\n        "db": { "command": "db" }\r\n    }\r\n}\r\n');
+    await put(".codex/config.toml", 'model = "o3"\n[profiles.x]\nmodel = "y"');
+    await installAgentIntegration(dir);
+    const mcp = await read(".mcp.json");
+    expect(mcp).toContain('\r\n        "db": {');
+    expect(Object.keys(JSON.parse(mcp).mcpServers)).toEqual(["db", "tandem"]);
+    const toml = await read(".codex/config.toml");
+    expect(toml.startsWith('model = "o3"\n[profiles.x]\nmodel = "y"\n\n# BEGIN TANDEM')).toBe(true);
+    expect((await installAgentIntegration(dir)).every((c) => c.action === "unchanged")).toBe(true);
+  });
+
+  it("leaves a user-written [mcp_servers.tandem] alone", async () => {
+    const mine = '[mcp_servers.tandem]\ncommand = "C:/tools/tandem.exe"\nargs = ["mcp"]\n';
+    await put(".codex/config.toml", mine);
+    const changes = await installAgentIntegration(dir);
+    expect(await read(".codex/config.toml")).toBe(mine);
+    expect(changes.find((c) => c.path === ".codex/config.toml")?.action).toBe("unchanged");
+    const item = (await checkAgentIntegration(dir)).find((i) => i.path === ".codex/config.toml");
+    expect(item?.state).toBe("current");
+  });
+
+  it("refuses an invalid .mcp.json before writing anything", async () => {
+    await put(".mcp.json", "{ nope");
+    await expect(installAgentIntegration(dir)).rejects.toThrow(/\.mcp\.json/);
+    expect(await exists("AGENTS.md")).toBe(false);
+  });
+
+  it("updates an outdated entry and reports it stale first", async () => {
+    await installAgentIntegration(dir);
+    await put(".mcp.json", JSON.stringify({ mcpServers: { tandem: { command: "old" } } }));
+    expect((await checkAgentIntegration(dir)).find((i) => i.path === ".mcp.json")?.state).toBe("stale");
+    await installAgentIntegration(dir);
+    expect(JSON.parse(await read(".mcp.json")).mcpServers.tandem).toEqual({ command: "tandem", args: ["mcp"] });
   });
 });
 
@@ -198,6 +244,8 @@ describe("remove", () => {
       ".claude/settings.json":
         JSON.stringify({ permissions: { allow: ["Bash(ls)"] }, hooks: { Stop: [{ hooks: [{ type: "command", command: "echo mine" }] }] } }, null, 2) + "\n",
       ".codex/hooks.json": JSON.stringify({ hooks: { PreToolUse: [{ hooks: [{ type: "command", command: "echo x" }] }] } }, null, 2) + "\n",
+      ".mcp.json": JSON.stringify({ mcpServers: { other: { command: "x" } } }, null, 2) + "\n",
+      ".codex/config.toml": 'model = "gpt"\r\n\r\n[mcp_servers.other]\r\ncommand = "x"\r\n',
       "other.txt": "untouched\n",
     };
     for (const [k, v] of Object.entries(files)) await put(k, v);

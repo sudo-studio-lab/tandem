@@ -1,7 +1,6 @@
 /**
  * Brief: what changed that affects me, and who waits on whom.
  * Pure functions only — callers gather inputs from records, git and GitHub.
- * Spec: specs/001-core/data-model.md (推導出來的資料), contracts/cli.md (tandem brief).
  */
 import {
   PRODUCT,
@@ -200,7 +199,7 @@ export function renderBrief(brief: Brief, now: Date = new Date()): string {
 }
 
 /**
- * Text injected into the agent's context at session start (research R8, R10).
+ * Text injected into the agent's context at session start.
  * Kept well under Codex's ~2,500-token SessionStart limit.
  */
 export function renderAgentContext(brief: Brief, now: Date = new Date()): string {
@@ -218,5 +217,6 @@ export function renderAgentContext(brief: Brief, now: Date = new Date()): string
     `- 沒有別人的答案就做不下去：\`${cmd} ask <帳號> --title … --body …\`。可以先做、之後再改的事，直接記決定。`,
     `- 一段工作結束、或使用者要離開：\`${cmd} status --doing … --next … [--blocked …] [--deliverable 標題=網址]\`，只更新使用者自己的狀態。`,
     `- 不要改別人的狀態檔和別人的決定；要推翻決定就新增一筆並寫 supersedes。`,
+    `- 有 \`${cmd}_decide\`、\`${cmd}_ask\`、\`${cmd}_status\` 這些工具時直接用工具（效果和上面的指令一樣，不用打指令）。`,
   ].join("\n");
 }

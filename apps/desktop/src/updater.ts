@@ -5,7 +5,7 @@ import { readState, writeState } from "./state.ts";
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
 /**
- * Auto-update (research S10). The installed electron-updater (6.8.11) has no `autoInstallEvent`,
+ * Auto-update. The installed electron-updater (6.8.11) has no `autoInstallEvent`,
  * so: download in the background, never install on quit, remember the downloaded version, and on
  * the NEXT launch call quitAndInstall as soon as the cached update is reported downloaded.
  * `shutdown` must stop the server child first (it locks the exe).

@@ -1,4 +1,4 @@
-/** Command implementations. Spec: specs/001-core/contracts/cli.md */
+/** Command implementations. */
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import {
@@ -30,7 +30,7 @@ interface JsonOpt {
   json?: boolean;
 }
 
-/** Tell the user where a record write ended up (research S1). */
+/** Tell the user where a record write ended up. */
 function reportWrite(w: WriteResult | undefined): void {
   if (!w || w.result === "pushed") return;
   if (w.result === "conflict") info(`⚠ 已經有同名的紀錄，這筆沒有寫入：${(w.conflicts ?? []).join("、")}`);
@@ -235,7 +235,7 @@ export async function cmdTask(title: string, opts: JsonOpt & { assign?: string[]
 // ---------------------------------------------------------------------------
 // invite / join
 // ---------------------------------------------------------------------------
-/** Public download page (research S7, S8); the repo name rides in the fragment, never sent to a server. */
+/** Public download page; the repo name rides in the fragment, never sent to a server. */
 export const DOWNLOAD_PAGE = "https://sudo-studio-lab.github.io/tandem-releases/";
 
 export function joinUrlFor(owner: string, name: string): string {

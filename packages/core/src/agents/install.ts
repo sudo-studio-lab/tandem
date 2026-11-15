@@ -323,6 +323,97 @@ function planHooksRemove(rel: string, before: string | null): Op {
 }
 
 // ---------------------------------------------------------------------------
+// MCP registration: project files only, never the user's global config.
+//   Claude Code: .mcp.json  {"mcpServers": {"tandem": {"command", "args"}}}
+//     (verified 2026-11-15 on Windows: a bare "tandem" resolves to tandem.cmd, no `cmd /c` needed)
+//   Codex: .codex/config.toml  [mcp_servers.tandem]  (only read when the project is trusted)
+// ---------------------------------------------------------------------------
+const MCP_JSON = ".mcp.json";
+const CODEX_CONFIG = ".codex/config.toml";
+const MCP_NAME = PRODUCT.command;
+
+function mcpEntry(): Json {
+  return { command: C, args: ["mcp"] };
+}
+
+function parseMcpJson(text: string): Json {
+  const v = parseJsonFile(MCP_JSON, text);
+  if (v.mcpServers !== undefined && !isObj(v.mcpServers)) {
+    throw new TandemError("validation", `${MCP_JSON} 的 "mcpServers" 必須是物件`);
+  }
+  return v;
+}
+
+function planMcpJsonInstall(before: string | null): Op {
+  const base: Json = before === null ? {} : parseMcpJson(before);
+  const servers: Json = isObj(base.mcpServers) ? base.mcpServers : {};
+  if (deepEqual(servers[MCP_NAME], mcpEntry()) && before !== null) return { rel: MCP_JSON, before, after: before };
+  const next = structuredClone(base);
+  next.mcpServers = { ...servers, [MCP_NAME]: mcpEntry() };
+  return { rel: MCP_JSON, before, after: serializeJson(next, before) };
+}
+
+function planMcpJsonRemove(before: string | null): Op {
+  if (before === null) return { rel: MCP_JSON, before, after: null };
+  let base: Json;
+  try {
+    base = parseMcpJson(before);
+  } catch {
+    return { rel: MCP_JSON, before, after: before, note: "無法解析，沒有動" };
+  }
+  if (!isObj(base.mcpServers) || !(MCP_NAME in base.mcpServers)) return { rel: MCP_JSON, before, after: before };
+  const next = structuredClone(base);
+  const servers = next.mcpServers as Json;
+  delete servers[MCP_NAME];
+  if (Object.keys(servers).length === 0) delete next.mcpServers;
+  if (Object.keys(next).length === 0) return { rel: MCP_JSON, before, after: null };
+  return { rel: MCP_JSON, before, after: serializeJson(next, before) };
+}
+
+const TOML_BEGIN = `# BEGIN ${PRODUCT.markerName}`;
+const TOML_END = `# END ${PRODUCT.markerName}`;
+const TOML_BLOCK_RE = new RegExp(`^${TOML_BEGIN}[^\\n]*\\r?\\n[\\s\\S]*?^${TOML_END}[ \\t]*$`, "m");
+/** A [mcp_servers.tandem] table the user wrote themselves (outside our block). */
+const TOML_OWN_TABLE_RE = new RegExp(`^\\s*\\[\\s*mcp_servers\\s*\\.\\s*"?${MCP_NAME}"?\\s*\\]`, "m");
+
+function codexBlock(): string {
+  return [
+    `${TOML_BEGIN}（由 ${C} init 管理，不要手動改）`,
+    `[mcp_servers.${MCP_NAME}]`,
+    `command = "${C}"`,
+    `args = ["mcp"]`,
+    TOML_END,
+  ].join("\n");
+}
+
+function planCodexConfigInstall(before: string | null): Op {
+  if (before === null) return { rel: CODEX_CONFIG, before, after: codexBlock() + "\n" };
+  const [bom, text] = splitBom(before);
+  const eol = detectEol(text);
+  const block = toEol(codexBlock(), eol);
+  if (TOML_BLOCK_RE.test(text)) return { rel: CODEX_CONFIG, before, after: bom + text.replace(TOML_BLOCK_RE, () => block) };
+  if (TOML_OWN_TABLE_RE.test(text)) {
+    return { rel: CODEX_CONFIG, before, after: before, note: `已經有自己的 [mcp_servers.${MCP_NAME}]，沒有動` };
+  }
+  // Appended at the end: our block starts with a table header, so it can't capture the user's keys.
+  const sep = text.length === 0 ? "" : text.endsWith("\n") ? eol : eol + eol;
+  return { rel: CODEX_CONFIG, before, after: bom + text + sep + block + eol };
+}
+
+function planCodexConfigRemove(before: string | null): Op {
+  if (before === null) return { rel: CODEX_CONFIG, before, after: null };
+  const [bom, text] = splitBom(before);
+  const m = TOML_BLOCK_RE.exec(text);
+  if (!m) return { rel: CODEX_CONFIG, before, after: before };
+  let end = m.index + m[0].length;
+  const eolM = /^\r?\n/.exec(text.slice(end));
+  if (eolM) end += eolM[0].length;
+  const after = (text.slice(0, m.index) + text.slice(end)).replace(/(\r?\n)(\r?\n)+$/, "$1");
+  if (after.trim() === "") return { rel: CODEX_CONFIG, before, after: null };
+  return { rel: CODEX_CONFIG, before, after: bom + after };
+}
+
+// ---------------------------------------------------------------------------
 // Skills
 // ---------------------------------------------------------------------------
 const SKILL_ROOTS = [".claude/skills", ".agents/skills"];
@@ -348,10 +439,12 @@ export async function installAgentIntegration(repoRoot: string, opts: { dryRun?:
   const codex = await readText(repoRoot, CODEX_HOOKS);
   const settingsOp = planHooksInstall(CLAUDE_SETTINGS, settings, claudeSpecs());
   const codexOp = planHooksInstall(CODEX_HOOKS, codex, codexSpecs());
+  const mcpOp = planMcpJsonInstall(await readText(repoRoot, MCP_JSON));
 
   ops.push(planAgentsInstall(await readText(repoRoot, AGENTS_MD)));
   ops.push(planClaudeMdInstall(await readText(repoRoot, CLAUDE_MD)));
-  ops.push(settingsOp, codexOp);
+  ops.push(settingsOp, codexOp, mcpOp);
+  ops.push(planCodexConfigInstall(await readText(repoRoot, CODEX_CONFIG)));
   for (const s of skillPaths()) ops.push({ rel: s.rel, before: await readText(repoRoot, s.rel), after: s.text });
   return apply(repoRoot, ops, opts.dryRun === true);
 }
@@ -362,6 +455,8 @@ export async function removeAgentIntegration(repoRoot: string, opts: { dryRun?: 
   ops.push(planClaudeMdRemove(await readText(repoRoot, CLAUDE_MD)));
   ops.push(planHooksRemove(CLAUDE_SETTINGS, await readText(repoRoot, CLAUDE_SETTINGS)));
   ops.push(planHooksRemove(CODEX_HOOKS, await readText(repoRoot, CODEX_HOOKS)));
+  ops.push(planMcpJsonRemove(await readText(repoRoot, MCP_JSON)));
+  ops.push(planCodexConfigRemove(await readText(repoRoot, CODEX_CONFIG)));
   for (const s of skillPaths()) {
     const before = await readText(repoRoot, s.rel);
     ops.push({ rel: s.rel, before, after: null, removeDir: s.dir });
@@ -422,6 +517,34 @@ export async function checkAgentIntegration(repoRoot: string): Promise<CheckItem
       else if (deepEqual(existing, [specEntry(spec)])) items.push({ item, path: rel, state: "current" });
       else items.push({ item, path: rel, state: "stale", note: "設定和目前的不同" });
     }
+  }
+
+  {
+    const item = "Claude Code MCP";
+    const text = await readText(repoRoot, MCP_JSON);
+    let state: CheckItem["state"] = "missing";
+    let note: string | undefined;
+    if (text !== null) {
+      try {
+        const parsed = parseMcpJson(text);
+        const entry = isObj(parsed.mcpServers) ? parsed.mcpServers[MCP_NAME] : undefined;
+        if (entry === undefined) state = "missing";
+        else if (deepEqual(entry, mcpEntry())) state = "current";
+        else [state, note] = ["stale", "設定和目前的不同"];
+      } catch (e) {
+        [state, note] = ["stale", (e as Error).message];
+      }
+    }
+    items.push({ item, path: MCP_JSON, state, ...(note ? { note } : {}) });
+  }
+  {
+    const item = "Codex MCP";
+    const text = await readText(repoRoot, CODEX_CONFIG);
+    const norm = text?.replace(/\r\n/g, "\n") ?? null;
+    const m = norm === null ? null : TOML_BLOCK_RE.exec(norm);
+    if (m) items.push({ item, path: CODEX_CONFIG, ...(m[0] === codexBlock() ? { state: "current" as const } : { state: "stale" as const, note: "設定和目前的不同" }) });
+    else if (norm !== null && TOML_OWN_TABLE_RE.test(norm)) items.push({ item, path: CODEX_CONFIG, state: "current", note: "使用者自己的設定" });
+    else items.push({ item, path: CODEX_CONFIG, state: "missing" });
   }
 
   for (const s of skillPaths()) {

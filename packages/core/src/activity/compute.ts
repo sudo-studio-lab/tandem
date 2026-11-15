@@ -15,7 +15,7 @@ function localDay(d: Date): string {
 }
 
 /**
- * Turn raw GitHub activity into per-member, newest-first activity items (research S2).
+ * Turn raw GitHub activity into per-member, newest-first activity items.
  * Result has a key for every member (empty array when nothing happened); logins are matched
  * case-insensitively and the key keeps the casing given in `members`.
  */

@@ -1,12 +1,11 @@
 /**
  * Tandem shared contracts: data formats only, no I/O.
- * Spec: specs/001-core/data-model.md and contracts/cli.md.
  */
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------
 // Product naming. Every user-visible name derives from here so that renaming
-// the product (Q-20261115-1c9) is a one-line change.
+// the product is a one-line change.
 // ---------------------------------------------------------------------------
 export const PRODUCT = {
   /** CLI command name. */
@@ -50,7 +49,7 @@ export const DECISION_SECTIONS = {
 export const WAITING_PREFIX = "等：";
 
 // ---------------------------------------------------------------------------
-// IDs: <kind>-<YYYYMMDD>-<4 base36>, e.g. D-20261115-k3f9 (research R1)
+// IDs: <kind>-<YYYYMMDD>-<4 base36>, e.g. D-20261115-k3f9
 // ---------------------------------------------------------------------------
 export const DECISION_ID_RE = /^D-(\d{8})-([0-9a-z]{4})$/;
 export const DecisionId = z.string().regex(DECISION_ID_RE, "編號格式應為 D-YYYYMMDD-xxxx（4 碼小寫英數）");
@@ -66,7 +65,7 @@ export const Strength = z.enum(["hard", "preference", "hunch", "one-off"]);
 export type Strength = z.infer<typeof Strength>;
 
 // ---------------------------------------------------------------------------
-// Decisions (immutable once written; "superseded" is derived on read — R2)
+// Decisions (immutable once written; "superseded" is derived on read)
 // ---------------------------------------------------------------------------
 export const DecisionFrontmatter = z.object({
   id: DecisionId,
@@ -135,7 +134,7 @@ export interface Decision {
 }
 
 // ---------------------------------------------------------------------------
-// Status: one file per person, only that person's agent writes it (R7)
+// Status: one file per person, only that person's agent writes it
 // ---------------------------------------------------------------------------
 export const StatusFrontmatter = z.object({
   login: GitHubLogin,
@@ -250,7 +249,7 @@ export interface WaitingItem {
 }
 
 // ---------------------------------------------------------------------------
-// `tandem brief --json` output (contracts/cli.md)
+// `tandem brief --json` output
 // ---------------------------------------------------------------------------
 export interface BriefDecision {
   id: string;
@@ -342,6 +341,7 @@ export class TandemError extends Error {
   }
 }
 
-/** CLI exit codes (contracts/cli.md). */
+/** CLI exit codes. */
 export const EXIT = { ok: 0, error: 1, usage: 2, needsHuman: 3 } as const;
 export type * from "./app.ts";
+export type * from "./agent.ts";
