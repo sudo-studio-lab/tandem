@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { cp, readdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,7 +9,9 @@ import { put, tempRepo } from "./helpers.test-util.ts";
 const realRepo = resolve(fileURLToPath(import.meta.url), "../../../../..");
 const now = new Date(2026, 10, 15, 16, 0, 0);
 
-describe("migrateLegacyRecords on the real repo (dry run)", () => {
+// Only meaningful while this repo still has unmigrated legacy records.
+const hasLegacy = existsSync(join(realRepo, "records/decisions")) && !existsSync(join(realRepo, "tandem/decisions"));
+describe.skipIf(!hasLegacy)("migrateLegacyRecords on the real repo (dry run)", () => {
   it("converts every legacy decision with no errors", async () => {
     const legacy = (await readdir(join(realRepo, "records/decisions"))).filter((n) => n.endsWith(".md"));
     expect(legacy.length).toBeGreaterThan(10);

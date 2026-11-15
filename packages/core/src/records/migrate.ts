@@ -52,8 +52,14 @@ function firstSentenceTitle(decision: string): string {
   const strip = (x: string) => x.replace(/[\s，、；：:;,.。！？!?]+$/u, "");
   s = strip(s);
   const chars = [...s];
-  if (chars.length > 40) s = strip(chars.slice(0, 40).join(""));
-  return s;
+  if (chars.length <= 40) return s;
+  // Too long: prefer a clause boundary over cutting mid-phrase.
+  const head = chars.slice(0, 40).join("");
+  const colon = head.search(/[：:]/u);
+  if (colon >= 4) return strip(head.slice(0, colon));
+  const lastComma = Math.max(...["，", "；", ";", ","].map((p) => head.lastIndexOf(p)));
+  if (lastComma >= 8) return strip(head.slice(0, lastComma));
+  return `${strip(chars.slice(0, 39).join(""))}…`;
 }
 
 const LEGACY_FOOTER = /^「([\s\S]*)」 — @([A-Za-z0-9-]+)(?: 轉述 @([A-Za-z0-9-]+)[^（]*)?（([\s\S]*)）\s*$/;
