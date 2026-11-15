@@ -39,4 +39,17 @@ describe.skipIf(process.env.TANDEM_LIVE !== "1")("live (read-only)", () => {
     console.log("prs count:", list.length, JSON.stringify(list.slice(0, 2)));
     expect(Array.isArray(list)).toBe(true);
   });
+  it("getActivityRaw (GraphQL query validity)", async () => {
+    const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const raw = await (await client()).getActivityRaw({ since });
+    console.log("activity:", raw.commits.length, "commits", raw.pullRequests.length, "prs", raw.comments.length, "comments");
+    expect(Array.isArray(raw.commits)).toBe(true);
+  });
+
+  it("getRepo / listOwners / listInvitations", async () => {
+    const c = await client();
+    expect((await c.getRepo()).defaultBranch.length).toBeGreaterThan(0);
+    expect((await c.listOwners()).length).toBeGreaterThan(0);
+    expect(Array.isArray(await c.listInvitations())).toBe(true);
+  });
 });

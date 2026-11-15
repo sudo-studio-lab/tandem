@@ -1,0 +1,60 @@
+appId: com.sudo-studio-lab.tandem   # permanent: also the Windows AUMID used by notifications
+productName: Tandem
+electronVersion: 45.2.1   # pinned: workspace package.json uses a range, which electron-builder rejects
+copyright: sudo-studio-lab
+# The workspace package is "@tandem/desktop"; without this the install folder is
+# Programs\@tandemdesktop and the data folder %APPDATA%\@tandem\desktop.
+extraMetadata:
+  name: tandem
+  productName: Tandem
+directories:
+  output: release
+  buildResources: build
+# Main/preload are fully bundled by build.mjs, so no node_modules go into app.asar.
+files:
+  - dist/**
+  - package.json
+  - "!**/node_modules/**"
+  - "!dist/**/*.map"
+asar: true
+# Everything below lives OUTSIDE app.asar (resources/...), so nothing needs asarUnpack:
+# the bundled git and the CLI (run via ELECTRON_RUN_AS_NODE, which can read files but must
+# be able to load the native keyring .node) are real files on disk.
+extraResources:
+  - from: build/icon.ico
+    to: icon.ico
+  # Git for Windows from dugite -> resources/git (TANDEM_GIT=resources/git/cmd/git.exe)
+  - from: ../../node_modules/dugite/git
+    to: git
+  # CLI bundle (bin.mjs + client/ web UI, produced by the cli desktop build) -> resources/cli
+  - from: ../cli/dist-desktop
+    to: cli
+  # @napi-rs/keyring is native, so the CLI bundle must keep it external (not inline it).
+  # Node resolves it from resources/cli/node_modules next to bin.mjs.
+  - from: ../../node_modules/@napi-rs/keyring
+    to: cli/node_modules/@napi-rs/keyring
+  - from: ../../node_modules/@napi-rs/keyring-win32-x64-msvc
+    to: cli/node_modules/@napi-rs/keyring-win32-x64-msvc
+protocols:
+  - name: Tandem
+    schemes: [tandem]
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  # Unsigned for now (research S6): SmartScreen warns on first install.
+nsis:
+  oneClick: true
+  perMachine: false
+  createStartMenuShortcut: true
+  createDesktopShortcut: true
+  shortcutName: Tandem
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+  artifactName: Tandem-Setup-${version}.${ext}
+publish:
+  provider: github
+  owner: sudo-studio-lab
+  repo: tandem-releases
+  releaseType: release

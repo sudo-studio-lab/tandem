@@ -32,8 +32,21 @@ export function buildProgram(): Command {
     .option("--port <port>", "連接埠", (v) => Number(v))
     .option("--no-open", "不要自動打開瀏覽器")
     .action(async (o) => {
-      const { startBoard } = await import("./server.ts");
-      await startBoard({ port: o.port, openBrowser: o.open });
+      const { startServer } = await import("./server.ts");
+      await startServer({ cwd: process.cwd(), port: o.port, openBrowser: o.open });
+    });
+
+  program
+    .command("serve")
+    .description("給桌面 app 用：啟動本機伺服器")
+    .option("--port <port>", "連接埠，0 代表自動挑", (v) => Number(v))
+    .option("--token-stdin", "從標準輸入讀一行通行碼")
+    .option("--desktop", "桌面 app 模式")
+    .action(async (o) => {
+      let sessionToken: string | undefined;
+      if (o.tokenStdin) sessionToken = await readLine();
+      const { startServer } = await import("./server.ts");
+      await startServer({ port: o.port ?? 0, sessionToken, desktop: !!o.desktop, readyLine: true, openBrowser: false });
     });
 
   program
@@ -136,6 +149,24 @@ export function buildProgram(): Command {
     .action((e, o) => cmdHook(e, o));
 
   return program;
+}
+
+/** Read one line from stdin without keeping stdin open afterwards. */
+function readLine(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let buf = "";
+    const onData = (d: Buffer) => {
+      buf += d.toString("utf8");
+      const i = buf.indexOf("\n");
+      if (i >= 0) {
+        process.stdin.off("data", onData);
+        process.stdin.pause();
+        resolve(buf.slice(0, i).trim());
+      }
+    };
+    process.stdin.on("data", onData);
+    process.stdin.once("end", () => (buf.trim() ? resolve(buf.trim()) : reject(new Error("沒有收到通行碼"))));
+  });
 }
 
 export async function main(argv: string[]): Promise<void> {

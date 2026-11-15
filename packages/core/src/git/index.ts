@@ -1,4 +1,4 @@
-export { runGit } from "./run.ts";
+export { runGit, gitAuthEnv, resolveGit } from "./run.ts";
 export type { RunGitOptions, RunGitResult } from "./run.ts";
 export { GitQueue, getQueue } from "./queue.ts";
 export { findRepoRoot, getGitDir, getRemoteRepo, parseRemoteUrl, headCommit, currentBranch } from "./repo.ts";

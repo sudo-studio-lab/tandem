@@ -8,5 +8,6 @@ node_modules/
 Thumbs.db
 .claude/settings.local.json
 dist/
+dist-desktop/
 coverage/
 *.tsbuildinfo

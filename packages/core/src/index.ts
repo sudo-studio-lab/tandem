@@ -5,3 +5,8 @@ export * from "./state/index.ts";
 export * from "./github/index.ts";
 export * from "./agents/index.ts";
 export * from "./brief/index.ts";
+export * from "./data/index.ts";
+export * from "./auth/index.ts";
+export * from "./activity/index.ts";
+export * from "./notify/index.ts";
+export * from "./app-state/index.ts";

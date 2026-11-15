@@ -1,59 +1,234 @@
-import { PRODUCT } from "@tandem/contracts";
-import { useBoard } from "./useBoard.ts";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api } from "./api.ts";
+import { useApp } from "./useApp.ts";
 import { useNow } from "./time.ts";
 import { Header } from "./components/Header.tsx";
+import { Mine } from "./components/Mine.tsx";
 import { People } from "./components/People.tsx";
 import { Waiting } from "./components/Waiting.tsx";
 import { Discussions } from "./components/Discussions.tsx";
 import { Tasks } from "./components/Tasks.tsx";
 import { Decisions } from "./components/Decisions.tsx";
 import { Problems } from "./components/Problems.tsx";
+import { SignIn } from "./components/SignIn.tsx";
+import { Picker, type StartOp } from "./components/Picker.tsx";
+import { ProgressView } from "./components/Progress.tsx";
+import { InviteDialog, SettingsDialog } from "./components/Dialogs.tsx";
+import { Spinner, errMsg } from "./components/ui.tsx";
+
+interface Op {
+  /** null while the start request is in flight. */
+  opId: string | null;
+  withAccept: boolean;
+  start: () => Promise<{ opId: string }>;
+}
+
+const joinHint = () => new URLSearchParams(location.search).get("join");
 
 export function App() {
-  const { board, error, connected, mock, refreshing, syncing, refresh, sync, invite } = useBoard();
+  const app = useApp();
+  const { session, board, progress } = app;
   const now = useNow();
+  const [showPicker, setShowPicker] = useState(false);
+  const [op, setOp] = useState<Op | null>(null);
+  const [dialog, setDialog] = useState<"invite" | "settings" | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
+  const handledDone = useRef<string | null>(null);
 
-  if (!board) {
+  const notify = useCallback((msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast((t) => (t === msg ? null : t)), 7000);
+  }, []);
+
+  // Desktop bridge: badge = everything waiting across all projects.
+  const attention = session ? session.projects.reduce((n, p) => n + p.attention, 0) : 0;
+  useEffect(() => {
+    window.tandemDesktop?.setBadge(attention);
+    document.title = attention > 0 ? `(${attention}) Tandem` : "Tandem";
+  }, [attention]);
+
+  // Start an operation (accept / start / new) and follow it in the progress view.
+  const begin: StartOp = useCallback(
+    (start, withAccept) => {
+      setStartError(null);
+      const next: Op = { opId: null, withAccept, start };
+      setOp(next);
+      start().then(
+        (r) => setOp((cur) => (cur === next ? { ...next, opId: r.opId } : cur)),
+        (e) => {
+          setOp(null);
+          setStartError(errMsg(e));
+        },
+      );
+    },
+    [],
+  );
+
+  const retry = () => {
+    if (op) begin(op.start, op.withAccept);
+  };
+
+  // When the operation is done, show that project.
+  const p = op?.opId ? progress[op.opId] : undefined;
+  useEffect(() => {
+    if (!op?.opId || !p || p.step !== "done" || p.error || !p.projectId) return;
+    if (handledDone.current === op.opId) return;
+    handledDone.current = op.opId;
+    void app.selectProject(p.projectId).then(() => {
+      setOp(null);
+      setShowPicker(false);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [op?.opId, p]);
+
+  const openFolder = async (path: string) => {
+    const r = await api<{ id?: string } | undefined>("POST", "/api/projects/open-folder", { path });
+    if (r?.id) await app.selectProject(r.id);
+    else await app.loadSession();
+    setShowPicker(false);
+  };
+
+  const signOut = async () => {
+    await api("POST", "/api/logout");
+    setDialog(null);
+    setShowPicker(false);
+    await app.loadSession();
+  };
+
+  if (session === undefined) {
     return (
-      <main className="page">
-        <h1>{PRODUCT.displayName}</h1>
-        {error ? (
-          <p className="banner banner-error" role="alert">
-            無法載入看板：{error}
-          </p>
-        ) : (
-          <p className="muted">載入中…</p>
-        )}
+      <main className="center-page">
+        <div className="panel">
+          <h1 className="brand-big">Tandem</h1>
+          {app.loadError ? (
+            <>
+              <p className="banner banner-error" role="alert">
+                {app.loadError}
+              </p>
+              <button type="button" className="btn btn-primary" onClick={() => void app.loadSession()}>
+                再試一次
+              </button>
+            </>
+          ) : (
+            <Spinner label="載入中…" />
+          )}
+        </div>
       </main>
     );
   }
 
+  if (!session.login) return <SignIn onSignedIn={() => void app.loadSession()} />;
+
+  if (op) {
+    return (
+      <ProgressView
+        progress={p}
+        withAccept={op.withAccept}
+        onRetry={retry}
+        onBack={() => {
+          setOp(null);
+          setShowPicker(true);
+        }}
+      />
+    );
+  }
+
+  const project = session.projects.find((x) => x.id === session.currentProjectId);
+  const picking = showPicker || session.projects.length === 0 || !project;
+
+  const toastEl = toast && (
+    <p className="banner banner-error toast" role="alert">
+      {toast}{" "}
+      <button type="button" className="btn btn-small" onClick={() => setToast(null)}>
+        知道了
+      </button>
+    </p>
+  );
+
+  const header = (
+    <Header
+      session={session}
+      project={project}
+      board={board}
+      now={now}
+      mock={app.mock}
+      connected={app.connected}
+      refreshing={app.refreshing}
+      syncing={app.syncing}
+      onRefresh={app.refresh}
+      onSync={app.sync}
+      onSelect={(id) => {
+        setShowPicker(false);
+        void app.selectProject(id);
+      }}
+      onRemove={app.removeProject}
+      onAddProject={() => setShowPicker(true)}
+      onInvite={() => setDialog("invite")}
+      onSettings={() => setDialog("settings")}
+      onError={notify}
+    />
+  );
+
   return (
     <>
-      <Header
-        board={board}
-        now={now}
-        mock={mock}
-        connected={connected}
-        refreshing={refreshing}
-        syncing={syncing}
-        onRefresh={refresh}
-        onSync={sync}
-        onInvite={invite}
-      />
-      <main className="page">
-        {error && (
-          <p className="banner banner-error" role="alert">
-            {error}
-          </p>
-        )}
-        <People board={board} now={now} />
-        <Waiting items={board.waiting} now={now} />
-        <Discussions items={board.discussions} now={now} />
-        <Tasks items={board.tasks} />
-        <Decisions board={board} />
-        <Problems items={board.problems} />
-      </main>
+      {header}
+      {toastEl}
+      {startError && (
+        <p className="banner banner-error toast" role="alert">
+          {startError}
+        </p>
+      )}
+      {picking ? (
+        <Picker
+          session={session}
+          hint={joinHint()}
+          now={now}
+          onStart={begin}
+          onOpenFolder={openFolder}
+          onBack={project ? () => setShowPicker(false) : undefined}
+        />
+      ) : !project.available ? (
+        <main className="page">
+          <div className="card pad gap-top">
+            <h2>找不到資料夾</h2>
+            <p className="muted">{project.path} 不見了，可能被移動或刪除。你可以把它從清單移除，再重新加入專案。</p>
+            <button type="button" className="btn btn-primary" onClick={() => void app.removeProject(project.id).catch((e) => notify(errMsg(e)))}>
+              從清單移除
+            </button>
+          </div>
+        </main>
+      ) : !board ? (
+        <main className="page">
+          {app.boardError ? (
+            <p className="banner banner-error" role="alert">
+              無法載入看板：{app.boardError}{" "}
+              <button type="button" className="btn btn-small" onClick={() => void app.refresh()}>
+                再試一次
+              </button>
+            </p>
+          ) : (
+            <Spinner label="載入看板中…" />
+          )}
+        </main>
+      ) : (
+        <main className="page">
+          {app.boardError && (
+            <p className="banner banner-error" role="alert">
+              {app.boardError}
+            </p>
+          )}
+          <Mine items={board.waiting} me={board.me} now={now} />
+          <People board={board} now={now} />
+          <Waiting items={board.waiting} now={now} />
+          <Discussions items={board.discussions} now={now} />
+          <Tasks items={board.tasks} />
+          <Decisions board={board} />
+          <Problems items={board.problems} />
+        </main>
+      )}
+      {dialog === "invite" && project && <InviteDialog projectId={project.id} onClose={() => setDialog(null)} />}
+      {dialog === "settings" && <SettingsDialog session={session} onClose={() => setDialog(null)} onSignOut={signOut} />}
     </>
   );
 }

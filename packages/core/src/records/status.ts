@@ -1,5 +1,3 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import {
   GitHubLogin,
   PATHS,
@@ -9,6 +7,7 @@ import {
   type Problem,
   type Status,
 } from "@tandem/contracts";
+import { openFsDataStore, type DataStore, type WriteResult } from "../data/index.ts";
 import { localIsoString } from "./ids.ts";
 import { splitFrontmatter, stringifyFrontmatter, zodProblems } from "./frontmatter.ts";
 
@@ -43,21 +42,32 @@ export function parseStatus(path: string, content: string): { status?: Status; p
   return { status: { ...fm.data, path, notes: split.body.trim() }, problems };
 }
 
-export async function loadStatuses(repoRoot: string): Promise<{ statuses: Status[]; problems: Problem[] }> {
+function asStore(store: DataStore | string): DataStore {
+  return typeof store === "string" ? openFsDataStore(store) : store;
+}
+
+export async function loadStatuses(storeOrRoot: DataStore | string): Promise<{ statuses: Status[]; problems: Problem[] }> {
+  const store = asStore(storeOrRoot);
   const statuses: Status[] = [];
   const problems: Problem[] = [];
-  let names: string[] = [];
-  try {
-    names = (await readdir(join(repoRoot, PATHS.status))).filter((n) => n.endsWith(".md")).sort();
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-  }
-  for (const name of names) {
-    const path = `${PATHS.status}/${name}`;
-    const r = parseStatus(path, await readFile(join(repoRoot, path), "utf8"));
+  const paths = (await store.list("status")).map((n) => `${PATHS.status}/${n}`);
+  const contents: (string | null)[] = new Array<string | null>(paths.length).fill(null);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const i = next++;
+      if (i >= paths.length) return;
+      contents[i] = await store.read(paths[i]!);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(8, paths.length) }, worker));
+  paths.forEach((path, i) => {
+    const content = contents[i];
+    if (content === null || content === undefined) return;
+    const r = parseStatus(path, content);
     problems.push(...r.problems);
     if (r.status) statuses.push(r.status);
-  }
+  });
   return { statuses, problems };
 }
 
@@ -66,15 +76,18 @@ export interface UpdateStatusResult {
   content: string;
   status: Status;
   problems: Problem[];
+  /** Result of writing through the store (absent for dry runs). */
+  write?: WriteResult;
 }
 
 /** Merge `patch` into the status file of `login` (only ever that person's own file). */
 export async function updateStatus(
-  repoRoot: string,
+  storeOrRoot: DataStore | string,
   login: string,
   patch: StatusPatch,
   opts: { now?: Date; dryRun?: boolean } = {},
 ): Promise<UpdateStatusResult> {
+  const store = asStore(storeOrRoot);
   const lg = GitHubLogin.safeParse(login);
   if (!lg.success) throw new TandemError("validation", `GitHub 帳號格式不正確：${login}`);
   const p = StatusPatch.safeParse(patch);
@@ -82,16 +95,10 @@ export async function updateStatus(
     throw new TandemError("validation", p.error.issues.map((i) => `${i.path.join(".")}：${i.message}`).join("；"), p.error.issues);
 
   const path = `${PATHS.status}/${login}.md`;
-  const abs = join(repoRoot, path);
   const problems: Problem[] = [];
   let current: Status | undefined;
-  let existing: string | undefined;
-  try {
-    existing = await readFile(abs, "utf8");
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-  }
-  if (existing !== undefined) {
+  const existing = await store.read(path);
+  if (existing !== null) {
     const split = splitFrontmatter(existing);
     if (split.ok && typeof split.data.login === "string" && split.data.login !== login)
       throw new TandemError("validation", `只能更新自己的狀態檔：這個檔案屬於 @${split.data.login}，不是 @${login}`);
@@ -120,9 +127,7 @@ export async function updateStatus(
     throw new TandemError("validation", zodProblems(path, fm.error).map((x) => x.message).join("；"), fm.error.issues);
   const notes = p.data.notes ?? current?.notes ?? "";
   const content = renderStatus({ ...fm.data, notes });
-  if (!opts.dryRun) {
-    await mkdir(join(repoRoot, PATHS.status), { recursive: true });
-    await writeFile(abs, content, "utf8");
-  }
-  return { path, content, status: { ...fm.data, path, notes: notes.trim() }, problems };
+  const result: UpdateStatusResult = { path, content, status: { ...fm.data, path, notes: notes.trim() }, problems };
+  if (!opts.dryRun) result.write = await store.write([{ path, content }], `tandem: update status @${login}`);
+  return result;
 }

@@ -1,7 +1,37 @@
 import type { ReactNode } from "react";
-import { DECISION_ID_RE, type BoardData, type BoardMember } from "@tandem/contracts";
+import type { ActivityItem, ActivityKind, BoardMember, ProjectBoard } from "@tandem/contracts";
 import { Ext, Section } from "./Ext.tsx";
 import { relTime, waitedFor } from "../time.ts";
+
+const DECISION_ID_RE = /^D-\d{8}-[0-9a-z]{4}$/;
+
+const ACTIVITY: Record<ActivityKind, { icon: string; verb: string }> = {
+  commit: { icon: "⬆", verb: "上傳了更新" },
+  pr_opened: { icon: "◐", verb: "提出修改" },
+  pr_merged: { icon: "✔", verb: "修改已合併" },
+  comment: { icon: "💬", verb: "留言" },
+};
+
+function Activity({ items, now }: { items: ActivityItem[]; now: number }) {
+  return (
+    <div className="activity">
+      <h4>最近動態</h4>
+      <ul>
+        {items.map((a, i) => (
+          <li key={`${a.url}${i}`}>
+            <span className="act-icon" aria-hidden="true">
+              {ACTIVITY[a.kind].icon}
+            </span>
+            <span className="sr-only">{ACTIVITY[a.kind].verb}：</span>
+            <Ext href={a.url}>{a.title}</Ext>
+            {a.count && a.count > 1 && <span className="muted"> 等 {a.count} 筆</span>}
+            <span className="muted act-time"> {relTime(a.time, now)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function Field({ label, children, tone }: { label: string; children: ReactNode; tone?: "bad" }) {
   return (
@@ -12,7 +42,7 @@ function Field({ label, children, tone }: { label: string; children: ReactNode; 
   );
 }
 
-function PersonCard({ m, board, now }: { m: BoardMember; board: BoardData; now: number }) {
+function PersonCard({ m, board, now }: { m: BoardMember; board: ProjectBoard; now: number }) {
   const s = m.status;
   const isMe = m.login === board.me;
   const repoUrl = board.repo.url;
@@ -28,6 +58,7 @@ function PersonCard({ m, board, now }: { m: BoardMember; board: BoardData; now: 
     );
   };
   const prs = m.recentPullRequests.filter((p) => p.state !== "closed");
+  const activity = board.activity[m.login] ?? [];
 
   return (
     <article className={`card person${s?.blocked ? " is-blocked" : ""}`} aria-label={m.login}>
@@ -40,7 +71,7 @@ function PersonCard({ m, board, now }: { m: BoardMember; board: BoardData; now: 
       </header>
 
       {!s ? (
-        <p className="muted">還沒有狀態</p>
+        activity.length === 0 && <p className="muted">最近 7 天沒有動態</p>
       ) : (
         <dl className="fields">
           <Field label="在做">{s.doing || <span className="muted">—</span>}</Field>
@@ -64,6 +95,8 @@ function PersonCard({ m, board, now }: { m: BoardMember; board: BoardData; now: 
           )}
         </dl>
       )}
+
+      {activity.length > 0 && <Activity items={activity} now={now} />}
 
       {((s && s.deliverables.length > 0) || prs.length > 0) && (
         <dl className="fields">
@@ -135,7 +168,7 @@ function PersonCard({ m, board, now }: { m: BoardMember; board: BoardData; now: 
   );
 }
 
-export function People({ board, now }: { board: BoardData; now: number }) {
+export function People({ board, now }: { board: ProjectBoard; now: number }) {
   const members = [...board.members].sort((a, b) => Number(b.login === board.me) - Number(a.login === board.me));
   return (
     <Section title="大家在做什麼" count={members.length}>

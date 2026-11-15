@@ -1,5 +1,49 @@
 import { spawn } from "node:child_process";
+import path from "node:path";
 import { TandemError } from "@tandem/contracts";
+
+/**
+ * Git binary and environment. With TANDEM_GIT (absolute path to dugite's `<gitDir>/cmd/git.exe`)
+ * we run the bundled git and set up its environment like dugite's lib/git-environment.ts;
+ * otherwise the system `git`.
+ */
+export function resolveGit(
+  parentEnv: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch,
+): { bin: string; env: Record<string, string> } {
+  const bin = parentEnv.TANDEM_GIT?.trim();
+  if (!bin) return { bin: "git", env: {} };
+  const P = platform === "win32" ? path.win32 : path;
+  const gitDir = P.dirname(P.dirname(bin));
+  const env: Record<string, string> = {};
+  if (platform === "win32") {
+    const sub = arch === "x64" ? "ucrt64" : arch === "arm64" ? "clangarm64" : "mingw32";
+    const pathKey = Object.keys(parentEnv).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+    env[pathKey] = [path.win32.join(gitDir, sub, "bin"), path.win32.join(gitDir, sub, "usr", "bin"), parentEnv[pathKey] ?? ""].join(";");
+    env.GIT_EXEC_PATH = P.join(gitDir, sub, "libexec", "git-core");
+  } else {
+    env.GIT_EXEC_PATH = path.join(gitDir, "libexec", "git-core");
+    env.GIT_CONFIG_SYSTEM = parentEnv.GIT_CONFIG_SYSTEM || path.join(gitDir, "etc", "gitconfig");
+  }
+  return { bin, env };
+}
+
+/**
+ * Environment that lets a child git authenticate to GitHub over HTTPS without writing the
+ * token to .git/config or the command line (research S5). Never log the returned values.
+ */
+export function gitAuthEnv(token: string, host = "github.com"): Record<string, string> {
+  const basic = Buffer.from(`x-access-token:${token}`).toString("base64");
+  return {
+    GIT_TERMINAL_PROMPT: "0",
+    GIT_CONFIG_COUNT: "2",
+    GIT_CONFIG_KEY_0: "credential.helper",
+    GIT_CONFIG_VALUE_0: "",
+    GIT_CONFIG_KEY_1: `http.https://${host}/.extraHeader`,
+    GIT_CONFIG_VALUE_1: `Authorization: Basic ${basic}`,
+  };
+}
 
 export interface RunGitOptions {
   cwd: string;
@@ -18,9 +62,10 @@ export interface RunGitResult {
 /** Run git without a shell. Throws TandemError("internal") on non-zero exit unless allowFail. */
 export function runGit(args: string[], opts: RunGitOptions): Promise<RunGitResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn("git", args, {
+    const g = resolveGit();
+    const child = spawn(g.bin, args, {
       cwd: opts.cwd,
-      env: { ...process.env, ...opts.env, LC_ALL: "C", GIT_TERMINAL_PROMPT: "0" },
+      env: { ...process.env, ...g.env, ...opts.env, LC_ALL: "C", GIT_TERMINAL_PROMPT: "0" },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });

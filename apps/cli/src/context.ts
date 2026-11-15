@@ -4,8 +4,12 @@ import {
   findRepoRoot,
   getGitHubToken,
   getRemoteRepo,
+  gitAuthEnv,
+  openGitDataStore,
   readLocalState,
+  runGit,
   writeLocalState,
+  type DataStore,
   type EtagCache,
   type LocalState,
 } from "@tandem/core";
@@ -24,6 +28,19 @@ export interface Context {
   me: string;
   state: CliState;
   saveState(): Promise<void>;
+  /** GitHub token; only ever passed to child processes through `gitEnv`. */
+  token: string;
+  /** Env for git network commands (research S5): token as an extra header, never in config or argv. */
+  gitEnv: Record<string, string>;
+  /** Records live on the remote default branch (research S1). */
+  store: DataStore;
+}
+
+/** Commit author for records: the repo's git identity, else the GitHub noreply address. */
+async function authorFor(repoRoot: string, login: string): Promise<{ name: string; email: string }> {
+  const get = async (k: string) => (await runGit(["config", "--get", k], { cwd: repoRoot, allowFail: true })).stdout.trim();
+  const [name, email] = await Promise.all([get("user.name"), get("user.email")]);
+  return { name: name || login, email: email || `${login}@users.noreply.github.com` };
 }
 
 function stateEtagCache(state: CliState): EtagCache {
@@ -39,11 +56,11 @@ function stateEtagCache(state: CliState): EtagCache {
   };
 }
 
-export async function openContext(cwd: string = process.cwd()): Promise<Context> {
+export async function openContext(cwd: string = process.cwd(), opts: { token?: string } = {}): Promise<Context> {
   const repoRoot = await findRepoRoot(cwd);
   const remote = await getRemoteRepo(repoRoot);
   const state = (await readLocalState(repoRoot)) as CliState;
-  const { token } = await getGitHubToken();
+  const token = opts.token ?? (await getGitHubToken()).token;
   const gh = createGitHubClient({ token, owner: remote.owner, repo: remote.name, cache: stateEtagCache(state) });
   let me = state.login;
   if (!me) {
@@ -51,6 +68,8 @@ export async function openContext(cwd: string = process.cwd()): Promise<Context>
     state.login = me;
     await writeLocalState(repoRoot, state);
   }
+  const gitEnv = gitAuthEnv(token);
+  const store = openGitDataStore(repoRoot, { gitEnv, author: await authorFor(repoRoot, me) });
   return {
     repoRoot,
     remote,
@@ -58,6 +77,9 @@ export async function openContext(cwd: string = process.cwd()): Promise<Context>
     me,
     state,
     saveState: () => writeLocalState(repoRoot, state),
+    token,
+    gitEnv,
+    store,
   };
 }
 

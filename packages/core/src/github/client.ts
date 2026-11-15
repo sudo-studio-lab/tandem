@@ -2,7 +2,10 @@ import {
   LABELS,
   TandemError,
   type DiscussionSummary,
+  type Invitation,
+  type OwnerChoice,
   type PullRequestSummary,
+  type RepoChoice,
   type TaskSummary,
 } from "@tandem/contracts";
 import { createMemoryEtagCache, type EtagCache } from "./cache.ts";
@@ -44,6 +47,54 @@ export interface CreateIssueInput {
   body?: string;
   assignees?: string[];
   labels?: string[];
+}
+
+export interface CreateRepoInput {
+  owner: string;
+  name: string;
+  /** True when owner is an organization. */
+  isOrg: boolean;
+}
+
+export interface CreatedRepo {
+  owner: string;
+  name: string;
+  fullName: string;
+  cloneUrl: string;
+  defaultBranch: string;
+}
+
+export interface RepoInfo {
+  defaultBranch: string;
+  private: boolean;
+  permissions: { admin: boolean; push: boolean; pull: boolean };
+}
+
+/** Plain, un-aggregated GitHub activity of one repo (input of activity/computeActivity). */
+export interface ActivityRaw {
+  /** https://github.com/<owner>/<repo> */
+  repoUrl: string;
+  /** One entry per (branch, commit); the same oid appears once per branch that contains it. */
+  commits: {
+    oid: string;
+    branch: string;
+    headline: string;
+    committedDate: string;
+    url: string;
+    /** GitHub login of the author; null when the commit email is not linked to a GitHub account. */
+    login: string | null;
+  }[];
+  pullRequests: {
+    number: number;
+    title: string;
+    url: string;
+    author: string | null;
+    createdAt: string;
+    mergedAt: string | null;
+    mergedBy: string | null;
+  }[];
+  /** Discussion comments and issue/PR comments. `title` is the discussion title, or "#<n>" for issue/PR comments. */
+  comments: { login: string | null; title: string; url: string; createdAt: string }[];
 }
 
 export type GitHubClient = ReturnType<typeof createGitHubClient>;
@@ -288,8 +339,157 @@ export function createGitHubClient(opts: GitHubClientOptions) {
     const want = `${owner}/${repo}`.toLowerCase();
     const inv = list.find((i) => String(i?.repository?.full_name ?? "").toLowerCase() === want);
     if (!inv) return "none";
-    await rest({ method: "PATCH", path: `/user/repository_invitations/${inv.id}`, what: "接受邀請" });
+    await acceptInvitation(inv.id);
     return "accepted";
+  }
+
+  async function acceptInvitation(id: number): Promise<void> {
+    await rest({ method: "PATCH", path: `/user/repository_invitations/${id}`, what: "接受邀請" });
+  }
+
+  async function listInvitations(): Promise<Invitation[]> {
+    const list = await listAll("/user/repository_invitations", false);
+    return list.map((i) => {
+      const full = String(i?.repository?.full_name ?? "");
+      return {
+        id: i.id,
+        repo: {
+          owner: i?.repository?.owner?.login ?? full.split("/")[0] ?? "",
+          name: i?.repository?.name ?? full.split("/")[1] ?? "",
+          fullName: full,
+          private: !!i?.repository?.private,
+        },
+        inviter: i?.inviter?.login ?? "ghost",
+        createdAt: i?.created_at ?? "",
+      };
+    });
+  }
+
+  /** People with access to this repo (needs push access to list). Pending invitees are not included. */
+  async function listCollaborators(): Promise<string[]> {
+    const r = await rest({ path: `${repoPath}/collaborators?affiliation=all&per_page=100`, etag: true, what: "讀取成員" });
+    return Array.isArray(r.body) ? r.body.map((u: any) => String(u.login)).filter(Boolean) : [];
+  }
+
+  async function getRepo(): Promise<RepoInfo> {
+    const r = await rest({ path: repoPath, what: "讀取專案資訊" });
+    const b = r.body ?? {};
+    return {
+      defaultBranch: b.default_branch ?? "main",
+      private: !!b.private,
+      permissions: { admin: !!b.permissions?.admin, push: !!b.permissions?.push, pull: b.permissions?.pull !== false },
+    };
+  }
+
+  /** Repos the user can push to, newest push first. Up to 3 pages of 100. */
+  async function listMyRepos(o: { q?: string } = {}): Promise<RepoChoice[]> {
+    const out: RepoChoice[] = [];
+    const q = o.q?.trim().toLowerCase();
+    for (let page = 1; page <= 3; page++) {
+      const r = await rest({
+        path: `/user/repos?affiliation=owner,collaborator,organization_member&sort=pushed&per_page=100&page=${page}`,
+        etag: true,
+        what: "讀取你的專案清單",
+      });
+      const arr: any[] = Array.isArray(r.body) ? r.body : [];
+      for (const x of arr) {
+        if (!x?.permissions?.push) continue;
+        const fullName = String(x.full_name ?? "");
+        if (q && !fullName.toLowerCase().includes(q)) continue;
+        const c: RepoChoice = {
+          owner: x.owner?.login ?? fullName.split("/")[0] ?? "",
+          name: x.name,
+          fullName,
+          private: !!x.private,
+        };
+        if (x.pushed_at) c.pushedAt = x.pushed_at;
+        out.push(c);
+      }
+      if (arr.length < 100) break;
+    }
+    return out;
+  }
+
+  /** The viewer plus every organization they belong to. Whether they may create repos there is only known on creation. */
+  async function listOwners(): Promise<OwnerChoice[]> {
+    const me = await viewerLogin();
+    const r = await rest({ path: "/user/orgs?per_page=100", etag: true, what: "讀取你的組織" });
+    const orgs: OwnerChoice[] = (Array.isArray(r.body) ? r.body : [])
+      .filter((o: any) => typeof o?.login === "string")
+      .map((o: any) => ({ login: o.login as string, kind: "org" as const }));
+    return [{ login: me, kind: "user" }, ...orgs];
+  }
+
+  /** Create a private repo with an initial commit, so its default branch exists. */
+  async function createRepo(input: CreateRepoInput): Promise<CreatedRepo> {
+    const r = await rest({
+      method: "POST",
+      path: input.isOrg ? `/orgs/${encodeURIComponent(input.owner)}/repos` : "/user/repos",
+      body: { name: input.name, private: true, auto_init: true },
+      what: input.isOrg ? `在組織 ${input.owner} 建立專案（需要組織允許你建立 repo）` : "建立專案",
+    });
+    const b = r.body ?? {};
+    return {
+      owner: b.owner?.login ?? input.owner,
+      name: b.name ?? input.name,
+      fullName: b.full_name ?? `${input.owner}/${input.name}`,
+      cloneUrl: b.clone_url ?? `https://github.com/${input.owner}/${input.name}.git`,
+      defaultBranch: b.default_branch ?? "main",
+    };
+  }
+
+  /** Recent commits (all branches), PRs, discussion comments and issue comments since `since` (ISO). */
+  async function getActivityRaw(o: { since: string }): Promise<ActivityRaw> {
+    const q = `query($owner:String!,$repo:String!,$since:GitTimestamp!){repository(owner:$owner,name:$repo){
+      refs(refPrefix:"refs/heads/",first:30,orderBy:{field:TAG_COMMIT_DATE,direction:DESC}){nodes{name target{... on Commit{history(since:$since,first:30){nodes{oid messageHeadline committedDate url author{user{login}}}}}}}}
+      pullRequests(first:30,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{number title url createdAt mergedAt author{login} mergedBy{login}}}
+      discussions(first:20,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{title url comments(last:10){nodes{author{login} createdAt url}}}}
+    }}`;
+    const d = await graphql<any>(q, { owner, repo, since: o.since }, "讀取成員動態");
+    const r = d?.repository;
+    const raw: ActivityRaw = { repoUrl: `https://github.com/${owner}/${repo}`, commits: [], pullRequests: [], comments: [] };
+    for (const ref of r?.refs?.nodes ?? []) {
+      for (const c of ref?.target?.history?.nodes ?? []) {
+        raw.commits.push({
+          oid: c.oid,
+          branch: ref.name,
+          headline: c.messageHeadline ?? "",
+          committedDate: c.committedDate,
+          url: c.url,
+          login: c.author?.user?.login ?? null,
+        });
+      }
+    }
+    for (const p of r?.pullRequests?.nodes ?? []) {
+      raw.pullRequests.push({
+        number: p.number,
+        title: p.title,
+        url: p.url,
+        author: p.author?.login ?? null,
+        createdAt: p.createdAt,
+        mergedAt: p.mergedAt ?? null,
+        mergedBy: p.mergedBy?.login ?? null,
+      });
+    }
+    for (const disc of r?.discussions?.nodes ?? []) {
+      for (const c of disc?.comments?.nodes ?? []) {
+        raw.comments.push({ login: c.author?.login ?? null, title: disc.title, url: c.url, createdAt: c.createdAt });
+      }
+    }
+    const ic = await rest({
+      path: `${repoPath}/issues/comments?since=${encodeURIComponent(o.since)}&sort=created&direction=desc&per_page=50`,
+      what: "讀取留言",
+    });
+    for (const c of Array.isArray(ic.body) ? ic.body : []) {
+      const n = /\/(\d+)$/.exec(String(c.issue_url ?? ""))?.[1];
+      raw.comments.push({
+        login: c.user?.login ?? null,
+        title: n ? `#${n}` : "issue",
+        url: c.html_url,
+        createdAt: c.created_at,
+      });
+    }
+    return raw;
   }
 
   async function getDiscussionsInfo(): Promise<DiscussionsInfo> {
@@ -517,6 +717,14 @@ export function createGitHubClient(opts: GitHubClientOptions) {
     viewerLogin,
     inviteCollaborator,
     acceptInvitationFor,
+    acceptInvitation,
+    listInvitations,
+    getRepo,
+    listCollaborators,
+    listMyRepos,
+    listOwners,
+    createRepo,
+    getActivityRaw,
     getDiscussionsInfo,
     enableDiscussions,
     ensureLabels,

@@ -1,4 +1,4 @@
-import type { BoardData, Decision, WaitingItem } from "@tandem/contracts";
+import type { ActivityItem, BoardData, Decision, ProjectBoard, WaitingItem } from "@tandem/contracts";
 
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 const H = 3_600_000;
@@ -234,4 +234,24 @@ export function mockBoard(): BoardData {
     sync: { state: "idle", lastSyncAt: ago(4 * 60_000) },
     generatedAt: new Date().toISOString(),
   };
+}
+
+/** The 002 board: the fixture plus per-member activity. A third member has neither status nor activity. */
+export function mockProjectBoard(projectId: string, me: string): ProjectBoard {
+  const b = mockBoard();
+  const [owner = "demo", name = "project"] = projectId.split("/");
+  b.repo = { owner, name, url: `https://github.com/${owner}/${name}` };
+  b.me = me;
+  b.members.push({ login: "mei-lin", waitingOn: [], waitedOnBy: [], openTasks: [], recentPullRequests: [] });
+  const activity: Record<string, ActivityItem[]> = {
+    jielle2453: [
+      { kind: "commit", login: "jielle2453", title: "加上看板的活動區塊", url: `${REPO}/commit/a1`, time: ago(2 * H), branch: "main", count: 3 },
+      { kind: "pr_merged", login: "jielle2453", title: "整理狀態檔格式", url: `${REPO}/pull/14`, time: ago(1 * D) },
+    ],
+    theroyatlas: [
+      { kind: "pr_opened", login: "theroyatlas", title: "加入看板頁面", url: `${REPO}/pull/15`, time: ago(3 * H) },
+      { kind: "comment", login: "theroyatlas", title: "登入要不要支援 Google？", url: `${REPO}/issues/12#c1`, time: ago(5 * H) },
+    ],
+  };
+  return { ...b, projectId, activity, defaultBranch: "main", pendingWrites: 0 };
 }
