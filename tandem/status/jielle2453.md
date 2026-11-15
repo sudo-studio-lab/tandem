@@ -1,8 +1,8 @@
 ---
 login: jielle2453
-updated: 2026-11-15T21:40:56+08:00
-doing: 查 Tandem 決定紀錄（關鍵字 agent），並在 repo 根目錄執行 git rev-parse --abbrev-ref HEAD > zz-e2e.txt。
-next: 確認 zz-e2e.txt 的內容（應為分支名稱 main）；是否保留這個檔案由使用者決定。
+updated: 2026-11-15T21:44:55+08:00
+doing: "查看最新 commit 的標題（003 phase 1: tandem mcp server and MCP registration），並回報它的用途"
+next: 等待使用者下一步指示
 blocked: ""
 fyi:
   - text: 建好公開 repo sudo-studio-lab/tandem-releases（放安裝檔和下載頁）
