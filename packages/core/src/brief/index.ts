@@ -211,7 +211,7 @@ export function renderAgentContext(brief: Brief, now: Date = new Date()): string
     "",
     renderBrief(brief, now),
     "",
-    "請在你的第一個回覆，用五行以內告訴使用者上面跟他有關的部分（附連結）；如果寫著沒有變動，就不用提。",
+    "請在你的第一個回覆，用五行以內把上面跟使用者有關的部分告訴使用者（附連結）；如果寫著沒有變動，就不用提。",
     "",
     "### 工作方式",
     `- 使用者做了會影響別人的決定：用 \`${cmd} decide --input - --dry-run\` 產生紀錄，給使用者看「我記成這樣，對嗎？」，確認後去掉 --dry-run 正式寫入。原話必須逐字。`,

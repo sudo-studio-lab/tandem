@@ -104,7 +104,7 @@ function PersonCard({ m, board, now }: { m: BoardMember; board: BoardData; now: 
             </Field>
           )}
           {m.waitedOnBy.length > 0 && (
-            <Field label="誰在等他">
+            <Field label="誰在等這個人">
               <ul>
                 {m.waitedOnBy.map((w, i) => (
                   <li key={i}>

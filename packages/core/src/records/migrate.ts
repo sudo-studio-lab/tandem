@@ -157,7 +157,7 @@ export async function migrateLegacyRecords(
             warn(e.path, "legacy-quote-relayed", `@${q.by} 的原話來自沒有網址的文件，已標為由 @${owner} 轉述`);
           } else {
             deciders.push(q.by);
-            warn(e.path, "legacy-quoter-added", `@${q.by} 在對話中說的話被引用，已把他加入 deciders`);
+            warn(e.path, "legacy-quoter-added", `@${q.by} 在對話中說的話被引用，已把 @${q.by} 加入 deciders`);
           }
         }
         quotes.push(q);
