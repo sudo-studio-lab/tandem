@@ -13,6 +13,7 @@
 | [`notes/why-and-ideas.md`](notes/why-and-ideas.md) | 為什麼要做、痛點、想過哪些做法 |
 | [`notes/research.md`](notes/research.md) | 參考過的產品和做法 |
 | [`notes/design.md`](notes/design.md) | 現在的架構和流程、待解問題 |
+| [`specs/`](specs/) | 每個功能做了什麼、怎麼做、為什麼（001 核心、002 桌面版、003 agent 和房間），加上資料格式和指令說明。是紀錄，不是定案 |
 
 ## 安裝
 
@@ -41,3 +42,4 @@ cd apps/cli && npm link
 | `packages/contracts` | 共用的資料格式 |
 | `tandem/` | 這個團隊自己的紀錄：決定、每個人的狀態、團隊習慣 |
 | `notes/` | 背景文件 |
+| `specs/` | 功能紀錄、資料格式、指令說明 |
