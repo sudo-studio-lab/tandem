@@ -179,7 +179,7 @@ GitHub 登入用裝置碼流程（像 GitHub Desktop），沒裝 `gh` 也能用�
 
 ### 1. 等 Roy 一起決定
 
-原本開給 Roy 的四個問題，只留下[正式名稱](https://github.com/sudo-studio-lab/tandem/discussions/2)；另外三題先關掉，等 Roy 測試完再一起從頭談：
+原本開給 Roy 的四個問題，只留下[正式名稱](https://github.com/sudo-studio-lab/tandem/discussions/2)；另外三題已經刪掉，問題記在這裡，等 Roy 測試完再一起從頭談：
 
 | 問題 | 關係到什麼 |
 |---|---|
