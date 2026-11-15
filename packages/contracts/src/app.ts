@@ -1,7 +1,6 @@
 /**
  * 002-desktop contracts: the app-level (multi-project) API shared by the local server,
  * the web UI and the Electron shell. Types only — no runtime code, so the web bundle stays small.
- * See specs/002-desktop/plan.md §API.
  */
 import type { BoardData, SyncState } from "./index.ts";
 

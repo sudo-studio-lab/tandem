@@ -1,4 +1,4 @@
-/** Command implementations. Spec: specs/001-core/contracts/cli.md */
+/** Command implementations. */
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import {

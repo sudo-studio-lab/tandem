@@ -1,6 +1,5 @@
 /**
  * Tandem shared contracts: data formats only, no I/O.
- * Spec: specs/001-core/data-model.md and contracts/cli.md.
  */
 import { z } from "zod";
 

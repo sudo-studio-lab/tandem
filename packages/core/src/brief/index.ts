@@ -1,7 +1,6 @@
 /**
  * Brief: what changed that affects me, and who waits on whom.
  * Pure functions only — callers gather inputs from records, git and GitHub.
- * Spec: specs/001-core/data-model.md (推導出來的資料), contracts/cli.md (tandem brief).
  */
 import {
   PRODUCT,
