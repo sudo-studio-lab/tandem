@@ -1,14 +1,12 @@
 ---
 login: jielle2453
-updated: 2026-11-15T16:29:55+08:00
-doing: "Tandem 第一版做好並合併了（PR #1），這個 repo 已經改用 Tandem 管理紀錄。"
-next: 用個人 repo 測邀請流程（invite / join）；修看板自動同步時會順便推送程式碼 commit 的問題。
-blocked: "等 @theroyatlas 裝好 tandem 試用，並回答 #3（誰決定）和 #5（本人看過才跑）。"
+updated: 2026-11-15T17:16:37+08:00
+doing: 002 桌面版：多專案伺服器、Electron 殼、GitHub 登入都做好了，看板用真資料跑得起來；還沒 commit。
+next: 解決 Smart App Control 擋住沒簽章的 Tandem.exe（關掉或簽章），再打包安裝檔、兩台電腦實測。
+blocked: 這台電腦的 Smart App Control 還開著，會擋住安裝檔
 fyi:
-  - text: 裝一次就好：git pull → npm install → npm run build → cd apps/cli && npm link，然後執行 tandem
-    ref: https://github.com/sudo-studio-lab/tandem/pull/1
-  - text: 舊的 4 個問題搬到 Discussions 了，都在等你
-    ref: https://github.com/sudo-studio-lab/tandem/discussions
+  - text: 建好公開 repo sudo-studio-lab/tandem-releases（放安裝檔和下載頁）
+  - text: GitHub OAuth App 已登記，Client ID 已放進程式
 deliverables:
   - title: "PR #1：Tandem 第一版"
     url: https://github.com/sudo-studio-lab/tandem/pull/1
