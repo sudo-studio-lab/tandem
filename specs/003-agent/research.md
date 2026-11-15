@@ -41,6 +41,11 @@
 
 - `--mcp-config <檔案或 JSON>`；`-p` 模式不會跳出「信任這個 MCP 伺服器嗎」的詢問，也會連上專案 `.mcp.json` 的伺服器。
 - 專案 `.mcp.json`：`{"mcpServers":{"tandem":{"command":"tandem","args":["mcp"]}}}`。在終端機互動模式下，第一次會問使用者要不要啟用（這是 Claude Code 自己的保護，不繞過）。
+- **已驗證**（2026-11-15，Claude Code 2.1.314，Windows）：
+  - `command` 直接寫 `tandem` 就能啟動（解析到 npm 的 `tandem.cmd`），不需要 `cmd /c`。`--mcp-config` 和專案 `.mcp.json` 都一樣。
+  - `-p` 模式會自動連上專案 `.mcp.json` 的伺服器（`system/init` 裡 `source: "project"`、`status: "connected"`），沒有詢問。
+  - MCP 工具在 `-p` 模式要被允許才能用（`--allowedTools mcp__tandem__tandem_decisions` 後成功呼叫）。之後由 `--permission-prompt-tool` 接手。
+  - `-p` 模式也會跑專案的 SessionStart 和 Stop hook。stream-json 的第一行可能是 `system/hook_started`，不一定是 `system/init`。
 
 ### A7. 模型
 

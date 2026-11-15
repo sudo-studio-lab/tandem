@@ -78,7 +78,7 @@ async function handle(event: HookEvent, agent: Agent, stdin: string): Promise<st
         if (await statusTouchedSince(ctx, s.startedAt)) return formatHookOutput(agent, "stop", {});
         s.nudged = true;
         return formatHookOutput(agent, "stop", {
-          blockReason: `這次有做事，但 @${ctx.me} 的 ${PRODUCT.displayName} 狀態還沒更新。請用 \`${PRODUCT.command} status --doing … --next … [--deliverable 標題=網址]\` 更新後再結束（只提醒這一次）。`,
+          blockReason: `這次有做事，但 @${ctx.me} 的 ${PRODUCT.displayName} 狀態還沒更新。請用 \`${PRODUCT.command}_status\` 工具（沒有的話用 \`${PRODUCT.command} status --doing … --next … [--deliverable 標題=網址]\`）更新後再結束（只提醒這一次）。`,
         });
       }
     }

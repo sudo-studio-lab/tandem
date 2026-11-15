@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "tandem": {
+      "command": "tandem",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}
