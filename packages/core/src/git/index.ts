@@ -1,1 +1,11 @@
-export {};
+export { runGit } from "./run.ts";
+export type { RunGitOptions, RunGitResult } from "./run.ts";
+export { GitQueue, getQueue } from "./queue.ts";
+export { findRepoRoot, getGitDir, getRemoteRepo, parseRemoteUrl, headCommit, currentBranch } from "./repo.ts";
+export { changesSince } from "./history.ts";
+export type { ChangedCommit, ChangedFile } from "./history.ts";
+export { syncData, fetchRemote } from "./sync.ts";
+export type { SyncResult } from "./sync.ts";
+export { createSyncScheduler } from "./scheduler.ts";
+export type { SyncSchedulerOptions } from "./scheduler.ts";
+export { installPreCommitHook, removePreCommitHook } from "./hook.ts";
