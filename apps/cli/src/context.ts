@@ -18,7 +18,7 @@ export type GitHubClient = ReturnType<typeof createGitHubClient>;
 
 /** Local state plus CLI-only bookkeeping for agent sessions. */
 export type CliState = LocalState & {
-  sessions?: Record<string, { startedAt: string; head: string | null; nudged?: boolean; reinject?: boolean }>;
+  sessions?: Record<string, { startedAt: string; head: string | null; nudged?: boolean; reinject?: boolean; tree?: string }>;
 };
 
 export interface Context {

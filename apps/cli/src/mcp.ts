@@ -41,12 +41,64 @@ const DATA_NOTE =
 
 export async function runMcpServer(cwd: string = process.cwd()): Promise<void> {
   let ctxPromise: Promise<Context> | null = null;
-  const server = createMcpServer(() => (ctxPromise ??= openContext(cwd)));
+  const testRoot = process.env.TANDEM_TEST_ROOT;
+  const open = testRoot
+    ? async () => (await import("./test-context.ts")).offlineContext(testRoot, process.env.TANDEM_TEST_ME || "tester")
+    : () => openContext(cwd);
+  const server = createMcpServer(() => (ctxPromise ??= open()), approveFromEnv());
   await server.connect(new StdioServerTransport());
 }
 
+/**
+ * Approval bridge (plan A4): when Tandem itself starts a Claude chat it passes these env vars and
+ * `--permission-prompt-tool mcp__tandem__approve`. The tool forwards the request to the local
+ * Tandem server and waits for the user's click. Not registered in a plain terminal session.
+ */
+export interface ApproveBridge {
+  url: string;
+  token: string;
+  chatId: string;
+}
+
+/**
+ * Existing, still-current decisions that look related to a new one (same area, or sharing words):
+ * shown with the draft so the agent can offer `supersedes` instead of silently contradicting them.
+ */
+async function relatedDecisions(c: Context, input: DecisionInput): Promise<string[]> {
+  const words = (t: string) => {
+    const lower = t.toLowerCase();
+    const latin = lower.match(/[a-z0-9][a-z0-9.+#-]{2,}/g) ?? [];
+    // CJK: overlapping pairs of characters are a cheap stand-in for words.
+    const cjk = (lower.match(/[㐀-鿿]+/g) ?? []).flatMap((run) =>
+      Array.from({ length: Math.max(0, run.length - 1) }, (_, i) => run.slice(i, i + 2)),
+    );
+    return new Set([...latin, ...cjk]);
+  };
+  const mine = words(`${input.title} ${input.decision}`);
+  const { decisions } = await loadDecisions(c.store);
+  return decisions
+    .filter((d) => d.supersededBy.length === 0 && !(input.supersedes ?? []).includes(d.frontmatter.id))
+    .map((d) => {
+      const theirs = words(`${d.frontmatter.title} ${d.decision}`);
+      let score = [...mine].filter((w) => theirs.has(w)).length;
+      if (input.area && d.frontmatter.area && input.area.toLowerCase() === d.frontmatter.area.toLowerCase()) score += 2;
+      return { d, score };
+    })
+    .filter((x) => x.score >= 2)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .map(({ d }) => `- ${d.frontmatter.id}｜${d.frontmatter.title}｜${d.decision.replace(/\s+/g, " ").slice(0, 80)}`);
+}
+
+export function approveFromEnv(env: NodeJS.ProcessEnv = process.env): ApproveBridge | undefined {
+  const url = env.TANDEM_APPROVE_URL;
+  const token = env.TANDEM_APPROVE_TOKEN;
+  const chatId = env.TANDEM_CHAT_ID;
+  return url && token && chatId ? { url, token, chatId } : undefined;
+}
+
 /** The server without a transport; `ctx` is opened lazily so listing tools never touches the network. */
-export function createMcpServer(ctx: () => Promise<Context>): McpServer {
+export function createMcpServer(ctx: () => Promise<Context>, approve?: ApproveBridge): McpServer {
   const server = new McpServer(
     { name: PRODUCT.command, version: pkg.version },
     {
@@ -84,7 +136,7 @@ export function createMcpServer(ctx: () => Promise<Context>): McpServer {
     guard(async ({ markRead }: { markRead?: boolean }) => {
       const c = await ctx();
       await syncData(c.repoRoot, { gitEnv: c.gitEnv }).catch(() => undefined);
-      const gh = await withTimeout(gatherGitHub(c), 15_000, null);
+      const gh = await withTimeout(gatherGitHub(c).catch(() => null), 15_000, null);
       const { brief, head } = await buildBrief(c, gh);
       if (markRead) {
         c.state.lastBrief = { commit: head, time: new Date().toISOString() };
@@ -96,7 +148,7 @@ export function createMcpServer(ctx: () => Promise<Context>): McpServer {
 
   // --- decide -------------------------------------------------------------------
   const QuoteIn = z.object({
-    by: z.string().describe("說這句話的人的 GitHub 帳號"),
+    by: z.string().optional().describe("說這句話的人的 GitHub 帳號。使用者本人說的就省略（Tandem 會填上正確的帳號），不要猜帳號"),
     text: z.string().describe("逐字原話：不改寫、不摘要、不翻譯、不修錯字"),
     source: z.string().default("chat").describe("chat，或說這句話的網址"),
     relayedBy: z.string().optional().describe("如果是別人轉述的，轉述的人的帳號"),
@@ -130,13 +182,18 @@ export function createMcpServer(ctx: () => Promise<Context>): McpServer {
       const input = {
         ...rest,
         deciders: (rest.deciders as string[] | undefined)?.length ? rest.deciders : [c.me],
+        quotes: (args.quotes as { by?: string }[]).map((q) => ({ ...q, by: (q.by || c.me).replace(/^@/, "") })),
         noQuoteBy: args.quotes.length === 0 ? c.me : undefined,
       } as DecisionInput;
       const r = await createDecision(c.store, input, { dryRun });
       const errors = r.problems.filter((p) => p.severity === "error");
       if (errors.length) return fail(`格式有問題，沒有寫入：\n${problemsText(r.problems)}`);
       if (dryRun) {
-        return ok(`草稿（還沒寫入）。給使用者看，問「我記成這樣，對嗎？」：\n\n${r.content}${r.problems.length ? `\n\n${problemsText(r.problems)}` : ""}`);
+        const related = await relatedDecisions(c, input);
+        const hint = related.length
+          ? `\n\n可能相關的現有決定（如果新決定取代其中哪一筆，把編號放進 supersedes，並在給使用者看的時候說明；不要去改舊檔案）：\n${related.join("\n")}`
+          : "";
+        return ok(`草稿（還沒寫入）。給使用者看，問「我記成這樣，對嗎？」：\n\n${r.content}${r.problems.length ? `\n\n${problemsText(r.problems)}` : ""}${hint}`);
       }
       return ok(`已記錄 ${r.id}（${r.path}）${writeNote(r.write)}`);
     }),
@@ -286,6 +343,47 @@ export function createMcpServer(ctx: () => Promise<Context>): McpServer {
       return ok(r.problems.length ? problemsText(r.problems) : "紀錄都沒有問題");
     }),
   );
+
+  if (approve) {
+    server.registerTool(
+      "approve",
+      {
+        title: "請使用者核准",
+        description: "Tandem 內部用：把需要核准的動作交給使用者決定。",
+        inputSchema: {
+          tool_name: z.string(),
+          input: z.record(z.string(), z.unknown()),
+          tool_use_id: z.string().optional(),
+        },
+      },
+      async (args: { tool_name: string; input: Record<string, unknown>; tool_use_id?: string }) => {
+        let decision: { behavior: "allow"; updatedInput: Record<string, unknown> } | { behavior: "deny"; message: string };
+        try {
+          // The server answers within a few minutes either way; while the user hasn't clicked yet it
+          // says `pending` and we ask again (HTTP clients give up on very long waits).
+          let approvalId: string | undefined;
+          let j: { allow?: boolean; message?: string; pending?: boolean; approvalId?: string } = {};
+          for (;;) {
+            const res = await fetch(approve.url, {
+              method: "POST",
+              headers: { "content-type": "application/json", authorization: `Bearer ${approve.token}` },
+              body: JSON.stringify({ chatId: approve.chatId, toolName: args.tool_name, input: args.input, toolUseId: args.tool_use_id, approvalId }),
+            });
+            j = (await res.json()) as typeof j;
+            if (!res.ok) throw new Error(j.message ?? `HTTP ${res.status}`);
+            if (!j.pending) break;
+            approvalId = j.approvalId;
+          }
+          decision = j.allow
+            ? { behavior: "allow", updatedInput: args.input }
+            : { behavior: "deny", message: j.message || "使用者拒絕了這個動作。" };
+        } catch (e) {
+          decision = { behavior: "deny", message: `沒辦法問使用者（${(e as Error).message}），所以先不做。` };
+        }
+        return { content: [{ type: "text" as const, text: JSON.stringify(decision) }] };
+      },
+    );
+  }
 
   return server;
 }

@@ -128,3 +128,12 @@
 5. Codex 能不能不改全域設定就接上 Tandem 的 MCP。
 6. Codex 自己的 API key 登入指令。
 7. 兩家在 Windows 上從 GUI 程式（Electron）啟動時，PATH 和環境變數是否正確。
+
+## 實機驗證結果（2026-11-15，Claude Code 2.1.314，Windows）
+
+1. **stream-json 輸入**：一行 `{"type":"user","message":{"role":"user","content":"文字"}}` 就夠（content 可以是字串或 text 區塊陣列）。stdin 不關，程序就一直活著，可以連續送好幾則；每則各有一個 `result`，`session_id` 不變。
+2. **核准**：`--permission-prompt-tool mcp__tandem__approve` 收到 `{tool_name, input, tool_use_id}`；回 `{"behavior":"allow","updatedInput":...}` 或 `{"behavior":"deny","message":"..."}`（放在工具結果的文字裡）。拒絕的訊息會原樣交給 agent；`result.permission_denials` 會列出被拒的動作。唯讀的指令（例如 `echo`）不會來問。
+3. **中斷**：`taskkill /T /F` 約 0.2 秒結束。之後 `--resume <session_id>` 記得之前的內容；被中斷那一則的回覆沒有保存（agent 以為還沒開始），可以接受。
+4. **登入狀態**：`claude auth status --json` 欄位：`loggedIn`、`authMethod`（例如 `claude.ai`）、`apiProvider`、`subscriptionType`、`orgName`、`email`。Tandem 只用 `loggedIn`、`authMethod`、`subscriptionType`，不顯示也不保存 email。
+5. **啟動**：Node 不經過 shell 直接 `spawn("claude")` 可以執行（原生版 `claude.exe`）。
+6. Codex 的項目（4、5、6）交給 @theroyatlas 實測。

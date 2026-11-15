@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { AgentAvailability, AgentKind, AppSession, ProjectBoard, ProjectRef } from "@tandem/contracts";
+import type { AgentKind, AgentStatus, AppSession, ProjectBoard, ProjectRef } from "@tandem/contracts";
 import { api, projectPath } from "../api.ts";
 import { relTime } from "../time.ts";
 import { errMsg } from "./ui.tsx";
@@ -23,6 +23,8 @@ interface Props {
   onInvite: () => void;
   onSettings: () => void;
   onError: (msg: string) => void;
+  view: "board" | "chat";
+  onView: (v: "board" | "chat") => void;
 }
 
 function SyncIndicator({ board, now, syncing, onSync }: Pick<Props, "board" | "now" | "syncing" | "onSync">) {
@@ -153,12 +155,12 @@ function Switcher({ session, project, onSelect, onRemove, onAddProject, onError 
 }
 
 export function Header(p: Props) {
-  const [agents, setAgents] = useState<AgentAvailability[]>([]);
+  const [agents, setAgents] = useState<AgentStatus[]>([]);
   const [opening, setOpening] = useState<string | null>(null);
   const id = p.project?.id;
 
   useEffect(() => {
-    api<AgentAvailability[]>("GET", "/api/agents")
+    api<AgentStatus[]>("GET", "/api/agents")
       .then(setAgents)
       .catch(() => {});
   }, []);
@@ -197,26 +199,31 @@ export function Header(p: Props) {
       </div>
       {usable && id && (
         <div className="topbar-inner actions">
+          <div className="view-tabs" role="group" aria-label="畫面">
+            <button type="button" aria-pressed={p.view === "board"} onClick={() => p.onView("board")}>
+              看板
+            </button>
+            <button type="button" aria-pressed={p.view === "chat"} onClick={() => p.onView("chat")}>
+              跟 AI 對話
+            </button>
+          </div>
           <button type="button" className="btn" onClick={p.onInvite}>
             邀請
           </button>
-          {agents.map((a) =>
-            a.installed ? (
+          {agents
+            .filter((a) => a.installed)
+            .map((a) => (
               <button
                 key={a.agent}
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-quiet"
                 disabled={opening === a.agent}
+                title="在終端機裡使用，Tandem 的工具一樣能用"
                 onClick={() => run(a.agent, projectPath(id, "/open-agent"), { agent: a.agent })}
               >
-                用 {AGENT_NAME[a.agent]} 開始
+                在終端機打開 {AGENT_NAME[a.agent]}
               </button>
-            ) : (
-              <a key={a.agent} className="btn btn-quiet" href={a.installUrl} target="_blank" rel="noreferrer">
-                還沒安裝 {AGENT_NAME[a.agent]}，點此安裝
-              </a>
-            ),
-          )}
+            ))}
           <button type="button" className="btn" disabled={opening === "folder"} onClick={() => run("folder", projectPath(id, "/open-folder"))}>
             打開資料夾
           </button>

@@ -6,7 +6,9 @@
  * Repo names containing "fail" make the progress run fail, to show the error state.
  */
 import type {
-  AgentAvailability,
+  AgentStatus,
+  Chat,
+  ChatItem,
   AppEvent,
   AppSession,
   AppSettings,
@@ -63,10 +65,40 @@ const owners: OwnerChoice[] = [
   { login: "sudo-studio-lab", kind: "org" },
 ];
 
-const agents: AgentAvailability[] = [
-  { agent: "claude", installed: true, installUrl: "https://claude.com/claude-code" },
-  { agent: "codex", installed: false, installUrl: "https://developers.openai.com/codex" },
+const agents: AgentStatus[] = [
+  {
+    agent: "claude",
+    label: "Claude",
+    installed: true,
+    version: "2.1.0",
+    auth: "subscription",
+    plan: "pro",
+    models: [
+      { id: "", label: "預設", isDefault: true },
+      { id: "sonnet", label: "Sonnet" },
+    ],
+    installUrl: "https://code.claude.com/docs/en/setup",
+  },
+  { agent: "codex", label: "Codex", installed: false, auth: "none", models: [], installUrl: "https://developers.openai.com/codex" },
 ];
+
+/** Fake chats: the agent answers with a canned reply and one approval card. */
+const chats: Chat[] = [];
+function mockChatReply(chat: Chat, text: string) {
+  const at = () => new Date().toISOString();
+  const push = (item: ChatItem) => {
+    chat.items.push(item);
+    emit({ type: "chat", data: { chatId: chat.id, type: "item", item } });
+  };
+  const summary = () => emit({ type: "chat", data: { chatId: chat.id, type: "summary", chat: { ...chat, items: undefined } as never } });
+  chat.running = true;
+  summary();
+  setTimeout(() => {
+    push({ kind: "assistant", id: `a${chat.items.length}`, at: at(), text: `（範例回覆）收到：「${text}」。我先看一下專案。` });
+    push({ kind: "tool", id: `t${chat.items.length}`, at: at(), name: "Read", summary: "README.md", status: "done", output: "# 範例" });
+    push({ kind: "approval", id: `p${chat.items.length}`, at: at(), name: "Bash", summary: "npm test", state: "pending" });
+  }, 600);
+}
 
 // --- events -----------------------------------------------------------------
 const listeners = new Set<(e: AppEvent) => void>();
@@ -215,6 +247,37 @@ export async function handle(method: string, path: string, body: unknown): Promi
   }
 
   if (method === "GET" && p === "/api/agents") return agents;
+  if ((m = p.match(/^\/api\/chats\/([^/]+)(\/.*)?$/))) {
+    const chat = chats.find((c) => c.id === m![1]);
+    if (!chat) throw new ApiError("找不到這段對話", "usage");
+    const tail = m[2] ?? "";
+    if (method === "GET" && !tail) return chat;
+    if (method === "DELETE" && !tail) {
+      chats.splice(chats.indexOf(chat), 1);
+      emit({ type: "chat", data: { chatId: chat.id, type: "deleted" } });
+      return { ok: true };
+    }
+    if (method === "POST" && tail === "/messages") {
+      const text = String((body as { text?: string })?.text ?? "");
+      const item: ChatItem = { kind: "user", id: `u${chat.items.length}`, at: new Date().toISOString(), text };
+      chat.items.push(item);
+      if (chat.title === "新對話") chat.title = text.slice(0, 40);
+      emit({ type: "chat", data: { chatId: chat.id, type: "item", item } });
+      mockChatReply(chat, text);
+      return { ok: true };
+    }
+    if (method === "POST" && (tail === "/interrupt" || tail.startsWith("/approvals/"))) {
+      for (const it of chat.items) {
+        if (it.kind === "approval" && it.state === "pending") {
+          it.state = tail === "/interrupt" || (body as { decision?: string })?.decision === "deny" ? "denied" : "allowed";
+          emit({ type: "chat", data: { chatId: chat.id, type: "item", item: it } });
+        }
+      }
+      chat.running = false;
+      emit({ type: "chat", data: { chatId: chat.id, type: "summary", chat: { ...chat, items: undefined } as never } });
+      return { ok: true };
+    }
+  }
   if (method === "GET" && p === "/api/settings") return settings;
   if (method === "PUT" && p === "/api/settings") {
     Object.assign(settings, body);
@@ -258,6 +321,13 @@ export async function handle(method: string, path: string, body: unknown): Promi
       };
     }
     if (method === "POST" && tail === "/open-agent") return { ok: true };
+    if (method === "GET" && tail === "/chats") return chats.filter((c) => c.projectId === id).map(({ items: _i, ...c }) => c);
+    if (method === "POST" && tail === "/chats") {
+      const t = new Date().toISOString();
+      const c: Chat = { id: `chat${chats.length + 1}`, projectId: id, agent: "claude", model: String((b as { model?: string }).model ?? ""), title: "新對話", createdAt: t, updatedAt: t, running: false, items: [] };
+      chats.push(c);
+      return { ...c, items: undefined };
+    }
     if (method === "POST" && tail === "/open-folder") return { ok: true };
   }
 

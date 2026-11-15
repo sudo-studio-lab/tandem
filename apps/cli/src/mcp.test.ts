@@ -100,6 +100,23 @@ describe("tandem mcp", () => {
     expect(text).toContain("alice");
   });
 
+  it("a draft lists related current decisions so the agent can offer supersedes", async () => {
+    await call("tandem_decide", { ...DECISION, dryRun: false });
+    const id = (await decisionFiles())[0]!.slice(0, 15);
+    const draft = await call("tandem_decide", {
+      title: "登入改成 GitHub 和 email 都可以",
+      decision: "登入除了 GitHub 也支援 email。",
+      why: "有客戶沒有 GitHub。",
+      quotes: [{ text: "好 email也要可以登入" }],
+    });
+    expect(draft.text).toContain("可能相關的現有決定");
+    expect(draft.text).toContain(id);
+    // A quote without `by` is the user's own words.
+    expect(draft.text).toContain("alice");
+    const unrelated = await call("tandem_decide", { title: "部署用 Fly.io", decision: "部署到 Fly.io。", why: "便宜。", quotes: [] });
+    expect(unrelated.text).not.toContain("可能相關的現有決定");
+  });
+
   it("finds decisions by keyword", async () => {
     await call("tandem_decide", { ...DECISION, dryRun: false });
     const hit = await call("tandem_decisions", { query: "github" });

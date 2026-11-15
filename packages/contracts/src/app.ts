@@ -170,6 +170,8 @@ export type AppEvent =
   | { type: "sync"; data: SyncState & { projectId: string } }
   | { type: "progress"; data: ProjectProgress }
   | { type: "notify"; data: AppNotification }
+  | { type: "chat"; data: import("./agent.ts").ChatUpdate }
+  | { type: "agents"; data: import("./agent.ts").AgentStatus[] }
   | { type: "ping"; data: "" };
 
 /** First line the server prints on stdout when started with `tandem serve` (research S9). */

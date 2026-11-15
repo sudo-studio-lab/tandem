@@ -345,3 +345,4 @@ export class TandemError extends Error {
 /** CLI exit codes (contracts/cli.md). */
 export const EXIT = { ok: 0, error: 1, usage: 2, needsHuman: 3 } as const;
 export type * from "./app.ts";
+export type * from "./agent.ts";

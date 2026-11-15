@@ -14,6 +14,7 @@ import { SignIn } from "./components/SignIn.tsx";
 import { Picker, type StartOp } from "./components/Picker.tsx";
 import { ProgressView } from "./components/Progress.tsx";
 import { InviteDialog, SettingsDialog } from "./components/Dialogs.tsx";
+import { AgentSettingsDialog, ChatView } from "./components/Chat.tsx";
 import { Spinner, errMsg } from "./components/ui.tsx";
 
 interface Op {
@@ -31,7 +32,8 @@ export function App() {
   const now = useNow();
   const [showPicker, setShowPicker] = useState(false);
   const [op, setOp] = useState<Op | null>(null);
-  const [dialog, setDialog] = useState<"invite" | "settings" | null>(null);
+  const [dialog, setDialog] = useState<"invite" | "settings" | "agents" | null>(null);
+  const [view, setView] = useState<"board" | "chat">("board");
   const [toast, setToast] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const handledDone = useRef<string | null>(null);
@@ -167,6 +169,8 @@ export function App() {
       onInvite={() => setDialog("invite")}
       onSettings={() => setDialog("settings")}
       onError={notify}
+      view={view}
+      onView={setView}
     />
   );
 
@@ -198,6 +202,8 @@ export function App() {
             </button>
           </div>
         </main>
+      ) : view === "chat" ? (
+        <ChatView projectId={project.id} now={now} onOpenSettings={() => setDialog("agents")} />
       ) : !board ? (
         <main className="page">
           {app.boardError ? (
@@ -228,6 +234,7 @@ export function App() {
         </main>
       )}
       {dialog === "invite" && project && <InviteDialog projectId={project.id} onClose={() => setDialog(null)} />}
+      {dialog === "agents" && <AgentSettingsDialog onClose={() => setDialog(null)} />}
       {dialog === "settings" && <SettingsDialog session={session} onClose={() => setDialog(null)} onSignOut={signOut} />}
     </>
   );

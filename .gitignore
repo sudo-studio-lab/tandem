@@ -11,3 +11,6 @@ dist/
 dist-desktop/
 coverage/
 *.tsbuildinfo
+
+# Agent conformance output (npm run test:agents)
+tests/agents/last-report.md

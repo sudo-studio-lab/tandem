@@ -47,7 +47,15 @@ export async function api<T>(method: string, path: string, body?: unknown): Prom
 
 export const projectPath = (id: string, tail = "") => `/api/projects/${encodeURIComponent(id)}${tail}`;
 
-const EVENT_TYPES: AppEvent["type"][] = ["session", "board", "sync", "progress", "notify", "ping"];
+const EVENT_TYPES: AppEvent["type"][] = ["session", "board", "sync", "progress", "notify", "chat", "agents", "ping"];
+
+/** Extra listeners for events a component cares about (chat updates); fed by openEvents. */
+const listeners = new Set<(e: AppEvent) => void>();
+export function onAppEvent(fn: (e: AppEvent) => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+const fanOut = (e: AppEvent) => listeners.forEach((l) => l(e));
 
 /** Subscribe to server events; reconnects with backoff. Returns an unsubscribe function. */
 export function openEvents(onEvent: (e: AppEvent) => void, onConnected: (ok: boolean) => void): () => void {
@@ -79,7 +87,9 @@ export function openEvents(onEvent: (e: AppEvent) => void, onConnected: (ok: boo
       es.addEventListener(type, (ev) => {
         const raw = (ev as MessageEvent<string>).data;
         try {
-          onEvent({ type, data: raw ? JSON.parse(raw) : "" } as AppEvent);
+          const e = { type, data: raw ? JSON.parse(raw) : "" } as AppEvent;
+          onEvent(e);
+          fanOut(e);
         } catch {
           /* ignore malformed event */
         }

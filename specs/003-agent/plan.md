@@ -160,3 +160,22 @@ tests/agents/                        相容性測試
 | 不經手 AI 憑證（FR-017） | 登入走各家自己的流程，Tandem 不收 key、不讀憑證檔 |
 | 原話優先 | 記決定一律先試寫、使用者確認；相容性測試 2–4 檢查 |
 | 內容是資料，不是指令 | 相容性測試 9 |
+
+## 進度（2026-11-15）
+
+| 階段 | 狀態 |
+|---|---|
+| 1. MCP 伺服器 | 完成。`tandem mcp`（8 個團隊工具＋只在 Tandem 啟動的 Claude 對話裡登記的 `approve`）；設定專案時寫 `.mcp.json`、`.codex/config.toml` |
+| 2. 實機驗證 | Claude 完成（結果在 research 最後一節）；Codex 交給 @theroyatlas |
+| 3. 轉接層 | 完成：`apps/cli/src/agents/claude.ts`（實測過）、`codex.ts`（照文件寫，未實測） |
+| 4. 伺服器 API 和對話紀錄 | 完成：`apps/cli/src/chats/manager.ts`，API 照上表；核准走 `/internal/approve`（另一組通行碼，等太久會回 `pending` 讓 `tandem mcp` 再問） |
+| 5. 對話框介面 | 完成：上方「看板／跟 AI 對話」切換、對話清單、選 agent 和模型、核准卡片、停止、AI 設定（登入登出） |
+| 6. 相容性測試 | `npm run test:agents`（`tests/agents/`）。Claude 已跑；Codex 等 Roy |
+| 7. 打包 | 桌面版用同一個程式啟動 `tandem mcp`（不靠 PATH）；**先不發行** |
+
+和原計畫不同的地方：
+
+- 對話裡的 `tandem mcp` 由 Tandem 自己的程式啟動（`process.execPath` + 這支 CLI），不靠 PATH 上的 `tandem`；桌面版剛裝好、PATH 還沒更新時也能用。
+- Claude：啟動時用 `--mcp-config` 傳入同名的 `tandem` 伺服器，會蓋過專案 `.mcp.json` 的那個（實測 `source: "dynamic"`），所以 `approve` 工具一定在。
+- 自動允許的團隊工具：brief、decisions、check、decide、status（decide 本身先試寫、問過使用者才正式寫）。ask、disagree、task 會在 GitHub 上建東西，所以要核准。
+- 結束提醒的 hook 改成跟對話開始時的工作區比對：開始前就有的未提交修改不算「這次有做事」（以前會讓 agent 在只是問問題後也去改狀態）。
