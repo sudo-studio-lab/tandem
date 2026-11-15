@@ -9,4 +9,8 @@ export {
   type DiscussionsInfo,
   type CreateDiscussionInput,
   type CreateIssueInput,
+  type CreateRepoInput,
+  type CreatedRepo,
+  type RepoInfo,
+  type ActivityRaw,
 } from "./client.ts";

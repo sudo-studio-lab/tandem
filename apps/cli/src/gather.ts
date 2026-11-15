@@ -11,7 +11,7 @@ import {
   type SyncState,
   type TaskSummary,
 } from "@tandem/contracts";
-import { changesSince, checkRecords, computeBrief, computeWaiting, headCommit, loadDecisions, loadStatuses } from "@tandem/core";
+import { changesSince, checkRecords, computeBrief, computeWaiting, loadDecisions, loadStatuses } from "@tandem/core";
 import type { Context } from "./context.ts";
 
 export interface GitHubData {
@@ -50,9 +50,9 @@ export async function gatherGitHub(ctx: Context): Promise<GitHubData> {
 
 export async function gatherLocal(ctx: Context) {
   const [{ decisions, problems: loadProblems }, statusesResult, check] = await Promise.all([
-    loadDecisions(ctx.repoRoot),
-    loadStatuses(ctx.repoRoot),
-    checkRecords(ctx.repoRoot, {}),
+    loadDecisions(ctx.store),
+    loadStatuses(ctx.store),
+    checkRecords(ctx.store, {}),
   ]);
   const statuses = Array.isArray(statusesResult) ? statusesResult : statusesResult.statuses;
   const statusProblems: Problem[] = Array.isArray(statusesResult) ? [] : (statusesResult.problems ?? []);
@@ -72,7 +72,7 @@ export async function buildBrief(ctx: Context, gh: GitHubData | null): Promise<{
   const [local, changes, head] = await Promise.all([
     gatherLocal(ctx),
     changesSince(ctx.repoRoot, since.commit, [PRODUCT.dataDir]),
-    headCommit(ctx.repoRoot),
+    ctx.store.snapshot(),
   ]);
   const added = new Set(
     changes.files.filter((f) => f.status === "A" && f.path.startsWith(`${PATHS.decisions}/`)).map((f) => f.path),
@@ -100,7 +100,8 @@ export async function buildBrief(ctx: Context, gh: GitHubData | null): Promise<{
 
 const sameLogin = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
-export async function buildBoard(ctx: Context, gh: GitHubData, sync: SyncState): Promise<BoardData> {
+/** `extraLogins`: collaborators and people seen in activity, so nobody with access is missing (spec 002 story 3). */
+export async function buildBoard(ctx: Context, gh: GitHubData, sync: SyncState, extraLogins: string[] = []): Promise<BoardData> {
   const local = await gatherLocal(ctx);
   const waiting = computeWaiting(gh);
   const logins = new Map<string, string>();
@@ -109,6 +110,7 @@ export async function buildBoard(ctx: Context, gh: GitHubData, sync: SyncState):
   };
   add(ctx.me);
   local.statuses.forEach((s) => add(s.login));
+  extraLogins.forEach(add);
   gh.tasks.filter((t) => t.state === "open").forEach((t) => t.assignees.forEach(add));
   waiting.forEach((w) => {
     add(w.from);

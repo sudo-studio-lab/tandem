@@ -2,8 +2,8 @@
  * `tandem hook <event> --agent claude|codex` — called by agent hooks, never by people.
  * Must always print valid JSON and never fail the agent (contracts/agent-integration.md §3).
  */
-import { PATHS, PRODUCT } from "@tandem/contracts";
-import { formatHookOutput, headCommit, readHookInput, renderAgentContext, runGit, syncData } from "@tandem/core";
+import { PRODUCT } from "@tandem/contracts";
+import { formatHookOutput, headCommit, loadStatuses, readHookInput, renderAgentContext, runGit, syncData } from "@tandem/core";
 import { openContext, withTimeout } from "./context.ts";
 import { buildBrief, gatherGitHub } from "./gather.ts";
 import { readStdin } from "./io.ts";
@@ -14,7 +14,7 @@ type HookEvent = "session-start" | "stop" | "user-prompt" | "post-compact";
 const HOOK_BUDGET_MS = 12_000;
 
 async function sessionContext(ctx: Awaited<ReturnType<typeof openContext>>): Promise<string> {
-  await withTimeout(syncData(ctx.repoRoot, { dataDir: PRODUCT.dataDir }).catch(() => undefined), 6_000, undefined);
+  await withTimeout(syncData(ctx.repoRoot, { gitEnv: ctx.gitEnv }).catch(() => undefined), 6_000, undefined);
   const gh = await withTimeout(gatherGitHub(ctx), 6_000, null);
   const { brief, head } = await buildBrief(ctx, gh);
   ctx.state.lastBrief = { commit: head, time: new Date().toISOString() };
@@ -33,13 +33,11 @@ async function workChangedSince(repoRoot: string, head: string | null): Promise<
   return log.stdout.trim().length > 0;
 }
 
-async function statusTouchedSince(repoRoot: string, login: string, sinceIso: string): Promise<boolean> {
-  const file = `${PATHS.status}/${login}.md`;
-  const dirty = await runGit(["status", "--porcelain", "--", file], { cwd: repoRoot, allowFail: true });
-  if (dirty.stdout.trim()) return true;
-  const log = await runGit(["log", "-1", "--format=%cI", "--", file], { cwd: repoRoot, allowFail: true });
-  const t = log.stdout.trim();
-  return t !== "" && Date.parse(t) >= Date.parse(sinceIso);
+/** Records live on the remote default branch now (research S1), so read my status through the store. */
+async function statusTouchedSince(ctx: Awaited<ReturnType<typeof openContext>>, sinceIso: string): Promise<boolean> {
+  const { statuses } = await loadStatuses(ctx.store);
+  const mine = statuses.find((s) => s.login.toLowerCase() === ctx.me.toLowerCase());
+  return !!mine && Date.parse(mine.updated) >= Date.parse(sinceIso);
 }
 
 async function handle(event: HookEvent, agent: Agent, stdin: string): Promise<string> {
@@ -77,7 +75,7 @@ async function handle(event: HookEvent, agent: Agent, stdin: string): Promise<st
         if (input.stopHookActive || !s || s.nudged) return formatHookOutput(agent, "stop", {});
         const worked = await workChangedSince(ctx.repoRoot, s.head);
         if (!worked) return formatHookOutput(agent, "stop", {});
-        if (await statusTouchedSince(ctx.repoRoot, ctx.me, s.startedAt)) return formatHookOutput(agent, "stop", {});
+        if (await statusTouchedSince(ctx, s.startedAt)) return formatHookOutput(agent, "stop", {});
         s.nudged = true;
         return formatHookOutput(agent, "stop", {
           blockReason: `這次有做事，但 @${ctx.me} 的 ${PRODUCT.displayName} 狀態還沒更新。請用 \`${PRODUCT.command} status --doing … --next … [--deliverable 標題=網址]\` 更新後再結束（只提醒這一次）。`,

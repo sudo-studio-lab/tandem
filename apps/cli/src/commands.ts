@@ -1,12 +1,8 @@
 /** Command implementations. Spec: specs/001-core/contracts/cli.md */
-import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import {
   LABELS,
-  PATHS,
   PRODUCT,
   StatusPatch,
   TandemError,
@@ -18,28 +14,27 @@ import {
   checkRecords,
   createDecision,
   createDiscussionOrIssue,
-  createGitHubClient,
-  findRepoRoot,
   getGitHubToken,
-  installAgentIntegration,
-  installPreCommitHook,
+  loadAppState,
   renderBrief,
-  runGit,
   syncData,
   updateStatus,
+  type WriteResult,
 } from "@tandem/core";
 import { openContext, withTimeout, type Context } from "./context.ts";
 import { buildBrief, gatherGitHub } from "./gather.ts";
 import { info, printJson, readJsonInput } from "./io.ts";
+import { joinProject, rememberProject, setupProject } from "./setup.ts";
 
 interface JsonOpt {
   json?: boolean;
 }
 
-async function syncQuietly(ctx: Context): Promise<void> {
-  const r = await syncData(ctx.repoRoot, { dataDir: PRODUCT.dataDir });
-  if (r.result === "conflict") info(`⚠ 同步時發生衝突，紀錄先留在本機：${r.message ?? ""}`);
-  else if (r.result === "offline") info("⚠ 目前離線，紀錄先留在本機，連上網後會再同步");
+/** Tell the user where a record write ended up (research S1). */
+function reportWrite(w: WriteResult | undefined): void {
+  if (!w || w.result === "pushed") return;
+  if (w.result === "conflict") info(`⚠ 已經有同名的紀錄，這筆沒有寫入：${(w.conflicts ?? []).join("、")}`);
+  else info(`⚠ 紀錄先存在這台電腦，連上網後會自動同步${w.message ? `（${w.message}）` : ""}`);
 }
 
 function printProblems(problems: Problem[]): void {
@@ -51,7 +46,7 @@ function printProblems(problems: Problem[]): void {
 // ---------------------------------------------------------------------------
 export async function cmdBrief(opts: JsonOpt & { peek?: boolean }): Promise<void> {
   const ctx = await openContext();
-  await syncData(ctx.repoRoot, { dataDir: PRODUCT.dataDir }).catch(() => undefined);
+  await syncData(ctx.repoRoot, { gitEnv: ctx.gitEnv }).catch(() => undefined);
   const gh = await withTimeout(gatherGitHub(ctx), 15_000, null);
   const { brief, head } = await buildBrief(ctx, gh);
   if (opts.json) printJson(brief);
@@ -109,7 +104,7 @@ export async function cmdDecide(
   raw.source ??= "chat";
   if ((!Array.isArray(raw.quotes) || raw.quotes.length === 0) && raw.noQuoteBy === undefined) raw.noQuoteBy = ctx.me;
 
-  const result = await createDecision(ctx.repoRoot, raw as DecisionInput, { dryRun: opts.dryRun });
+  const result = await createDecision(ctx.store, raw as DecisionInput, { dryRun: opts.dryRun });
   const errors = result.problems.filter((p) => p.severity === "error");
   if (opts.json) printJson({ ...result, written: !opts.dryRun && errors.length === 0 });
   else if (errors.length === 0) {
@@ -121,7 +116,7 @@ export async function cmdDecide(
     process.exitCode = 1;
     return;
   }
-  if (!opts.dryRun && opts.sync !== false) await syncQuietly(ctx);
+  if (!opts.dryRun) reportWrite(result.write);
 }
 
 // ---------------------------------------------------------------------------
@@ -167,18 +162,19 @@ export async function cmdStatus(
   }
   const parsed = StatusPatch.safeParse(patch);
   if (!parsed.success) throw new TandemError("validation", `狀態格式不正確：${parsed.error.issues.map((i) => i.message).join("；")}`);
-  const result = await updateStatus(ctx.repoRoot, ctx.me, parsed.data, { dryRun: opts.dryRun });
+  const result = await updateStatus(ctx.store, ctx.me, parsed.data, { dryRun: opts.dryRun });
   if (opts.json) printJson(result);
-  else info(opts.dryRun ? "（試寫，未存檔）" : `已更新 @${ctx.me} 的狀態`);
-  if (!opts.dryRun && opts.sync !== false) await syncQuietly(ctx);
+  else if (opts.dryRun) process.stdout.write(`${result.content}\n（試寫，未存檔）\n`);
+  else info(`已更新 @${ctx.me} 的狀態`);
+  if (!opts.dryRun) reportWrite(result.write);
 }
 
 // ---------------------------------------------------------------------------
 // check / sync
 // ---------------------------------------------------------------------------
 export async function cmdCheck(opts: JsonOpt & { fix?: boolean; quiet?: boolean }): Promise<void> {
-  const repoRoot = await findRepoRoot(process.cwd());
-  const r = await checkRecords(repoRoot, { fix: opts.fix });
+  const ctx = await openContext();
+  const r = await checkRecords(ctx.store, { fix: opts.fix });
   if (opts.json) printJson(r);
   else {
     printProblems(r.problems);
@@ -189,8 +185,8 @@ export async function cmdCheck(opts: JsonOpt & { fix?: boolean; quiet?: boolean 
 }
 
 export async function cmdSync(opts: JsonOpt): Promise<void> {
-  const repoRoot = await findRepoRoot(process.cwd());
-  const r = await syncData(repoRoot, { dataDir: PRODUCT.dataDir });
+  const ctx = await openContext();
+  const r = await syncData(ctx.repoRoot, { gitEnv: ctx.gitEnv });
   if (opts.json) printJson(r);
   else {
     const msg = { ok: "已同步", nothing: "沒有需要同步的", conflict: "有衝突，紀錄先留在本機", offline: "目前離線" }[r.result];
@@ -239,18 +235,29 @@ export async function cmdTask(title: string, opts: JsonOpt & { assign?: string[]
 // ---------------------------------------------------------------------------
 // invite / join
 // ---------------------------------------------------------------------------
+/** Public download page (research S7, S8); the repo name rides in the fragment, never sent to a server. */
+export const DOWNLOAD_PAGE = "https://sudo-studio-lab.github.io/tandem-releases/";
+
+export function joinUrlFor(owner: string, name: string): string {
+  return `${DOWNLOAD_PAGE}#join=${encodeURIComponent(`${owner}/${name}`)}`;
+}
+
 export function shareTextFor(owner: string, name: string): string {
   return [
     `我用 ${PRODUCT.displayName} 邀請你一起做 ${owner}/${name}。`,
-    `1. 安裝 ${PRODUCT.command}（目前從 sudo-studio-lab/tandem 安裝，見它的 README）`,
-    `2. 執行：${PRODUCT.command} join ${owner}/${name}`,
-    "會自動接受邀請、下載專案、打開看板。",
+    `下載 ${PRODUCT.displayName}、用 GitHub 登入，就會看到這個邀請：`,
+    joinUrlFor(owner, name),
   ].join("\n");
 }
 
 export async function inviteLogin(ctx: Context, login: string) {
   const status = await ctx.gh.inviteCollaborator(login);
-  return { invited: login, status, shareText: shareTextFor(ctx.remote.owner, ctx.remote.name) };
+  return {
+    invited: login,
+    status,
+    shareText: shareTextFor(ctx.remote.owner, ctx.remote.name),
+    url: joinUrlFor(ctx.remote.owner, ctx.remote.name),
+  };
 }
 
 export async function cmdInvite(login: string, opts: JsonOpt): Promise<void> {
@@ -268,44 +275,27 @@ export async function cmdJoin(repoArg: string, opts: JsonOpt & { dir?: string; b
   if (!m) throw new TandemError("usage", "請用 owner/repo 的格式，例如 tandem join sudo-studio-lab/tandem");
   const [, owner, name] = m as unknown as [string, string, string];
   const { token } = await getGitHubToken();
-  const gh = createGitHubClient({ token, owner, repo: name });
-  const accepted = await gh.acceptInvitationFor();
-  info(accepted === "accepted" ? `已接受 ${owner}/${name} 的邀請` : `沒有待接受的邀請（可能本來就有權限）`);
-
-  const dir = path.resolve(opts.dir ?? name);
-  if (!existsSync(path.join(dir, ".git"))) {
-    info(`下載專案到 ${dir} …`);
-    const viaGh = spawnSync("gh", ["repo", "clone", `${owner}/${name}`, dir], { stdio: "inherit" });
-    if (viaGh.status !== 0) {
-      const viaGit = spawnSync("git", ["clone", `https://github.com/${owner}/${name}.git`, dir], { stdio: "inherit" });
-      if (viaGit.status !== 0) throw new TandemError("github", "下載專案失敗，請確認有權限、網路正常");
-    }
-  } else info(`${dir} 已經有這個專案了`);
-
-  process.chdir(dir);
-  const ctx = await openContext(dir);
-  await updateStatus(ctx.repoRoot, ctx.me, {}, {});
-  await syncQuietly(ctx);
-  if (opts.json) printJson({ repo: `${owner}/${name}`, dir, accepted });
-  info(`完成。之後在 ${dir} 打開你的 Claude Code 或 Codex 就能開始。`);
+  const app = await loadAppState();
+  const r = await joinProject({
+    owner,
+    name,
+    token,
+    projectsDir: app.projectsDir,
+    dir: opts.dir ? path.resolve(opts.dir) : path.resolve(name),
+    progress: (_step, message) => info(message),
+  });
+  for (const p of r.setup.problems) info(`⚠ ${p}`);
+  if (opts.json) printJson({ repo: `${owner}/${name}`, dir: r.dir });
+  info(`完成。之後在 ${r.dir} 打開你的 Claude Code 或 Codex 就能開始。`);
   if (opts.board !== false) {
-    const { startBoard } = await import("./server.ts");
-    await startBoard({ cwd: dir });
+    const { startServer } = await import("./server.ts");
+    await startServer({ cwd: r.dir });
   }
 }
 
 // ---------------------------------------------------------------------------
 // init
 // ---------------------------------------------------------------------------
-const TEAM_TEMPLATE = `# 團隊習慣
-
-用白話寫這個團隊的習慣，每個人的 agent 開工時都會讀。想到再加，不用一次寫完。
-
-例如：
-- 設計相關的決定都要問 @某人
-- 黑客松期間不開討論，直接記決定，有意見再提
-`;
-
 async function confirm(question: string): Promise<boolean> {
   if (!process.stdin.isTTY) return false;
   const rl = createInterface({ input: process.stdin, output: process.stderr });
@@ -328,53 +318,14 @@ export async function cmdInit(
     return;
   }
 
-  const created: string[] = [];
-  await mkdir(path.join(ctx.repoRoot, PATHS.decisions), { recursive: true });
-  const keep = path.join(ctx.repoRoot, PATHS.decisions, ".gitkeep");
-  if (!existsSync(keep)) {
-    await writeFile(keep, "");
-    created.push(`${PATHS.decisions}/.gitkeep`);
-  }
-  const team = path.join(ctx.repoRoot, PATHS.team);
-  if (!existsSync(team)) {
-    await writeFile(team, TEAM_TEMPLATE);
-    created.push(PATHS.team);
-  }
-  await updateStatus(ctx.repoRoot, ctx.me, {}, {});
-
-  const changes = await installAgentIntegration(ctx.repoRoot);
-  for (const c of changes) if (c.action !== "unchanged") created.push(c.path);
-  await installPreCommitHook(
-    ctx.repoRoot,
-    `if command -v ${PRODUCT.command} >/dev/null 2>&1; then ${PRODUCT.command} check --quiet; fi`,
-  );
-
-  // Discussions (research R18): ask before changing a repo setting.
-  let discussions = "unknown";
-  try {
-    const d = await ctx.gh.getDiscussionsInfo();
-    if (!d.enabled) {
-      const yes = opts.enableDiscussions ?? (await confirm("這個 repo 還沒開 GitHub Discussions（問題和分歧會放這裡）。要幫你開啟嗎？"));
-      if (yes) {
-        await ctx.gh.enableDiscussions();
-        discussions = "enabled";
-      } else discussions = "disabled-fallback-issues";
-    } else discussions = "enabled";
-    await ctx.gh.ensureLabels();
-  } catch (e) {
-    info(`⚠ 設定 GitHub 時出了問題：${e instanceof Error ? e.message : String(e)}`);
-  }
-
-  // Commit the shared setup so teammates get it.
-  const paths = [PRODUCT.dataDir, "AGENTS.md", "CLAUDE.md", ".claude/settings.json", ".claude/skills", ".codex/hooks.json", ".agents/skills"]
-    .filter((p) => existsSync(path.join(ctx.repoRoot, p)));
-  await runGit(["add", "--", ...paths], { cwd: ctx.repoRoot });
-  const staged = await runGit(["diff", "--cached", "--quiet"], { cwd: ctx.repoRoot, allowFail: true });
-  if (staged.code !== 0) {
-    await runGit(["commit", "-m", `${PRODUCT.command}: set up ${PRODUCT.displayName}`], { cwd: ctx.repoRoot });
-  }
-  if (opts.push !== false) await syncQuietly(ctx);
-
+  const r = await setupProject(ctx, {
+    enableDiscussions: async () =>
+      opts.enableDiscussions ?? (await confirm("這個 repo 還沒開 GitHub Discussions（問題和分歧會放這裡）。要幫你開啟嗎？")),
+    push: opts.push,
+  });
+  const { created, discussions } = r;
+  await rememberProject(ctx).catch(() => undefined);
+  for (const p of r.problems) info(`⚠ ${p}`);
   if (opts.json) printJson({ created, discussions });
   else {
     info(`${PRODUCT.displayName} 設定完成。`);
@@ -387,8 +338,8 @@ export async function cmdInit(
     info(`有問題可以執行 ${PRODUCT.command} doctor 檢查。`);
   }
   if (opts.board !== false && !opts.json) {
-    const { startBoard } = await import("./server.ts");
-    await startBoard({ cwd: ctx.repoRoot });
+    const { startServer } = await import("./server.ts");
+    await startServer({ cwd: ctx.repoRoot });
   }
 }
 
@@ -400,7 +351,7 @@ export async function cmdDoctor(opts: JsonOpt): Promise<void> {
   const add = (item: string, ok: boolean, note: string) => results.push({ item, ok, note });
   try {
     const t = await getGitHubToken();
-    add("GitHub 登入", true, t.source === "gh" ? "借用 gh 的登入" : "使用環境變數");
+    add("GitHub 登入", true, { gh: "借用 gh 的登入", keyring: "已用 Tandem 登入", env: "使用環境變數" }[t.source]);
   } catch (e) {
     add("GitHub 登入", false, e instanceof Error ? e.message : String(e));
   }
@@ -416,7 +367,7 @@ export async function cmdDoctor(opts: JsonOpt): Promise<void> {
     for (const i of await checkAgentIntegration(ctx.repoRoot)) {
       add(i.item, i.state === "current", i.state === "current" ? "最新" : i.state === "stale" ? `過期，執行 ${PRODUCT.command} init 更新` : `缺少，執行 ${PRODUCT.command} init`);
     }
-    const r = await checkRecords(ctx.repoRoot, {});
+    const r = await checkRecords(ctx.store, {});
     const errs = r.problems.filter((p) => p.severity === "error").length;
     add("紀錄格式", errs === 0, errs === 0 ? "沒有問題" : `${errs} 個錯誤，執行 ${PRODUCT.command} check 查看`);
   } catch (e) {
@@ -428,5 +379,3 @@ export async function cmdDoctor(opts: JsonOpt): Promise<void> {
   if (results.some((r) => !r.ok)) process.exitCode = 1;
 }
 
-// Silence "unused" for helpers re-exported for tests.
-export const _internal = { TEAM_TEMPLATE };

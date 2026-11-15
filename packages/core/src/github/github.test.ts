@@ -83,15 +83,15 @@ describe("pure helpers", () => {
 
 describe("getGitHubToken", () => {
   it("prefers env in order", async () => {
-    const r = await getGitHubToken({ GH_TOKEN: "b", GITHUB_TOKEN: "c" }, async () => "gh");
+    const r = await getGitHubToken({ GH_TOKEN: "b", GITHUB_TOKEN: "c" }, async () => "gh", () => null);
     expect(r).toEqual({ token: "b", source: "env" });
-    expect(await getGitHubToken({ TANDEM_TOKEN: "a", GH_TOKEN: "b" }, async () => "gh")).toEqual({ token: "a", source: "env" });
+    expect(await getGitHubToken({ TANDEM_TOKEN: "a", GH_TOKEN: "b" }, async () => "gh", () => null)).toEqual({ token: "a", source: "env" });
   });
   it("falls back to gh", async () => {
-    expect(await getGitHubToken({}, async () => "ghtok")).toEqual({ token: "ghtok", source: "gh" });
+    expect(await getGitHubToken({}, async () => "ghtok", () => null)).toEqual({ token: "ghtok", source: "gh" });
   });
   it("throws auth error without leaking anything", async () => {
-    await expect(getGitHubToken({}, async () => undefined)).rejects.toMatchObject({
+    await expect(getGitHubToken({}, async () => undefined, () => null)).rejects.toMatchObject({
       code: "auth",
       message: "找不到 GitHub 登入。請先執行 gh auth login",
     });

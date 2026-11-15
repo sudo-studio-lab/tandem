@@ -1,5 +1,3 @@
-import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import {
   DecisionInput,
   PATHS,
@@ -7,36 +5,56 @@ import {
   type DecisionInput as DecisionInputType,
   type Problem,
 } from "@tandem/contracts";
+import { openFsDataStore, type DataStore, type FileChange, type WriteResult } from "../data/index.ts";
 import { dateFromId, generateDecisionId, localDateString, slugify } from "./ids.ts";
 import { parseDecision, renderDecision } from "./format.ts";
 import { zodProblems } from "./frontmatter.ts";
 import { basename, computeSupersededBy, validateDecision, validateDecisionSet } from "./validate.ts";
 import { loadStatuses } from "./status.ts";
 
-async function listMarkdown(dir: string): Promise<string[]> {
-  try {
-    const names = await readdir(dir);
-    return names.filter((n) => n.endsWith(".md")).sort();
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw e;
-  }
+/** A string means a plain folder (existing callers); a DataStore is used as is. */
+export function asStore(store: DataStore | string): DataStore {
+  return typeof store === "string" ? openFsDataStore(store) : store;
 }
 
-export async function loadDecisions(repoRoot: string): Promise<{ decisions: Decision[]; problems: Problem[] }> {
+/** Read many files with a small concurrency cap (each read may spawn a git process). */
+export async function readMany(store: DataStore, paths: string[]): Promise<(string | null | Error)[]> {
+  const out: (string | null | Error)[] = new Array<string | null | Error>(paths.length).fill(null);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const i = next++;
+      if (i >= paths.length) return;
+      out[i] = await store.read(paths[i]!).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(8, paths.length) }, worker));
+  return out;
+}
+
+export async function loadDecisions(
+  storeOrRoot: DataStore | string,
+): Promise<{ decisions: Decision[]; problems: Problem[] }> {
+  const store = asStore(storeOrRoot);
   const decisions: Decision[] = [];
   const problems: Problem[] = [];
-  for (const name of await listMarkdown(join(repoRoot, PATHS.decisions))) {
-    const path = `${PATHS.decisions}/${name}`;
-    try {
-      const content = await readFile(join(repoRoot, PATHS.decisions, name), "utf8");
-      const r = parseDecision(path, content);
-      problems.push(...r.problems);
-      if (r.decision) decisions.push(r.decision);
-    } catch (e) {
-      problems.push({ path, severity: "error", code: "unreadable", message: `讀不到檔案：${(e as Error).message}` });
+  const paths = (await store.list("decisions")).map((n) => `${PATHS.decisions}/${n}`);
+  const contents = await readMany(store, paths);
+  paths.forEach((path, i) => {
+    const content = contents[i];
+    if (content === null || content === undefined || content instanceof Error) {
+      problems.push({
+        path,
+        severity: "error",
+        code: "unreadable",
+        message: `讀不到檔案：${content instanceof Error ? content.message : "檔案不存在"}`,
+      });
+      return;
     }
-  }
+    const r = parseDecision(path, content);
+    problems.push(...r.problems);
+    if (r.decision) decisions.push(r.decision);
+  });
   computeSupersededBy(decisions);
   return { decisions, problems };
 }
@@ -46,13 +64,16 @@ export interface CreateResult {
   path: string;
   content: string;
   problems: Problem[];
+  /** Result of writing through the store (absent for dry runs and invalid input). */
+  write?: WriteResult;
 }
 
 export async function createDecision(
-  repoRoot: string,
+  storeOrRoot: DataStore | string,
   input: DecisionInputType,
   opts: { dryRun?: boolean; now?: Date } = {},
 ): Promise<CreateResult> {
+  const store = asStore(storeOrRoot);
   const now = opts.now ?? new Date();
   const parsed = DecisionInput.safeParse(input);
   if (!parsed.success) return { id: "", path: "", content: "", problems: zodProblems("(輸入)", parsed.error) };
@@ -72,7 +93,7 @@ export async function createDecision(
       ],
     };
 
-  const existing = await loadDecisions(repoRoot);
+  const existing = await loadDecisions(store);
   const taken = new Set(existing.decisions.map((d) => d.frontmatter.id));
   const id = generateDecisionId(now, (x) => taken.has(x));
   const date = p.date ?? localDateString(now);
@@ -87,24 +108,23 @@ export async function createDecision(
     problems.push(...validateDecisionSet([...existing.decisions, reparsed.decision]).filter((x) => x.path === path));
   }
   if (problems.some((x) => x.severity === "error")) return { id, path, content, problems };
-  if (!opts.dryRun) {
-    await mkdir(join(repoRoot, PATHS.decisions), { recursive: true });
-    await writeFile(join(repoRoot, path), content, { encoding: "utf8", flag: "wx" });
-  }
-  return { id, path, content, problems };
+  if (opts.dryRun) return { id, path, content, problems };
+  const write = await store.write([{ path, content, createOnly: true }], `tandem: add decision ${id}`);
+  return { id, path, content, problems, write };
 }
 
 export async function checkRecords(
-  repoRoot: string,
+  storeOrRoot: DataStore | string,
   opts: { fix?: boolean } = {},
 ): Promise<{ problems: Problem[]; fixed: string[] }> {
+  const store = asStore(storeOrRoot);
   const fixed: string[] = [];
   const run = async () => {
-    const { decisions, problems } = await loadDecisions(repoRoot);
+    const { decisions, problems } = await loadDecisions(store);
     const all = [...problems];
     for (const d of decisions) all.push(...validateDecision(d));
     all.push(...validateDecisionSet(decisions));
-    const st = await loadStatuses(repoRoot);
+    const st = await loadStatuses(store);
     all.push(...st.problems);
     return { decisions, problems: all };
   };
@@ -113,6 +133,7 @@ export async function checkRecords(
     const dupPaths = new Set(r.problems.filter((x) => x.code === "duplicate-id" && x.fixable).map((x) => x.path));
     if (dupPaths.size > 0) {
       const taken = new Set(r.decisions.map((d) => d.frontmatter.id));
+      const changes: FileChange[] = [];
       for (const d of r.decisions) {
         if (!dupPaths.has(d.path)) continue;
         const oldId = d.frontmatter.id;
@@ -123,12 +144,12 @@ export async function checkRecords(
           ? `${newId}${name.slice(oldId.length)}`
           : `${newId}-${slugify(d.frontmatter.title) ?? "decision"}.md`;
         const newPath = `${PATHS.decisions}/${newName}`;
-        const text = await readFile(join(repoRoot, d.path), "utf8");
+        const text = (await store.read(d.path)) ?? "";
         const rewritten = text.replace(/^(---\r?\n[\s\S]*?^id:[ \t]*).*$/m, `$1${newId}`);
-        await rename(join(repoRoot, d.path), join(repoRoot, newPath));
-        await writeFile(join(repoRoot, newPath), rewritten, "utf8");
+        changes.push({ path: d.path, content: null }, { path: newPath, content: rewritten });
         fixed.push(`${d.path} -> ${newPath}`);
       }
+      await store.write(changes, "tandem: fix duplicate decision ids");
       r = await run();
     }
   }
