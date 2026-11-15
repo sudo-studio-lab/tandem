@@ -6,10 +6,11 @@ import {
   type OwnerChoice,
   type PullRequestSummary,
   type RepoChoice,
+  type RoomRef,
   type TaskSummary,
 } from "@tandem/contracts";
 import { createMemoryEtagCache, type EtagCache } from "./cache.ts";
-import { discussionKindFromLabels, parseWaitingLine, withWaitingLine } from "./parse.ts";
+import { discussionKindFromLabels, parseRoomHost, parseRoomNotes, parseWaitingLine, roomBody, withWaitingLine } from "./parse.ts";
 
 const API = "https://api.github.com";
 const MAX_RETRIES = 2;
@@ -26,6 +27,12 @@ export interface GitHubClientOptions {
   /** Test hooks. */
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
+}
+
+export interface RoomData extends RoomRef {
+  id: string;
+  notes: string;
+  comments: { id: string; by: string; body: string; url: string; at: string }[];
 }
 
 export interface DiscussionsInfo {
@@ -596,6 +603,84 @@ export function createGitHubClient(opts: GitHubClientOptions) {
     );
   }
 
+  // ---- rooms (spec 004): a discussion whose body starts with the room marker ----
+  async function createRoom(title: string, host: string, notes = ""): Promise<RoomRef> {
+    const info = await getDiscussionsInfo();
+    if (!info.enabled) {
+      throw new TandemError("needs_human", "這個 repo 還沒開啟 Discussions。請 repo 管理員到 Settings > General > Features 開啟", {
+        reason: "discussions_disabled",
+      });
+    }
+    const cat =
+      info.categories.find((c) => c.slug === "general") ?? info.categories.find((c) => !c.isAnswerable) ?? info.categories[0];
+    if (!cat) throw new TandemError("needs_human", "這個 repo 的 Discussions 沒有任何分類");
+    const d = await graphql<any>(
+      `mutation($repositoryId:ID!,$categoryId:ID!,$title:String!,$body:String!){createDiscussion(input:{repositoryId:$repositoryId,categoryId:$categoryId,title:$title,body:$body}){discussion{number url updatedAt}}}`,
+      { repositoryId: info.repositoryId, categoryId: cat.id, title, body: roomBody(host, notes) },
+      "建立房間",
+    );
+    const disc = d?.createDiscussion?.discussion;
+    if (!disc) throw new TandemError("github", "建立房間失敗：GitHub 沒有回傳討論");
+    return { number: disc.number, url: disc.url, title, host, closed: false, updatedAt: disc.updatedAt };
+  }
+
+  /** Open rooms, plus rooms closed in the last 7 days. */
+  async function listRooms(): Promise<RoomRef[]> {
+    const d = await graphql<any>(
+      `query($owner:String!,$repo:String!){repository(owner:$owner,name:$repo){discussions(first:50,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{number title url body closed updatedAt}}}}`,
+      { owner, repo },
+      "讀取房間",
+    );
+    const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    const out: RoomRef[] = [];
+    for (const n of d?.repository?.discussions?.nodes ?? []) {
+      const host = parseRoomHost(n.body ?? "");
+      if (!host || (n.closed && n.updatedAt < since)) continue;
+      out.push({ number: n.number, url: n.url, title: n.title, host, closed: !!n.closed, updatedAt: n.updatedAt });
+    }
+    return out;
+  }
+
+  async function getRoom(number: number): Promise<RoomData> {
+    const q = `query($owner:String!,$repo:String!,$number:Int!,$after:String){repository(owner:$owner,name:$repo){discussion(number:$number){id number title url body closed updatedAt comments(first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{id body url createdAt author{login}}}}}}`;
+    let after: string | null = null;
+    let room: RoomData | null = null;
+    for (let page = 0; page < 10; page++) {
+      const d: any = await graphql(q, { owner, repo, number, after }, "讀取房間");
+      const n = d?.repository?.discussion;
+      const host = n ? parseRoomHost(n.body ?? "") : null;
+      if (!n || !host) throw new TandemError("usage", `#${number} 不是 Tandem 的房間`);
+      room ??= { id: n.id, number: n.number, url: n.url, title: n.title, host, closed: !!n.closed, updatedAt: n.updatedAt, notes: parseRoomNotes(n.body ?? ""), comments: [] };
+      for (const c of n.comments?.nodes ?? []) {
+        room.comments.push({ id: c.id, by: c.author?.login ?? "ghost", body: c.body ?? "", url: c.url, at: c.createdAt });
+      }
+      if (!n.comments?.pageInfo?.hasNextPage) break;
+      after = n.comments.pageInfo.endCursor;
+    }
+    return room!;
+  }
+
+  async function commentOnRoom(number: number, body: string): Promise<{ id: string; url: string; at: string }> {
+    const id = await discussionNodeId(number);
+    const d = await graphql<any>(
+      `mutation($discussionId:ID!,$body:String!){addDiscussionComment(input:{discussionId:$discussionId,body:$body}){comment{id url createdAt}}}`,
+      { discussionId: id, body },
+      "在房間留言",
+    );
+    const c = d?.addDiscussionComment?.comment;
+    if (!c) throw new TandemError("github", "留言失敗：GitHub 沒有回傳留言");
+    return { id: c.id, url: c.url, at: c.createdAt };
+  }
+
+  async function setRoomNotes(number: number, host: string, notes: string): Promise<void> {
+    const id = await discussionNodeId(number);
+    await graphql(
+      `mutation($discussionId:ID!,$body:String!){updateDiscussion(input:{discussionId:$discussionId,body:$body}){discussion{id}}}`,
+      { discussionId: id, body: roomBody(host, notes) },
+      "更新房間筆記",
+    );
+  }
+
   async function closeDiscussion(number: number, reason: "RESOLVED" | "OUTDATED" | "DUPLICATE"): Promise<void> {
     const id = await discussionNodeId(number);
     await graphql(
@@ -615,6 +700,7 @@ export function createGitHubClient(opts: GitHubClientOptions) {
       if (!conn) break;
       for (const n of conn.nodes ?? []) {
         if (n.closed && !(o.includeClosedSince && n.updatedAt >= o.includeClosedSince)) continue;
+        if (parseRoomHost(n.body ?? "")) continue; // rooms have their own tab
         const author = n.author?.login ?? "ghost";
         const labels: string[] = (n.labels?.nodes ?? []).map((l: any) => l.name);
         const commenters: string[] = [];
@@ -731,6 +817,11 @@ export function createGitHubClient(opts: GitHubClientOptions) {
     createDiscussion,
     commentOnDiscussion,
     closeDiscussion,
+    createRoom,
+    listRooms,
+    getRoom,
+    commentOnRoom,
+    setRoomNotes,
     listDiscussions,
     createIssue,
     listIssues,

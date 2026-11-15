@@ -32,7 +32,8 @@ export interface AgentStatus {
 export type ApprovalDecision = "allow" | "allowSession" | "deny";
 
 export type ChatItem =
-  | { kind: "user"; id: string; at: string; text: string }
+  /** `by`/`url` are set in rooms: who said it, and the GitHub comment it came from. */
+  | { kind: "user"; id: string; at: string; text: string; by?: string; url?: string }
   | { kind: "assistant"; id: string; at: string; text: string; streaming?: boolean }
   | {
       kind: "tool";
@@ -72,6 +73,8 @@ export interface ChatSummary {
   agentSessionId?: string;
   running: boolean;
   costUsd?: number;
+  /** Set when this chat is the host side of a room (spec 004): the agent answers the whole room. */
+  room?: { number: number; url: string };
 }
 
 export interface Chat extends ChatSummary {
@@ -92,4 +95,38 @@ export interface AgentLoginStart {
   /** A terminal window was opened running the agent's own login. */
   terminal?: boolean;
   message: string;
+}
+
+/**
+ * A room (spec 004): several teammates talk with one agent that runs on the host's computer.
+ * Messages travel through a GitHub Discussion, so every line has an author and a URL.
+ */
+export interface RoomRef {
+  number: number;
+  url: string;
+  title: string;
+  /** GitHub login whose computer (and agent subscription) runs the AI. */
+  host: string;
+  closed: boolean;
+  updatedAt: string;
+}
+
+export interface RoomMessage {
+  id: string;
+  by: string;
+  text: string;
+  url: string;
+  at: string;
+  /** Written by the room's AI (posted by the host's app, starts with 🤖). */
+  ai: boolean;
+}
+
+export interface Room extends RoomRef {
+  /** Meeting notes kept by the AI (the discussion body below the marker). */
+  notes: string;
+  messages: RoomMessage[];
+  /** The host's local chat behind this room; only set on the host's computer. */
+  chatId?: string;
+  /** Host side: the AI is answering right now. */
+  running?: boolean;
 }

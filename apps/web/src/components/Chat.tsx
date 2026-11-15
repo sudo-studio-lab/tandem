@@ -20,7 +20,7 @@ const AUTH_TEXT: Record<AgentStatus["auth"], string> = {
   unknown: "登入狀態不明",
 };
 
-const usableAgents = (agents: AgentStatus[]) => agents.filter((a) => a.installed && (a.auth === "subscription" || a.auth === "apiKey"));
+export const usableAgents = (agents: AgentStatus[]) => agents.filter((a) => a.installed && (a.auth === "subscription" || a.auth === "apiKey"));
 
 /** Agent install / login state, shared by the chat view and the settings dialog. */
 export function useAgents() {
@@ -233,7 +233,7 @@ export function ChatView({ projectId, now, onOpenSettings }: { projectId: string
           </ul>
         )}
         <button type="button" className="btn btn-small btn-quiet" onClick={onOpenSettings}>
-          AI 設定（登入、登出）
+          ⚙ AI 設定（登入、登出）
         </button>
       </aside>
       <section className="chat-main">
@@ -270,7 +270,7 @@ function agentLabel(agents: AgentStatus[] | null, kind: AgentKind) {
   return agents?.find((a) => a.agent === kind)?.label ?? (kind === "claude" ? "Claude" : "Codex");
 }
 
-function applyUpdate(c: Chat, u: ChatUpdate): Chat {
+export function applyUpdate(c: Chat, u: ChatUpdate): Chat {
   switch (u.type) {
     case "summary":
       return { ...c, ...u.chat, items: c.items };
@@ -491,7 +491,7 @@ function Conversation({
 
 const prettyTool = (name: string) => (name.startsWith("mcp__") ? name.split("__").slice(1).join(" · ") : name);
 
-function Item({ item, chatId, onError }: { item: ChatItem; chatId: string; onError: (m: string) => void }) {
+export function Item({ item, chatId, onError }: { item: ChatItem; chatId: string; onError: (m: string) => void }) {
   const [busy, setBusy] = useState(false);
   switch (item.kind) {
     case "user":
@@ -542,9 +542,10 @@ function Item({ item, chatId, onError }: { item: ChatItem; chatId: string; onErr
       };
       return (
         <div className={`approval approval-${item.state}`}>
-          <div>
-            <strong>{item.state === "pending" ? "要做這件事嗎？" : item.state === "allowed" ? "已同意" : "已拒絕"}</strong>{" "}
-            <span className="muted small">{prettyTool(item.name)}</span>
+          <div className="approval-head">
+            <span aria-hidden="true">{item.state === "pending" ? "✋" : item.state === "allowed" ? "✓" : "✕"}</span>
+            <strong>{item.state === "pending" ? "AI 想做這件事，可以嗎？" : item.state === "allowed" ? "已同意" : "已拒絕"}</strong>
+            <span className="tag">{prettyTool(item.name)}</span>
             {item.note && <span className="muted small">（{item.note}）</span>}
           </div>
           {item.summary && <code className="approval-summary">{item.summary}</code>}

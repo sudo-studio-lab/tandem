@@ -61,7 +61,10 @@ const fanOut = (e: AppEvent) => listeners.forEach((l) => l(e));
 export function openEvents(onEvent: (e: AppEvent) => void, onConnected: (ok: boolean) => void): () => void {
   if (mockServer) {
     onConnected(true);
-    return mockServer.subscribe(onEvent);
+    return mockServer.subscribe((e) => {
+      onEvent(e);
+      fanOut(e);
+    });
   }
   if (typeof EventSource === "undefined") return () => {};
   let es: EventSource | undefined;

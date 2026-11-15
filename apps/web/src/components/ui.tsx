@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 /** Native <dialog>: focus trap, Escape and backdrop come for free. */
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
@@ -56,3 +56,53 @@ export function Spinner({ label }: { label: string }) {
 }
 
 export const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** A titled block on the board: icon + title + count, then its content. */
+export function Panel({
+  title,
+  icon,
+  count,
+  tone,
+  className,
+  children,
+}: {
+  title: string;
+  icon?: string;
+  count?: number;
+  tone?: "warn" | "bad";
+  className?: string;
+  children: ReactNode;
+}) {
+  const id = `panel-${title}`;
+  return (
+    <section className={`panel-block${className ? ` ${className}` : ""}`} aria-labelledby={id}>
+      <h2 id={id} className="panel-title">
+        {icon && (
+          <span className="panel-icon" aria-hidden="true">
+            {icon}
+          </span>
+        )}
+        {title}
+        {count !== undefined && count > 0 && <span className={`count-chip${tone ? ` count-${tone}` : ""}`}>{count}</span>}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+const HUES = [210, 150, 25, 280, 340, 190, 45, 110];
+/** Initial in a colored circle; the color is stable per login. */
+export function Avatar({ login, size = 32 }: { login: string; size?: number }) {
+  let h = 0;
+  for (const c of login) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const hue = HUES[h % HUES.length];
+  return (
+    <span
+      className="avatar"
+      aria-hidden="true"
+      style={{ width: size, height: size, fontSize: size * 0.45, "--hue": hue } as CSSProperties}
+    >
+      {login.slice(0, 1).toUpperCase()}
+    </span>
+  );
+}

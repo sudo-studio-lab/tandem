@@ -1,0 +1,65 @@
+# Builds the Windows installer on GitHub and uploads it to sudo-studio-lab/tandem-releases,
+# so nobody's computer has to upload 150 MB. Started by `npm run release -- <version> "<notes>"`,
+# which pushes a tag like v0.2.1; the tag's message becomes the release notes.
+# Needs the secret RELEASES_TOKEN: a token that can create releases in tandem-releases.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check the token is set
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::缺少 secret RELEASES_TOKEN（能在 tandem-releases 建立 release 的 token）"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Use the tag as the app version
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("fs");
+            for (const f of ["apps/desktop/package.json", "apps/cli/package.json"]) {
+              const p = JSON.parse(fs.readFileSync(f, "utf8"));
+              p.version = process.argv[1];
+              fs.writeFileSync(f, JSON.stringify(p, null, 2) + "\n");
+            }' "${GITHUB_REF_NAME#v}"
+
+      - name: Build installer
+        run: npm run dist -w @tandem/desktop
+
+      - name: Upload to tandem-releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          git fetch --depth=1 origin "+refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          notes="$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")"
+          [ -n "$notes" ] || notes="Tandem $GITHUB_REF_NAME"
+          v="${GITHUB_REF_NAME#v}"
+          cd apps/desktop/release
+          # Stays a draft until every file is up, so nobody updates to half an installer.
+          gh release create "$GITHUB_REF_NAME" -R sudo-studio-lab/tandem-releases --target main \
+            --title "$GITHUB_REF_NAME" --notes "$notes" \
+            latest.yml "Tandem-Setup-$v.exe" "Tandem-Setup-$v.exe.blockmap"

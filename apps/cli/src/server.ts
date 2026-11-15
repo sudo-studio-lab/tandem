@@ -57,6 +57,7 @@ import { rememberProject, startProject, joinProject } from "./setup.ts";
 import { ADAPTERS, agentStatuses } from "./agents/index.ts";
 import type { McpLaunch } from "./agents/types.ts";
 import { ChatManager } from "./chats/manager.ts";
+import { RoomManager } from "./rooms/manager.ts";
 import pkg from "../package.json" with { type: "json" };
 
 const DEFAULT_PORT = 4318;
@@ -329,6 +330,15 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
     emit: (u) => emit({ type: "chat", data: u }),
     mcp: mcpLaunch,
     approveBridge: () => ({ url: `http://127.0.0.1:${port}/internal/approve`, token: approveToken }),
+    onTurnDone: (chat, texts) => rooms.onTurnDone(chat, texts),
+  });
+  const rooms: RoomManager = new RoomManager({
+    chats,
+    project: async (id) => {
+      const rt = await openRuntime(id);
+      return { gh: rt.ctx.gh, me: rt.ctx.me, cwd: rt.ctx.repoRoot };
+    },
+    agentLabel: (kind) => (kind === "codex" ? "Codex" : "Claude"),
   });
   const projectPathOf = async (projectId: string) => {
     const p = (await loadAppState()).projects.find((x) => x.id === projectId);
@@ -660,6 +670,39 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
       return c.json({ ok: true });
     }),
   );
+  // Rooms (spec 004)
+  const roomNo = (c: HonoContext) => {
+    const n = Number(c.req.param("n"));
+    if (!Number.isInteger(n) || n <= 0) throw new TandemError("usage", "房間編號不對");
+    return n;
+  };
+  const pid = (c: HonoContext) => decodeURIComponent(c.req.param("id") ?? "");
+  app.get("/api/projects/:id/rooms", handle(async (c) => c.json(await rooms.list(pid(c)))));
+  app.post(
+    "/api/projects/:id/rooms",
+    handle(async (c) => {
+      const b = await body<{ title: string; agent: AgentKind; model: string }>(c);
+      if (!b.agent || !ADAPTERS[b.agent]) throw new TandemError("usage", "請選一個 agent");
+      return c.json(await rooms.create(pid(c), String(b.title ?? ""), b.agent, typeof b.model === "string" ? b.model : ""));
+    }),
+  );
+  app.get("/api/projects/:id/rooms/:n", handle(async (c) => c.json(await rooms.get(pid(c), roomNo(c)))));
+  app.post(
+    "/api/projects/:id/rooms/:n/messages",
+    handle(async (c) => {
+      const b = await body<{ text: string }>(c);
+      await rooms.post(pid(c), roomNo(c), String(b.text ?? ""));
+      return c.json({ ok: true });
+    }),
+  );
+  app.post(
+    "/api/projects/:id/rooms/:n/notes",
+    handle(async (c) => {
+      const b = await body<{ end?: boolean }>(c);
+      await rooms.notes(pid(c), roomNo(c), !!b.end);
+      return c.json({ ok: true });
+    }),
+  );
   app.post(
     "/api/projects/:id/open-agent",
     handle(async (c) => {
@@ -761,6 +804,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
 
   const close = async () => {
     clearInterval(poll);
+    rooms.closeAll();
     await chats.closeAll();
     await new Promise<void>((resolve) => server!.close(() => resolve()));
   };

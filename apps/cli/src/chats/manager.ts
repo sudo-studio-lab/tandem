@@ -36,6 +36,8 @@ export interface ChatManagerOptions {
   mcp(): McpLaunch;
   /** Claude's approve bridge; undefined until the server knows its port. */
   approveBridge(): { url: string; token: string } | undefined;
+  /** A turn finished; `texts` are the assistant messages it produced (rooms post them). */
+  onTurnDone?(chat: Chat, texts: string[]): void;
   dir?: string;
 }
 
@@ -52,6 +54,8 @@ export class ChatManager {
   /** chatId → approval names the user allowed for the whole chat. */
   private allowAll = new Map<string, Set<string>>();
   private saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** chatId → index of the first item of the running turn. */
+  private turnStart = new Map<string, number>();
   private readonly dir: string;
 
   constructor(private opts: ChatManagerOptions) {
@@ -126,7 +130,7 @@ export class ChatManager {
   async list(projectId: string): Promise<ChatSummary[]> {
     await this.load();
     return [...this.chats.values()]
-      .filter((c) => c.projectId === projectId)
+      .filter((c) => c.projectId === projectId && !c.room)
       .map(summaryOf)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
@@ -135,10 +139,11 @@ export class ChatManager {
     return this.need(chatId);
   }
 
-  async create(projectId: string, agent: AgentKind, model: string): Promise<ChatSummary> {
+  async create(projectId: string, agent: AgentKind, model: string, room?: { number: number; url: string; title: string }): Promise<ChatSummary> {
     await this.load();
     const t = now();
-    const chat: Chat = { id: randomUUID(), projectId, agent, model, title: "新對話", createdAt: t, updatedAt: t, running: false, items: [] };
+    const chat: Chat = { id: randomUUID(), projectId, agent, model, title: room?.title ?? "新對話", createdAt: t, updatedAt: t, running: false, items: [] };
+    if (room) chat.room = { number: room.number, url: room.url };
     this.chats.set(chat.id, chat);
     this.touch(chat);
     return summaryOf(chat);
@@ -151,7 +156,28 @@ export class ChatManager {
     if (chat.running) throw new TandemError("usage", "agent 還在回覆，請等它做完或按停止");
     if (chat.items.length === 0 || chat.title === "新對話") chat.title = body.replace(/\s+/g, " ").slice(0, 40);
     this.upsert(chat, { kind: "user", id: randomUUID(), at: now(), text: body });
+    await this.sendToAgent(chat.id, body, cwd);
+  }
+
+  /** The room chat that answers discussion `number`, if this computer hosts it. */
+  async findRoom(projectId: string, number: number): Promise<Chat | undefined> {
+    await this.load();
+    return [...this.chats.values()].find((c) => c.projectId === projectId && c.room?.number === number);
+  }
+
+  /** Show an item without sending anything to the agent (room messages, notices). */
+  async addItem(chatId: string, item: ChatItem): Promise<void> {
+    const chat = await this.need(chatId);
+    this.upsert(chat, item);
+    this.touch(chat);
+  }
+
+  /** Send text to the agent without adding a user item (rooms add their own, with the author). */
+  async sendToAgent(chatId: string, body: string, cwd: string): Promise<void> {
+    const chat = await this.need(chatId);
+    if (chat.running) throw new TandemError("usage", "agent 還在回覆，請等它做完或按停止");
     chat.running = true;
+    this.turnStart.set(chat.id, chat.items.length);
     this.touch(chat);
     try {
       await this.session(chat, cwd).send(body);
@@ -311,12 +337,17 @@ export class ChatManager {
         });
         return;
       }
-      case "turnDone":
+      case "turnDone": {
         chat.running = false;
         if (e.costUsd !== undefined) chat.costUsd = (chat.costUsd ?? 0) + e.costUsd;
         this.finishStreaming(chat);
         this.touch(chat);
+        const from = this.turnStart.get(chatId) ?? chat.items.length;
+        this.turnStart.delete(chatId);
+        const texts = chat.items.slice(from).flatMap((it) => (it.kind === "assistant" && it.text.trim() ? [it.text] : []));
+        this.opts.onTurnDone?.(chat, texts);
         return;
+      }
       case "error":
         this.upsert(chat, { kind: "error", id: randomUUID(), at: now(), message: e.message, detail: e.detail });
         return;

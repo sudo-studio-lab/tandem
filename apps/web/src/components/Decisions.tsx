@@ -1,5 +1,6 @@
 import type { BoardData, Decision, Strength } from "@tandem/contracts";
-import { Ext, Section } from "./Ext.tsx";
+import { Ext } from "./Ext.tsx";
+import { Panel } from "./ui.tsx";
 
 const STRENGTH: Record<Strength, string> = {
   hard: "不能違反",
@@ -7,6 +8,9 @@ const STRENGTH: Record<Strength, string> = {
   hunch: "直覺",
   "one-off": "只限這次",
 };
+
+/** How many current decisions show before "更多". */
+const SHOWN = 6;
 
 function DecisionItem({ d, board }: { d: Decision; board: BoardData }) {
   const f = d.frontmatter;
@@ -16,42 +20,41 @@ function DecisionItem({ d, board }: { d: Decision; board: BoardData }) {
     <li className={superseded ? "dim" : undefined}>
       <details className="decision">
         <summary>
-          <span className="d-title">{f.title}</span> <span className={`badge badge-${f.strength}`}>{STRENGTH[f.strength]}</span>
-          {superseded && <span className="badge">已被 {d.supersededBy.join("、")} 取代</span>}
-          <span className="meta muted">
-            {f.date} · {f.deciders.map((l) => `@${l}`).join("、")}
+          <span className="d-line">
+            <span className="d-title">{f.title}</span>
+            <span className={`tag tag-${f.strength}`}>{STRENGTH[f.strength]}</span>
+          </span>
+          <span className="row-meta">
+            {f.date.slice(5).replace("-", "/")} · {f.deciders.map((l) => `@${l}`).join("、")}
+            {superseded && <> · 已被 {d.supersededBy.join("、")} 取代</>}
           </span>
         </summary>
         <div className="d-body">
           {d.quotes.length > 0 ? (
-            <>
-              <h4>原話</h4>
-              {d.quotes.map((q, i) => (
-                <blockquote key={i}>
-                  <p>{q.text}</p>
-                  <footer>
-                    @{q.by}
-                    {q.relayedBy && <span className="badge">轉述（@{q.relayedBy}）</span>}
-                    {/^https?:\/\//.test(q.source) && (
-                      <>
-                        {" "}
-                        · <Ext href={q.source}>來源</Ext>
-                      </>
-                    )}
-                  </footer>
-                </blockquote>
-              ))}
-            </>
+            d.quotes.map((q, i) => (
+              <blockquote key={i}>
+                <p>「{q.text}」</p>
+                <footer>
+                  — @{q.by}
+                  {q.relayedBy && <span className="tag">轉述（@{q.relayedBy}）</span>}
+                  {/^https?:\/\//.test(q.source) && (
+                    <>
+                      {" "}
+                      · <Ext href={q.source}>來源</Ext>
+                    </>
+                  )}
+                </footer>
+              </blockquote>
+            ))
           ) : (
-            d.noQuoteBy && <p className="muted">沒有原話（由 @{d.noQuoteBy} 的 agent 記錄）</p>
+            d.noQuoteBy && <p className="muted small">沒有原話（由 @{d.noQuoteBy} 的 agent 整理）</p>
           )}
           <h4>決定</h4>
           <p>{d.decision}</p>
           <h4>原因</h4>
           <p>{d.why}</p>
-          <p className="meta">
-            <Ext href={`${repoUrl}/blob/HEAD/${d.path}`}>在 GitHub 上看這份紀錄</Ext>
-            <span className="muted"> · {f.id}</span>
+          <p className="row-meta">
+            <Ext href={`${repoUrl}/blob/HEAD/${d.path}`}>在 GitHub 上看</Ext> · {f.id}
           </p>
         </div>
       </details>
@@ -65,17 +68,32 @@ export function Decisions({ board }: { board: BoardData }) {
       ? b.frontmatter.id.localeCompare(a.frontmatter.id)
       : b.frontmatter.date.localeCompare(a.frontmatter.date),
   );
+  // Current decisions first; replaced ones only under "更多".
+  const current = sorted.filter((d) => d.supersededBy.length === 0);
+  const rest = [...current.slice(SHOWN), ...sorted.filter((d) => d.supersededBy.length > 0)];
   return (
-    <Section title="決定" count={sorted.length}>
+    <Panel title="決定" icon="✅" count={current.length}>
       {sorted.length === 0 ? (
-        <p className="muted">還沒有記錄任何決定</p>
+        <p className="muted empty">還沒有記錄任何決定</p>
       ) : (
-        <ul className="list card">
-          {sorted.map((d) => (
-            <DecisionItem key={d.frontmatter.id} d={d} board={board} />
-          ))}
-        </ul>
+        <>
+          <ul className="rows card">
+            {current.slice(0, SHOWN).map((d) => (
+              <DecisionItem key={d.frontmatter.id} d={d} board={board} />
+            ))}
+          </ul>
+          {rest.length > 0 && (
+            <details className="more">
+              <summary>更早的和已被取代的（{rest.length}）</summary>
+              <ul className="rows card">
+                {rest.map((d) => (
+                  <DecisionItem key={d.frontmatter.id} d={d} board={board} />
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
       )}
-    </Section>
+    </Panel>
   );
 }

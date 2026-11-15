@@ -1,19 +1,24 @@
 import type { DiscussionSummary } from "@tandem/contracts";
-import { Ext, Section } from "./Ext.tsx";
+import { Ext } from "./Ext.tsx";
+import { Panel } from "./ui.tsx";
 import { relTime } from "../time.ts";
 
 const KIND = { question: "問題", disagreement: "意見不同", other: "討論" } as const;
+const TONE = { question: "tag-info", disagreement: "tag-warn", other: "" } as const;
 
 function Row({ d, now }: { d: DiscussionSummary; now: number }) {
-  const tone = d.kind === "disagreement" ? "badge-warn" : d.kind === "question" ? "badge-info" : "";
   return (
     <li>
-      <span className={`badge ${tone}`}>{KIND[d.kind]}</span> <Ext href={d.url}>{d.title}</Ext>
-      <div className="meta muted">
-        @{d.author} 發起
-        {d.waitingOn.length > 0 && <> · 等 {d.waitingOn.map((l) => `@${l}`).join("、")}</>}
-        {d.answered && <> · 已有回答</>} · {relTime(d.updatedAt, now)}更新
-      </div>
+      <span className="grow">
+        <Ext href={d.url} className="row-title">
+          {d.title}
+        </Ext>
+        <span className="row-meta">
+          <span className={`tag ${TONE[d.kind]}`}>{KIND[d.kind]}</span>
+          {d.waitingOn.length > 0 && <> 等 {d.waitingOn.map((l) => `@${l}`).join("、")} ·</>}
+          {d.answered && <> 已有回答 ·</>} {relTime(d.updatedAt, now)}
+        </span>
+      </span>
     </li>
   );
 }
@@ -23,11 +28,11 @@ export function Discussions({ items, now }: { items: DiscussionSummary[]; now: n
   const open = items.filter((d) => !d.closed).sort(byUpdated);
   const closed = items.filter((d) => d.closed).sort(byUpdated);
   return (
-    <Section title="討論" count={open.length}>
+    <Panel title="討論和問題" icon="💬" count={open.length}>
       {open.length === 0 ? (
-        <p className="muted">目前沒有開著的討論</p>
+        <p className="muted empty">目前沒有開著的討論</p>
       ) : (
-        <ul className="list card">
+        <ul className="rows card">
           {open.map((d) => (
             <Row key={d.id} d={d} now={now} />
           ))}
@@ -35,14 +40,14 @@ export function Discussions({ items, now }: { items: DiscussionSummary[]; now: n
       )}
       {closed.length > 0 && (
         <details className="more">
-          <summary>最近已結束的討論（{closed.length}）</summary>
-          <ul className="list card dim">
+          <summary>已結束（{closed.length}）</summary>
+          <ul className="rows card dim">
             {closed.map((d) => (
               <Row key={d.id} d={d} now={now} />
             ))}
           </ul>
         </details>
       )}
-    </Section>
+    </Panel>
   );
 }

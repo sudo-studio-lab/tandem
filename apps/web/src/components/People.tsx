@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
 import type { ActivityItem, ActivityKind, BoardMember, ProjectBoard } from "@tandem/contracts";
-import { Ext, Section } from "./Ext.tsx";
-import { relTime, waitedFor } from "../time.ts";
+import { Ext } from "./Ext.tsx";
+import { Avatar, Panel } from "./ui.tsx";
+import { relTime } from "../time.ts";
 
 const DECISION_ID_RE = /^D-\d{8}-[0-9a-z]{4}$/;
 
@@ -14,31 +14,21 @@ const ACTIVITY: Record<ActivityKind, { icon: string; verb: string }> = {
 
 function Activity({ items, now }: { items: ActivityItem[]; now: number }) {
   return (
-    <div className="activity">
-      <h4>最近動態</h4>
-      <ul>
-        {items.map((a, i) => (
-          <li key={`${a.url}${i}`}>
-            <span className="act-icon" aria-hidden="true">
-              {ACTIVITY[a.kind].icon}
-            </span>
-            <span className="sr-only">{ACTIVITY[a.kind].verb}：</span>
+    <ul className="mini-list">
+      {items.map((a, i) => (
+        <li key={`${a.url}${i}`}>
+          <span className="mini-icon" aria-hidden="true">
+            {ACTIVITY[a.kind].icon}
+          </span>
+          <span className="sr-only">{ACTIVITY[a.kind].verb}：</span>
+          <span className="grow">
             <Ext href={a.url}>{a.title}</Ext>
             {a.count && a.count > 1 && <span className="muted"> 等 {a.count} 筆</span>}
-            <span className="muted act-time"> {relTime(a.time, now)}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function Field({ label, children, tone }: { label: string; children: ReactNode; tone?: "bad" }) {
-  return (
-    <div className={`field${tone ? ` field-${tone}` : ""}`}>
-      <dt>{label}</dt>
-      <dd>{children}</dd>
-    </div>
+          </span>
+          <span className="muted mini-time">{relTime(a.time, now)}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -53,116 +43,139 @@ function PersonCard({ m, board, now }: { m: BoardMember; board: ProjectBoard; no
     return (
       <>
         {" "}
-        <Ext href={`${repoUrl}/blob/HEAD/${d.path}`}>{ref}</Ext>
+        <Ext href={`${repoUrl}/blob/HEAD/${d.path}`} className="ref-link">
+          {ref}
+        </Ext>
       </>
     );
   };
   const prs = m.recentPullRequests.filter((p) => p.state !== "closed");
   const activity = board.activity[m.login] ?? [];
+  const outputs = (s?.deliverables.length ?? 0) + prs.length;
+  const moreParts = [
+    outputs > 0 && `成品 ${outputs}`,
+    activity.length > 0 && `動態 ${activity.length}`,
+    m.openTasks.length > 0 && `待辦 ${m.openTasks.length}`,
+  ].filter(Boolean);
 
   return (
-    <article className={`card person${s?.blocked ? " is-blocked" : ""}`} aria-label={m.login}>
+    <article className={`card person${s?.blocked ? " is-blocked" : ""}${isMe ? " is-me" : ""}`} aria-label={m.login}>
       <header className="person-head">
-        <h3>
-          <Ext href={`https://github.com/${m.login}`}>@{m.login}</Ext>
-        </h3>
-        {isMe && <span className="badge badge-me">你</span>}
-        <span className="muted updated">{s ? `更新於 ${relTime(s.updated, now)}` : ""}</span>
+        <Avatar login={m.login} size={34} />
+        <div className="person-name">
+          <h3>
+            <Ext href={`https://github.com/${m.login}`}>{m.login}</Ext>
+            {isMe && <span className="badge badge-me">你</span>}
+          </h3>
+          <span className="muted small">{s ? `${relTime(s.updated, now)}更新` : activity.length ? "還沒寫狀態" : "最近 7 天沒有動態"}</span>
+        </div>
+        <div className="person-flags">
+          {m.waitedOnBy.length > 0 && (
+            <span className="flag flag-warn" title={m.waitedOnBy.map((w) => `@${w.from}：${w.title}`).join("\n")}>
+              別人在等 {m.waitedOnBy.length}
+            </span>
+          )}
+          {m.waitingOn.length > 0 && (
+            <span className="flag" title={m.waitingOn.map((w) => `@${w.to}：${w.title}`).join("\n")}>
+              在等別人 {m.waitingOn.length}
+            </span>
+          )}
+        </div>
       </header>
 
-      {!s ? (
-        activity.length === 0 && <p className="muted">最近 7 天沒有動態</p>
-      ) : (
-        <dl className="fields">
-          <Field label="在做">{s.doing || <span className="muted">—</span>}</Field>
-          <Field label="接下來">{s.next || <span className="muted">—</span>}</Field>
+      {s && (
+        <div className="person-body">
+          <div className="doing">
+            <span className="label">在做</span>
+            <p>{s.doing || <span className="muted">—</span>}</p>
+          </div>
           {s.blocked && (
-            <Field label="卡在" tone="bad">
-              {s.blocked}
-            </Field>
+            <div className="blocked" role="note">
+              <span className="label">卡在</span>
+              <p>{s.blocked}</p>
+            </div>
+          )}
+          {s.next && (
+            <div className="next">
+              <span className="label">接下來</span>
+              <p>{s.next}</p>
+            </div>
           )}
           {s.fyi.length > 0 && (
-            <Field label="要大家知道">
-              <ul>
-                {s.fyi.map((f, i) => (
-                  <li key={i}>
-                    {f.text}
-                    {decisionLink(f.ref)}
-                  </li>
-                ))}
-              </ul>
-            </Field>
-          )}
-        </dl>
-      )}
-
-      {activity.length > 0 && <Activity items={activity} now={now} />}
-
-      {((s && s.deliverables.length > 0) || prs.length > 0) && (
-        <dl className="fields">
-          <Field label="成品">
-            <ul>
-              {s?.deliverables.map((d) => (
-                <li key={d.url}>
-                  <Ext href={d.url}>{d.title}</Ext>
-                </li>
-              ))}
-              {prs.map((p) => (
-                <li key={`pr${p.number}`}>
-                  <Ext href={p.url}>
-                    #{p.number} {p.title}
-                  </Ext>{" "}
-                  <span className={`badge ${p.state === "merged" ? "badge-ok" : ""}`}>
-                    {p.state === "merged" ? "已合併" : p.draft ? "草稿 PR" : "PR 審查中"}
-                  </span>
+            <ul className="fyi">
+              {s.fyi.map((f, i) => (
+                <li key={i}>
+                  <span aria-hidden="true">📌 </span>
+                  <span className="sr-only">要大家知道：</span>
+                  {f.text}
+                  {decisionLink(f.ref)}
                 </li>
               ))}
             </ul>
-          </Field>
-        </dl>
+          )}
+        </div>
       )}
 
-      {(m.waitingOn.length > 0 || m.waitedOnBy.length > 0 || m.openTasks.length > 0) && (
-        <dl className="fields">
-          {m.waitingOn.length > 0 && (
-            <Field label="在等誰">
-              <ul>
-                {m.waitingOn.map((w, i) => (
-                  <li key={i}>
-                    @{w.to}：<Ext href={w.url}>{w.title}</Ext>{" "}
-                    <span className="muted">（{waitedFor(w.since, now)}）</span>
+      {moreParts.length > 0 && (
+        <details className="person-more">
+          <summary>{moreParts.join(" · ")}</summary>
+          {outputs > 0 && (
+            <div className="sub-block">
+              <h4>成品</h4>
+              <ul className="mini-list">
+                {s?.deliverables.map((d) => (
+                  <li key={d.url}>
+                    <span className="mini-icon" aria-hidden="true">
+                      📄
+                    </span>
+                    <Ext href={d.url}>{d.title}</Ext>
+                  </li>
+                ))}
+                {prs.map((p) => (
+                  <li key={`pr${p.number}`}>
+                    <span className="mini-icon" aria-hidden="true">
+                      ⇄
+                    </span>
+                    <span className="grow">
+                      <Ext href={p.url}>
+                        #{p.number} {p.title}
+                      </Ext>
+                    </span>
+                    <span className={`tag ${p.state === "merged" ? "tag-ok" : "tag-info"}`}>
+                      {p.state === "merged" ? "已合併" : p.draft ? "草稿" : "審查中"}
+                    </span>
                   </li>
                 ))}
               </ul>
-            </Field>
+            </div>
           )}
-          {m.waitedOnBy.length > 0 && (
-            <Field label="誰在等這個人">
-              <ul>
-                {m.waitedOnBy.map((w, i) => (
-                  <li key={i}>
-                    @{w.from}：<Ext href={w.url}>{w.title}</Ext>{" "}
-                    <span className="muted">（{waitedFor(w.since, now)}）</span>
-                  </li>
-                ))}
-              </ul>
-            </Field>
+          {activity.length > 0 && (
+            <div className="sub-block">
+              <h4>最近動態</h4>
+              <Activity items={activity} now={now} />
+            </div>
           )}
           {m.openTasks.length > 0 && (
-            <Field label="待辦任務">
-              <ul>
+            <div className="sub-block">
+              <h4>待辦任務</h4>
+              <ul className="mini-list">
                 {m.openTasks.map((t) => (
                   <li key={t.number}>
-                    <Ext href={t.url}>
-                      #{t.number} {t.title}
-                    </Ext>
-                    {t.blockedBy.length > 0 && <span className="badge badge-bad">被卡住</span>}
+                    <span className="mini-icon" aria-hidden="true">
+                      ☐
+                    </span>
+                    <span className="grow">
+                      <Ext href={t.url}>
+                        #{t.number} {t.title}
+                      </Ext>
+                    </span>
+                    {t.blockedBy.length > 0 && <span className="tag tag-bad">被卡住</span>}
                   </li>
                 ))}
               </ul>
-            </Field>
+            </div>
           )}
-        </dl>
+        </details>
       )}
     </article>
   );
@@ -171,16 +184,16 @@ function PersonCard({ m, board, now }: { m: BoardMember; board: ProjectBoard; no
 export function People({ board, now }: { board: ProjectBoard; now: number }) {
   const members = [...board.members].sort((a, b) => Number(b.login === board.me) - Number(a.login === board.me));
   return (
-    <Section title="大家在做什麼" count={members.length}>
+    <Panel title="大家在做什麼" icon="👥" count={members.length}>
       {members.length === 0 ? (
-        <p className="muted">還沒有成員</p>
+        <p className="muted empty">還沒有成員</p>
       ) : (
-        <div className="grid">
+        <div className="people-grid">
           {members.map((m) => (
             <PersonCard key={m.login} m={m} board={board} now={now} />
           ))}
         </div>
       )}
-    </Section>
+    </Panel>
   );
 }
