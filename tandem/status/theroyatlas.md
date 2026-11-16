@@ -1,12 +1,12 @@
 ---
 login: theroyatlas
-updated: 2026-11-16T13:17:58+08:00
-doing: 調整 Tandem 對話功能：模型切換與圖片附件後端、草稿儲存基礎已完成，介面尚未接上。
-next: 確認介面風格後接上模型選單、貼圖、草稿恢復，移除終端機提示，再做畫面驗證並開 PR。
-blocked: 等 Roy 選擇介面風格；目前沒有 DESIGN.md，依專案規則暫停畫面修改。
+updated: 2026-11-16T13:33:00+08:00
+doing: Tandem 對話功能調整中：後端與草稿儲存基礎已完成；Roy 已確認產品定位，完成 impeccable init，新增畫面預設先做參考圖。
+next: 收到介面感受或參考後，出三版對話介面參考圖供 Roy 選定，再完成模型選單、貼圖、草稿恢復與終端機文案調整。
+blocked: 等 Roy 提供想要的介面感受（也可回沒有），參考圖尚未產生與核准，未進行畫面實作。
 fyi:
-  - text: 本機分支 feat/chat-model-images-drafts；程式碼尚未 commit、push 或開 PR。
-  - text: 208 項測試通過、8 項略過；建置和型別檢查通過。圖片與模型轉接僅完成模擬協定驗證，尚未實際模型或桌面 App 驗收。
-  - text: 四項需求的決定紀錄已產生 dry-run 草稿，尚待 Roy 確認，未正式寫入。
+  - text: 程式碼仍在本機 feat/chat-model-images-drafts，未提交、推送或開 PR。
+  - text: PRODUCT.md 與先做參考圖的流程設定已建立；現有對話畫面已用模擬資料擷取，未改動視覺。
+  - text: 先前驗證：208 項測試通過、8 項略過，建置與型別檢查通過；四項功能尚未完成介面和實際模型驗收。
 deliverables: []
 ---
