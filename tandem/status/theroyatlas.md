@@ -1,12 +1,14 @@
 ---
 login: theroyatlas
-updated: 2026-11-16T13:42:08+08:00
-doing: Tandem 對話功能調整：產品與現有視覺規範已建立；三版參考圖已完成，並納入 Roy 新增的 steer／queue 需求，等待選版。
-next: 選定 A、B 或 C 後完成模型選擇、貼圖、草稿保存、steer／queue，並移除終端機提示，執行畫面和行為驗證。
-blocked: 等 Roy 選定對話介面參考圖；三版目前都未核准。
+updated: 2026-11-16T14:37:47+08:00
+doing: "已按 A 版完成本機對話功能：模型／effort、貼圖與對話圖片、草稿、steer／queue，以及 Antigravity／Grok／Cursor ACP；草稿 PR #10 已開。"
+next: 檢查 PR 和本機範例介面；由使用者完成 Antigravity 原廠登入，再另行驗收真實 provider 回合與桌面更新。
+blocked: Antigravity 尚需原廠登入。真實模型回合與實體手機未驗收；設計工具的 0 assets 額外人審關卡仍未關閉。
 fyi:
-  - text: A：控制集中在輸入區；B：模型置頂、先選送出模式；C：待處理訊息獨立側欄。參考圖是生成式設計稿，不是可操作成品。
-  - text: Codex 已有原生 turn/steer；Claude 現有串流管線能接受後續訊息，但尚未確認同等即時 steer，不能把排隊當成即時補充。
-  - text: 本機 feat/chat-model-images-drafts，尚未提交或推送程式碼；先前 208 項測試通過、8 項略過，不代表新增 steer／queue 已完成。
-deliverables: []
+  - text: 221 項測試通過、8 項略過；typecheck、build、diff check 通過。12 項瀏覽器檢查使用 MOCK、合成貼圖事件與 390px 模擬尺寸。
+  - text: 本機認證與模型 metadata probe：Grok／Cursor 通過，Antigravity 可啟動但要求登入；未送出真實模型 prompt。原生 steer 目前僅 Codex，其他 provider 使用 queue。
+  - text: 獨立複查三項介面修正 resolved、工作流證據 partial；未合併、未發布、未替換已安裝桌面 App。
+deliverables:
+  - title: A 版對話控制與三家 ACP provider 草稿 PR
+    url: https://github.com/sudo-studio-lab/tandem/pull/10
 ---
