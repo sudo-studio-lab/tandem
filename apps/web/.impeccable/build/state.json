@@ -101,7 +101,13 @@
       "forced": null
     }
   },
-  "finish": null,
+  "finish": {
+    "disposition": "fix",
+    "at": "2026-11-16T06:37:04.835Z",
+    "phaseAtFinish": "plates",
+    "artifactInputsSha256": "fdda1ae0f09b7da3b5f9b3e347ed9f29490ca695a8d091cfc0c1dbc39f374b70",
+    "artifactSha256": "1c7fe0761a46a75434bfa24e0219ad9026308b1eb89392d39b01e1ef31323681"
+  },
   "sessionId": "01a1e2bf-23fd-7681-b9ab-5f56b7e70ee9",
   "plates": {}
 }
