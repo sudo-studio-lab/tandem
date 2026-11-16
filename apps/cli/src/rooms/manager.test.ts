@@ -65,7 +65,7 @@ function setup(reply: (text: string) => string) {
   // eslint-disable-next-line prefer-const
   let rooms: RoomManager;
   const chats = new ChatManager({
-    adapters: { claude: adapter, codex: adapter },
+    adapters: { claude: adapter, codex: adapter, antigravity: adapter, grok: adapter, cursor: adapter },
     emit: () => {},
     mcp: () => ({ command: "node", args: [], env: {} }),
     approveBridge: () => undefined,

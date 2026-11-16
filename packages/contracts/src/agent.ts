@@ -9,10 +9,19 @@ export interface ModelChoice {
   id: string;
   label: string;
   isDefault?: boolean;
+  reasoningEfforts?: string[];
+  inputModalities?: string[];
+}
+
+export interface ChatImage {
+  id: string;
+  name: string;
+  /** Local image bytes; never uploaded to GitHub. */
+  dataUrl: string;
 }
 
 /** How the user signed in to an agent. Tandem never sees the credentials themselves. */
-export type AgentAuth = "subscription" | "apiKey" | "none" | "unknown";
+export type AgentAuth = "subscription" | "apiKey" | "authenticated" | "none" | "unknown";
 
 export interface AgentStatus {
   agent: AgentKind;
@@ -27,14 +36,25 @@ export interface AgentStatus {
   installUrl: string;
   /** Plain-language problem, e.g. could not read the login state. */
   note?: string;
+  managedAuthExternally?: boolean;
+  supportsSteer?: boolean;
+  supportsImages?: boolean;
+  terminalAvailable?: boolean;
+}
+
+export interface QueuedMessage {
+  id: string;
+  text: string;
+  images: ChatImage[];
+  at: string;
 }
 
 export type ApprovalDecision = "allow" | "allowSession" | "deny";
 
 export type ChatItem =
   /** `by`/`url` are set in rooms: who said it, and the GitHub comment it came from. */
-  | { kind: "user"; id: string; at: string; text: string; by?: string; url?: string }
-  | { kind: "assistant"; id: string; at: string; text: string; streaming?: boolean }
+  | { kind: "user"; id: string; at: string; text: string; images?: ChatImage[]; by?: string; url?: string }
+  | { kind: "assistant"; id: string; at: string; text: string; images?: ChatImage[]; streaming?: boolean }
   | {
       kind: "tool";
       id: string;
@@ -66,6 +86,9 @@ export interface ChatSummary {
   agent: AgentKind;
   /** "" = the agent's default model. */
   model: string;
+  reasoningEffort?: string;
+  queue?: QueuedMessage[];
+  queuePaused?: boolean;
   title: string;
   createdAt: string;
   updatedAt: string;

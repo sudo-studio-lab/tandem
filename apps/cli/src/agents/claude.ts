@@ -7,7 +7,8 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ChildProcess } from "node:child_process";
-import type { AgentLoginStart, AgentStatus, ModelChoice } from "@tandem/contracts";
+import { randomUUID } from "node:crypto";
+import type { AgentLoginStart, AgentStatus, ChatImage, ModelChoice } from "@tandem/contracts";
 import { appStateDir } from "@tandem/core";
 import { agentEnv, killTree, onLines, openTerminal, resolveCommand, runCapture, spawnAgent } from "./proc.ts";
 import { summarize, truncate, type AdapterEvent, type AgentAdapter, type AgentSession, type StartOptions } from "./types.ts";
@@ -17,7 +18,6 @@ const MODELS: ModelChoice[] = [
   { id: "opus", label: "Opus" },
   { id: "sonnet", label: "Sonnet" },
   { id: "haiku", label: "Haiku" },
-  { id: "fable", label: "Fable" },
 ];
 
 /** Team tools that run without asking: reading, and records the user already confirmed in chat. */
@@ -36,6 +36,8 @@ export const claudeAdapter: AgentAdapter = {
       auth: "none",
       models: MODELS,
       installUrl: "https://code.claude.com/docs/en/setup",
+      supportsSteer: false,
+      supportsImages: true,
     };
     if (!resolveCommand("claude")) return base;
     const [ver, st] = await Promise.all([runCapture("claude", ["--version"]), runCapture("claude", ["auth", "status", "--json"])]);
@@ -170,6 +172,8 @@ class ClaudeSession implements AgentSession {
             const n = this.finalTextCount.get(msg.id) ?? 0;
             this.finalTextCount.set(msg.id, n + 1);
             this.emit({ type: "message", id: `${msg.id}:t${n}`, text: b.text });
+          } else if (b.type === "image" && b.source?.type === "base64") {
+            this.emit({ type: "image", id: `${msg.id}:image`, image: { id: randomUUID(), name: "Claude 圖片", dataUrl: `data:${b.source.media_type};base64,${b.source.data}` } });
           } else if (b.type === "tool_use") {
             this.emit({ type: "tool", id: b.id, name: b.name, summary: summarize(b.name, b.input), input: b.input, status: "running" });
           }
@@ -199,10 +203,17 @@ class ClaudeSession implements AgentSession {
   private streamBlock = new Map<string, string>();
   private finalTextCount = new Map<string, number>();
 
-  async send(text: string): Promise<void> {
+  async send(text: string, images: ChatImage[] = []): Promise<void> {
     const child = await this.ensureProcess();
     this.turnActive = true;
-    child.stdin!.write(`${JSON.stringify({ type: "user", message: { role: "user", content: text } })}\n`);
+    const content = images.length ? [
+      ...(text ? [{ type: "text", text }] : []),
+      ...images.map((image) => {
+        const [header, data] = image.dataUrl.split(",");
+        return { type: "image", source: { type: "base64", media_type: header!.slice(5, -7), data } };
+      }),
+    ] : text;
+    child.stdin!.write(`${JSON.stringify({ type: "user", message: { role: "user", content } })}\n`);
   }
 
   async interrupt(): Promise<void> {

@@ -1,4 +1,6 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
+import path from "node:path";
 
 /** Env for the agent process: ours minus the Electron switch (the agent is not Electron). */
 export function agentEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
@@ -12,6 +14,10 @@ export function agentEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv 
  * are .cmd shims, which Node can only start through cmd.exe.
  */
 export function resolveCommand(cmd: string): { file: string; prefix: string[] } | null {
+  if (path.isAbsolute(cmd) && existsSync(cmd)) {
+    if (process.platform === "win32" && /\.(cmd|bat)$/i.test(cmd)) return { file: process.env.ComSpec || "cmd.exe", prefix: [cmd] };
+    return { file: cmd, prefix: [] };
+  }
   if (process.platform !== "win32") {
     const r = spawnSync("which", [cmd], { encoding: "utf8" });
     return r.status === 0 ? { file: cmd, prefix: [] } : null;

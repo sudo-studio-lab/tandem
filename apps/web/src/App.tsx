@@ -204,9 +204,9 @@ export function App() {
           </div>
         </main>
       ) : view === "room" ? (
-        <RoomView projectId={project.id} me={session.login} now={now} onOpenSettings={() => setDialog("agents")} />
+        <RoomView key={project.id} projectId={project.id} me={session.login} now={now} onOpenSettings={() => setDialog("agents")} />
       ) : view === "chat" ? (
-        <ChatView projectId={project.id} now={now} onOpenSettings={() => setDialog("agents")} />
+        <ChatView key={project.id} projectId={project.id} now={now} onOpenSettings={() => setDialog("agents")} />
       ) : !board ? (
         <main className="page">
           {app.boardError ? (

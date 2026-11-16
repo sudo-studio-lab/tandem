@@ -55,6 +55,7 @@ import { inviteLogin } from "./commands.ts";
 import { info } from "./io.ts";
 import { rememberProject, startProject, joinProject } from "./setup.ts";
 import { ADAPTERS, agentStatuses } from "./agents/index.ts";
+import { ACP_INFO } from "./agents/acp.ts";
 import type { McpLaunch } from "./agents/types.ts";
 import { ChatManager } from "./chats/manager.ts";
 import { RoomManager } from "./rooms/manager.ts";
@@ -607,7 +608,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
     handle(async (c) => {
       const kind = c.req.param("kind") as AgentKind;
       const adapter = ADAPTERS[kind];
-      if (!adapter) throw new TandemError("usage", "不認得這個 agent");
+      if (!Object.hasOwn(ADAPTERS, kind)) throw new TandemError("usage", "不認得這個 agent");
       const b = await body<{ method: "subscription" | "apiKey" }>(c);
       const r = await adapter.login(b.method === "apiKey" ? "apiKey" : "subscription", os.homedir());
       return c.json(r);
@@ -617,7 +618,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
     "/api/agents/:kind/logout",
     handle(async (c) => {
       const adapter = ADAPTERS[c.req.param("kind") as AgentKind];
-      if (!adapter) throw new TandemError("usage", "不認得這個 agent");
+      if (!Object.hasOwn(ADAPTERS, c.req.param("kind") ?? "")) throw new TandemError("usage", "不認得這個 agent");
       await adapter.logout();
       const data = await agentStatuses(true);
       emit({ type: "agents", data });
@@ -633,20 +634,53 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
       const id = decodeURIComponent(c.req.param("id") ?? "");
       await projectPathOf(id);
       const b = await body<{ agent: AgentKind; model: string }>(c);
-      if (!b.agent || !ADAPTERS[b.agent]) throw new TandemError("usage", "請選一個 agent");
+      if (typeof b.agent !== "string" || !Object.hasOwn(ADAPTERS, b.agent)) throw new TandemError("usage", "請選一個 agent");
       return c.json(await chats.create(id, b.agent, typeof b.model === "string" ? b.model : ""));
     }),
   );
   app.get("/api/chats/:chatId", handle(async (c) => c.json(await chats.get(c.req.param("chatId") ?? ""))));
+  app.patch(
+    "/api/chats/:chatId",
+    handle(async (c) => {
+      const chat = await chats.get(c.req.param("chatId") ?? "");
+      const b = await body<{ model: string; reasoningEffort?: string }>(c);
+      if (typeof b.model !== "string" || (b.reasoningEffort !== undefined && typeof b.reasoningEffort !== "string")) throw new TandemError("usage", "模型設定不正確");
+      const status = (await agentStatuses()).find((a) => a.agent === chat.agent);
+      const model = status?.models.find((m) => m.id === b.model);
+      if (!model) throw new TandemError("usage", "請選一個可用的模型");
+      if (b.reasoningEffort && !model.reasoningEfforts?.includes(b.reasoningEffort)) throw new TandemError("usage", "這個模型不支援所選的 effort");
+      return c.json(await chats.configure(chat.id, b.model, b.reasoningEffort || undefined));
+    }),
+  );
   app.post(
     "/api/chats/:chatId/messages",
     handle(async (c) => {
       const chat = await chats.get(c.req.param("chatId") ?? "");
-      const b = await body<{ text: string }>(c);
-      await chats.send(chat.id, String(b.text ?? ""), await projectPathOf(chat.projectId));
+      const b = await body<{ text: string; images?: unknown; mode?: string }>(c);
+      if (b.mode && !["send", "steer", "queue"].includes(b.mode)) throw new TandemError("usage", "不認得這個送出方式");
+      const text = String(b.text ?? "");
+      const cwd = await projectPathOf(chat.projectId);
+      if (b.mode === "steer") await chats.steer(chat.id, text, b.images);
+      else if (b.mode === "queue") await chats.enqueue(chat.id, text, cwd, b.images);
+      else await chats.send(chat.id, text, cwd, b.images);
       return c.json({ ok: true });
     }),
   );
+  app.post("/api/chats/:chatId/queue/resume", handle(async (c) => {
+    const chat = await chats.get(c.req.param("chatId") ?? "");
+    await chats.resumeQueue(chat.id, await projectPathOf(chat.projectId));
+    return c.json({ ok: true });
+  }));
+  app.patch("/api/chats/:chatId/queue/:messageId", handle(async (c) => {
+    const b = await body<{ text: string; images?: unknown }>(c);
+    if (typeof b.text !== "string") throw new TandemError("usage", "訊息格式不正確");
+    await chats.updateQueued(c.req.param("chatId") ?? "", c.req.param("messageId") ?? "", { text: b.text, images: b.images });
+    return c.json({ ok: true });
+  }));
+  app.delete("/api/chats/:chatId/queue/:messageId", handle(async (c) => {
+    await chats.updateQueued(c.req.param("chatId") ?? "", c.req.param("messageId") ?? "");
+    return c.json({ ok: true });
+  }));
   app.post(
     "/api/chats/:chatId/interrupt",
     handle(async (c) => {
@@ -682,7 +716,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
     "/api/projects/:id/rooms",
     handle(async (c) => {
       const b = await body<{ title: string; agent: AgentKind; model: string }>(c);
-      if (!b.agent || !ADAPTERS[b.agent]) throw new TandemError("usage", "請選一個 agent");
+      if (typeof b.agent !== "string" || !Object.hasOwn(ADAPTERS, b.agent)) throw new TandemError("usage", "請選一個 agent");
       return c.json(await rooms.create(pid(c), String(b.title ?? ""), b.agent, typeof b.model === "string" ? b.model : ""));
     }),
   );
@@ -707,7 +741,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
     "/api/projects/:id/open-agent",
     handle(async (c) => {
       const b = await body<{ agent: AgentKind }>(c);
-      if (b.agent !== "claude" && b.agent !== "codex") throw new TandemError("usage", "不認得這個 agent");
+      if (typeof b.agent !== "string" || !Object.hasOwn(ADAPTERS, b.agent)) throw new TandemError("usage", "不認得這個 agent");
       const rt = await projectRt(c);
       openAgent(b.agent, rt.ctx.repoRoot);
       return c.json({ ok: true });
@@ -819,6 +853,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
 const INSTALL_URLS: Record<AgentKind, string> = {
   claude: "https://code.claude.com/docs/en/setup",
   codex: "https://developers.openai.com/codex",
+  grok: ACP_INFO.grok.installUrl,
+  cursor: ACP_INFO.cursor.installUrl,
+  antigravity: ACP_INFO.antigravity.installUrl,
 };
 
 /** How the agent starts `tandem mcp`: this same program, so it works before PATH is updated (desktop). */
@@ -844,22 +881,23 @@ function onPath(cmd: string): boolean {
 }
 
 export function detectAgents(): AgentAvailability[] {
-  return (["claude", "codex"] as const).map((agent) => ({ agent, installed: onPath(agent), installUrl: INSTALL_URLS[agent] }));
+  return (Object.keys(INSTALL_URLS) as AgentKind[]).map((agent) => ({ agent, installed: onPath(agent === "cursor" ? "cursor-agent" : agent === "antigravity" ? "agy" : agent), installUrl: INSTALL_URLS[agent] }));
 }
 
 /** Open the user's own agent in a terminal at `dir`. Arguments are passed as an array, never a shell string. */
 function openAgent(agent: AgentKind, dir: string): void {
-  if (!onPath(agent)) throw new TandemError("usage", `這台電腦還沒安裝 ${agent === "claude" ? "Claude Code" : "Codex"}`);
+  const command = agent === "cursor" ? "cursor-agent" : agent === "antigravity" ? "agy" : agent;
+  if (!onPath(command)) throw new TandemError("usage", `這台電腦還沒安裝 ${command} 終端機工具`);
   const detached = { detached: true, stdio: "ignore" as const, windowsHide: false };
   if (process.platform === "win32") {
     if (onPath("wt")) {
-      spawn("wt.exe", ["-d", dir, agent], detached).unref();
+      spawn("wt.exe", ["-d", dir, command], detached).unref();
       return;
     }
     // PowerShell fallback: the folder is passed as an argument, not interpolated into the command.
     spawn(
       "powershell.exe",
-      ["-NoExit", "-Command", `Set-Location -LiteralPath $args[0]; ${agent}`, dir],
+      ["-NoExit", "-Command", `Set-Location -LiteralPath $args[0]; ${command}`, dir],
       { ...detached, shell: false },
     ).unref();
     return;

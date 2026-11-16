@@ -9,6 +9,7 @@ import { relTime } from "../time.ts";
 import { Avatar, Spinner, errMsg } from "./ui.tsx";
 import { Item, applyUpdate, useAgents, usableAgents } from "./Chat.tsx";
 import "./room.css";
+import { useDraft } from "../drafts.ts";
 
 const POLL_MS = 4000;
 
@@ -179,7 +180,9 @@ function NewRoom(props: { onOpenSettings: () => void; onCancel?: () => void; onC
 function RoomPane({ projectId, number, me, now, onError, onChanged }: { projectId: string; number: number; me: string; now: number; onError: (m: string) => void; onChanged: () => void }) {
   const [room, setRoom] = useState<Room | null>(null);
   const [chat, setChat] = useState<Chat | null>(null);
-  const [text, setText] = useState("");
+  const { draft, setDraft } = useDraft(`room:${projectId}:${number}:${me}`);
+  const text = draft.text;
+  const setText = (text: string) => setDraft((current) => ({ ...current, text }));
   const [sending, setSending] = useState(false);
   const [noting, setNoting] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
@@ -227,7 +230,7 @@ function RoomPane({ projectId, number, me, now, onError, onChanged }: { projectI
 
   const send = async () => {
     const body = text.trim();
-    if (!body) return;
+    if (!body || sending) return;
     setSending(true);
     try {
       await api("POST", projectPath(projectId, `/rooms/${number}/messages`), { text: body });
@@ -317,6 +320,7 @@ function RoomPane({ projectId, number, me, now, onError, onChanged }: { projectI
               className="input"
               rows={2}
               value={text}
+              disabled={sending}
               placeholder={isHost ? "跟大家和 AI 說…（Enter 送出，Shift+Enter 換行）" : `跟大家和 AI 說…AI 跑在 @${room.host} 的電腦，回覆會晚幾秒`}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {

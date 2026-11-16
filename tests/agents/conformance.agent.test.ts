@@ -16,6 +16,9 @@ const AGENTS = (process.env.TANDEM_CONF_AGENTS ?? "claude,codex").split(",").map
 const MODEL: Record<AgentKind, string> = {
   claude: process.env.TANDEM_CONF_CLAUDE_MODEL ?? "haiku",
   codex: process.env.TANDEM_CONF_CODEX_MODEL ?? "",
+  antigravity: process.env.TANDEM_CONF_ANTIGRAVITY_MODEL ?? "",
+  grok: process.env.TANDEM_CONF_GROK_MODEL ?? "",
+  cursor: process.env.TANDEM_CONF_CURSOR_MODEL ?? "",
 };
 
 const statuses = new Map<AgentKind, AgentStatus>();

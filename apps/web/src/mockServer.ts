@@ -7,6 +7,7 @@
  */
 import type {
   AgentStatus,
+  AgentKind,
   Chat,
   ChatItem,
   AppEvent,
@@ -23,6 +24,7 @@ import type {
 } from "@tandem/contracts";
 import { ApiError } from "./api.ts";
 import { mockProjectBoard } from "./mock.ts";
+import { validateChatImages } from "../../../packages/contracts/src/images.ts";
 
 const params = new URLSearchParams(location.search);
 const ME = "jielle2453";
@@ -79,22 +81,41 @@ const agents: AgentStatus[] = [
       { id: "sonnet", label: "Sonnet" },
     ],
     installUrl: "https://code.claude.com/docs/en/setup",
+    supportsImages: true,
+    supportsSteer: false,
   },
-  { agent: "codex", label: "Codex", installed: false, auth: "none", models: [], installUrl: "https://developers.openai.com/codex" },
+  { agent: "codex", label: "Codex", installed: true, auth: "subscription", supportsImages: true, supportsSteer: true, models: [{ id: "", label: "預設" }, { id: "gpt-6.1-sol", label: "GPT-6.1 Sol", reasoningEfforts: ["low", "medium", "high", "xhigh", "max"] }], installUrl: "https://developers.openai.com/codex" },
+  ...(["antigravity", "grok", "cursor"] as const).map((kind) => ({ agent: kind, label: kind === "grok" ? "Grok" : kind === "cursor" ? "Cursor" : "Antigravity", installed: true, auth: "authenticated" as const, managedAuthExternally: true, supportsImages: true, supportsSteer: false, models: [{ id: "", label: "預設（範例）" }], installUrl: "#" })),
 ];
 
 /** Fake chats: the agent answers with a canned reply and one approval card. */
-const chats: Chat[] = [];
+const chats: Chat[] = (() => {
+  try { return JSON.parse(sessionStorage.getItem("tandem:mock:chats") ?? "[]").map((chat: Chat) => ({ ...chat, running: false, queuePaused: !!chat.queue?.length })); } catch { return []; }
+})();
+const mockRuns = new Map<string, number>();
+function saveChats() { try { sessionStorage.setItem("tandem:mock:chats", JSON.stringify(chats)); } catch { /* demo only */ } }
+function chatSummary(chat: Chat) { saveChats(); emit({ type: "chat", data: { chatId: chat.id, type: "summary", chat: { ...chat, items: undefined } as never } }); }
+function drainMock(chat: Chat) {
+  if (chat.running || chat.queuePaused) return;
+  const next = chat.queue?.shift();
+  if (!next) return;
+  const item: ChatItem = { kind: "user", id: crypto.randomUUID(), at: new Date().toISOString(), text: next.text, images: next.images };
+  chat.items.push(item); emit({ type: "chat", data: { chatId: chat.id, type: "item", item } });
+  mockChatReply(chat, next.text);
+}
 function mockChatReply(chat: Chat, text: string) {
+  const run = (mockRuns.get(chat.id) ?? 0) + 1; mockRuns.set(chat.id, run);
   const at = () => new Date().toISOString();
   const push = (item: ChatItem) => {
     chat.items.push(item);
     emit({ type: "chat", data: { chatId: chat.id, type: "item", item } });
+    saveChats();
   };
-  const summary = () => emit({ type: "chat", data: { chatId: chat.id, type: "summary", chat: { ...chat, items: undefined } as never } });
+  const summary = () => chatSummary(chat);
   chat.running = true;
   summary();
   setTimeout(() => {
+    if (mockRuns.get(chat.id) !== run || !chat.running) return;
     push({ kind: "assistant", id: `a${chat.items.length}`, at: at(), text: `（範例回覆）收到：「${text}」。我先看一下專案。` });
     push({ kind: "tool", id: `t${chat.items.length}`, at: at(), name: "Read", summary: "README.md", status: "done", output: "# 範例" });
     push({ kind: "approval", id: `p${chat.items.length}`, at: at(), name: "Bash", summary: "npm test", state: "pending" });
@@ -143,7 +164,7 @@ function mockRoomSay(room: Room, text: string) {
 
 // --- events -----------------------------------------------------------------
 const listeners = new Set<(e: AppEvent) => void>();
-const emit = (e: AppEvent) => listeners.forEach((l) => l(e));
+const emit = (e: AppEvent) => listeners.forEach((l) => l(structuredClone(e)));
 export function subscribe(l: (e: AppEvent) => void): () => void {
   listeners.add(l);
   return () => listeners.delete(l);
@@ -295,19 +316,44 @@ export async function handle(method: string, path: string, body: unknown): Promi
     if (method === "GET" && !tail) return chat;
     if (method === "DELETE" && !tail) {
       chats.splice(chats.indexOf(chat), 1);
+      saveChats();
       emit({ type: "chat", data: { chatId: chat.id, type: "deleted" } });
       return { ok: true };
     }
+    if (method === "PATCH" && !tail) {
+      if (chat.running) throw new ApiError("請先等目前回覆完成", "usage");
+      Object.assign(chat, body); chatSummary(chat); return { ...chat, items: undefined };
+    }
+    if (method === "POST" && tail === "/queue/resume") { chat.queuePaused = false; drainMock(chat); chatSummary(chat); return { ok: true }; }
+    if (/^\/queue\/[^/]+$/.test(tail)) {
+      const id = tail.split("/")[2];
+      const message = chat.queue?.find((q) => q.id === id);
+      if (!message) throw new ApiError("訊息已送出或移除", "usage");
+      if (method === "DELETE") chat.queue = chat.queue!.filter((q) => q.id !== id);
+      if (method === "PATCH") Object.assign(message, body);
+      chatSummary(chat); return { ok: true };
+    }
     if (method === "POST" && tail === "/messages") {
       const text = String((body as { text?: string })?.text ?? "");
-      const item: ChatItem = { kind: "user", id: `u${chat.items.length}`, at: new Date().toISOString(), text };
+      const request = body as { mode?: string; images?: unknown };
+      const images = validateChatImages(request.images);
+      if (params.get("failSend") === "1") throw new ApiError("範例：送出失敗，草稿仍保留", "network");
+      if (request.mode === "queue") {
+        (chat.queue ??= []).push({ id: crypto.randomUUID(), text, images, at: new Date().toISOString() });
+        chatSummary(chat); drainMock(chat); return { ok: true };
+      }
+      if (request.mode === "steer" && (!chat.running || chat.agent !== "codex")) throw new ApiError("目前無法補充", "usage");
+      if (request.mode !== "steer" && chat.running) throw new ApiError("目前仍在回覆", "usage");
+      const item: ChatItem = { kind: "user", id: `u${chat.items.length}`, at: new Date().toISOString(), text, ...(images.length ? { images } : {}) };
       chat.items.push(item);
       if (chat.title === "新對話") chat.title = text.slice(0, 40);
       emit({ type: "chat", data: { chatId: chat.id, type: "item", item } });
-      mockChatReply(chat, text);
+      if (request.mode !== "steer") mockChatReply(chat, text);
+      else saveChats();
       return { ok: true };
     }
     if (method === "POST" && (tail === "/interrupt" || tail.startsWith("/approvals/"))) {
+      if (tail === "/interrupt") { chat.queuePaused = true; mockRuns.set(chat.id, (mockRuns.get(chat.id) ?? 0) + 1); }
       for (const it of chat.items) {
         if (it.kind === "approval" && it.state === "pending") {
           it.state = tail === "/interrupt" || (body as { decision?: string })?.decision === "deny" ? "denied" : "allowed";
@@ -315,7 +361,7 @@ export async function handle(method: string, path: string, body: unknown): Promi
         }
       }
       chat.running = false;
-      emit({ type: "chat", data: { chatId: chat.id, type: "summary", chat: { ...chat, items: undefined } as never } });
+      chatSummary(chat); drainMock(chat);
       return { ok: true };
     }
   }
@@ -365,8 +411,10 @@ export async function handle(method: string, path: string, body: unknown): Promi
     if (method === "GET" && tail === "/chats") return chats.filter((c) => c.projectId === id && !c.room).map(({ items: _i, ...c }) => c);
     if (method === "POST" && tail === "/chats") {
       const t = new Date().toISOString();
-      const c: Chat = { id: `chat${chats.length + 1}`, projectId: id, agent: "claude", model: String((b as { model?: string }).model ?? ""), title: "新對話", createdAt: t, updatedAt: t, running: false, items: [] };
+      const c: Chat = { id: crypto.randomUUID(), projectId: id, agent: ((b as { agent?: AgentKind }).agent ?? "claude"), model: String((b as { model?: string }).model ?? ""), title: "新對話", createdAt: t, updatedAt: t, running: false, items: [] };
       chats.push(c);
+      saveChats();
+      chatSummary(c);
       return { ...c, items: undefined };
     }
     if (method === "POST" && tail === "/open-folder") return { ok: true };

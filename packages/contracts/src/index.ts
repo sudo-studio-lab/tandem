@@ -318,30 +318,10 @@ export interface BoardData {
 // ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
-export type TandemErrorCode =
-  | "usage"
-  | "validation"
-  | "not_a_repo"
-  | "no_remote"
-  | "auth"
-  | "needs_human"
-  | "conflict"
-  | "offline"
-  | "github"
-  | "internal";
-
-export class TandemError extends Error {
-  readonly code: TandemErrorCode;
-  readonly details?: unknown;
-  constructor(code: TandemErrorCode, message: string, details?: unknown) {
-    super(message);
-    this.name = "TandemError";
-    this.code = code;
-    this.details = details;
-  }
-}
+export { TandemError, type TandemErrorCode } from "./errors.ts";
 
 /** CLI exit codes. */
 export const EXIT = { ok: 0, error: 1, usage: 2, needsHuman: 3 } as const;
 export type * from "./app.ts";
 export type * from "./agent.ts";
+export * from "./images.ts";

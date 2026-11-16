@@ -152,7 +152,7 @@ export interface AppSettings {
 // ---------------------------------------------------------------------------
 // Opening the user's agent
 // ---------------------------------------------------------------------------
-export type AgentKind = "claude" | "codex";
+export type AgentKind = "claude" | "codex" | "antigravity" | "grok" | "cursor";
 
 export interface AgentAvailability {
   agent: AgentKind;

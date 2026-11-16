@@ -1,0 +1,382 @@
+{
+  "regions": [
+    {
+      "id": "header",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 0,
+        "y": 0,
+        "w": 1536,
+        "h": 62
+      },
+      "note": "Existing global navigation bar",
+      "container": true
+    },
+    {
+      "id": "brand",
+      "kind": "text",
+      "pixelBox": {
+        "x": 143,
+        "y": 18,
+        "w": 78,
+        "h": 25
+      },
+      "note": "Tandem product name"
+    },
+    {
+      "id": "project",
+      "kind": "control",
+      "pixelBox": {
+        "x": 237,
+        "y": 14,
+        "w": 215,
+        "h": 31
+      },
+      "note": "Existing project selector"
+    },
+    {
+      "id": "tabs",
+      "kind": "control",
+      "pixelBox": {
+        "x": 473,
+        "y": 12,
+        "w": 222,
+        "h": 40
+      },
+      "note": "Existing three view navigation buttons"
+    },
+    {
+      "id": "header-status",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 998,
+        "y": 14,
+        "w": 236,
+        "h": 34
+      },
+      "note": "Synthetic data and synchronization state badges"
+    },
+    {
+      "id": "header-actions",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1241,
+        "y": 12,
+        "w": 170,
+        "h": 37
+      },
+      "note": "Invite and settings actions"
+    },
+    {
+      "id": "new-chat",
+      "kind": "control",
+      "pixelBox": {
+        "x": 128,
+        "y": 78,
+        "w": 268,
+        "h": 39
+      },
+      "note": "Create conversation button"
+    },
+    {
+      "id": "selected-chat",
+      "kind": "control",
+      "pixelBox": {
+        "x": 128,
+        "y": 124,
+        "w": 267,
+        "h": 63
+      },
+      "note": "Current conversation selection with title and provider metadata"
+    },
+    {
+      "id": "settings",
+      "kind": "control",
+      "pixelBox": {
+        "x": 183,
+        "y": 979,
+        "w": 194,
+        "h": 24
+      },
+      "note": "Existing account settings action"
+    },
+    {
+      "id": "frame",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 412,
+        "y": 78,
+        "w": 996,
+        "h": 919
+      },
+      "note": "Single enclosing conversation panel",
+      "container": true
+    },
+    {
+      "id": "chat-title",
+      "kind": "text",
+      "pixelBox": {
+        "x": 432,
+        "y": 94,
+        "w": 356,
+        "h": 27
+      },
+      "note": "Current conversation title"
+    },
+    {
+      "id": "delete",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1342,
+        "y": 94,
+        "w": 45,
+        "h": 28
+      },
+      "note": "Delete conversation action"
+    },
+    {
+      "id": "user-bubble",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 1187,
+        "y": 150,
+        "w": 206,
+        "h": 44
+      },
+      "note": "Sent user message surface"
+    },
+    {
+      "id": "user-text",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1207,
+        "y": 160,
+        "w": 173,
+        "h": 26
+      },
+      "note": "User request text in the conversation"
+    },
+    {
+      "id": "assistant-text",
+      "kind": "text",
+      "pixelBox": {
+        "x": 474,
+        "y": 209,
+        "w": 466,
+        "h": 28
+      },
+      "note": "Assistant response text"
+    },
+    {
+      "id": "tool-text",
+      "kind": "text",
+      "pixelBox": {
+        "x": 473,
+        "y": 247,
+        "w": 181,
+        "h": 26
+      },
+      "note": "Read tool event summary"
+    },
+    {
+      "id": "working-state",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 440,
+        "y": 292,
+        "w": 50,
+        "h": 20
+      },
+      "note": "Live response progress indicator"
+    },
+    {
+      "id": "model-label",
+      "kind": "text",
+      "pixelBox": {
+        "x": 435,
+        "y": 686,
+        "w": 36,
+        "h": 25
+      },
+      "note": "Model field label"
+    },
+    {
+      "id": "model",
+      "kind": "control",
+      "pixelBox": {
+        "x": 478,
+        "y": 680,
+        "w": 213,
+        "h": 40
+      },
+      "note": "Provider and model selection control"
+    },
+    {
+      "id": "effort-label",
+      "kind": "text",
+      "pixelBox": {
+        "x": 722,
+        "y": 686,
+        "w": 67,
+        "h": 25
+      },
+      "note": "Effort field label"
+    },
+    {
+      "id": "effort",
+      "kind": "control",
+      "pixelBox": {
+        "x": 790,
+        "y": 680,
+        "w": 123,
+        "h": 40
+      },
+      "note": "Effort selection control"
+    },
+    {
+      "id": "draft-state",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1293,
+        "y": 686,
+        "w": 102,
+        "h": 25
+      },
+      "note": "Saved draft status"
+    },
+    {
+      "id": "queue",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 429,
+        "y": 733,
+        "w": 965,
+        "h": 40
+      },
+      "note": "Single compact row for waiting work",
+      "container": true
+    },
+    {
+      "id": "queue-count",
+      "kind": "text",
+      "pixelBox": {
+        "x": 473,
+        "y": 744,
+        "w": 70,
+        "h": 23
+      },
+      "note": "Queue item count"
+    },
+    {
+      "id": "queue-text",
+      "kind": "text",
+      "pixelBox": {
+        "x": 582,
+        "y": 744,
+        "w": 531,
+        "h": 23
+      },
+      "note": "Waiting message text"
+    },
+    {
+      "id": "queue-edit",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1234,
+        "y": 738,
+        "w": 67,
+        "h": 32
+      },
+      "note": "Edit waiting message"
+    },
+    {
+      "id": "queue-remove",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1315,
+        "y": 738,
+        "w": 72,
+        "h": 32
+      },
+      "note": "Remove waiting message"
+    },
+    {
+      "id": "editor",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 429,
+        "y": 790,
+        "w": 965,
+        "h": 129
+      },
+      "note": "Single draft editor with attachment and text",
+      "container": true
+    },
+    {
+      "id": "attachment",
+      "kind": "control",
+      "pixelBox": {
+        "x": 445,
+        "y": 802,
+        "w": 116,
+        "h": 99
+      },
+      "note": "Interactive preview button for the selected user file"
+    },
+    {
+      "id": "draft-text",
+      "kind": "text",
+      "pixelBox": {
+        "x": 592,
+        "y": 803,
+        "w": 652,
+        "h": 29
+      },
+      "note": "Unsent message beside its attachment"
+    },
+    {
+      "id": "attach-button",
+      "kind": "control",
+      "pixelBox": {
+        "x": 429,
+        "y": 934,
+        "w": 134,
+        "h": 46
+      },
+      "note": "Select user image attachment"
+    },
+    {
+      "id": "steer",
+      "kind": "control",
+      "pixelBox": {
+        "x": 969,
+        "y": 934,
+        "w": 144,
+        "h": 46
+      },
+      "note": "Steer the currently running turn"
+    },
+    {
+      "id": "enqueue",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1122,
+        "y": 934,
+        "w": 151,
+        "h": 46
+      },
+      "note": "Queue a later turn"
+    },
+    {
+      "id": "stop",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1285,
+        "y": 934,
+        "w": 109,
+        "h": 46
+      },
+      "note": "Stop running work and pause the queue"
+    }
+  ]
+}

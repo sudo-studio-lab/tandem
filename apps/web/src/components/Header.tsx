@@ -4,7 +4,7 @@ import { api, projectPath } from "../api.ts";
 import { relTime } from "../time.ts";
 import { errMsg } from "./ui.tsx";
 
-const AGENT_NAME: Record<AgentKind, string> = { claude: "Claude Code", codex: "Codex" };
+const AGENT_NAME: Record<AgentKind, string> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity", grok: "Grok", cursor: "Cursor" };
 
 /** Top-level screens. Add a tab here and in TABS. */
 export type View = "board" | "chat" | "room";
@@ -254,11 +254,10 @@ export function Header(p: Props) {
     usable && id
       ? [
           ...agents
-            .filter((a) => a.installed)
+            .filter((a) => a.installed && a.terminalAvailable !== false)
             .map((a) => ({
               key: a.agent,
               label: `在終端機打開 ${AGENT_NAME[a.agent]}`,
-              hint: "Tandem 的工具一樣能用",
               disabled: opening === a.agent,
               run: () => void run(a.agent, projectPath(id, "/open-agent"), { agent: a.agent }),
             })),
