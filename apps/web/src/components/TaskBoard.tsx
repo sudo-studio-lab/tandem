@@ -1,8 +1,9 @@
-import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import type { BoardMember, ProjectBoard, WaitingItem } from "@tandem/contracts";
 import { api, projectPath } from "../api.ts";
 import { Ext } from "./Ext.tsx";
 import { Avatar, errMsg } from "./ui.tsx";
+import { Glyph } from "./icons.tsx";
 import { PersonCard } from "./People.tsx";
 import { relTime, waitedFor } from "../time.ts";
 import "./collaboration.css";
@@ -139,24 +140,33 @@ function Row({ it, now }: { it: Item; now: number }) {
   );
 }
 
-function Group({ label, k, open, items, now, empty }: { label: string; k: GroupKey; open: boolean; items: Item[]; now: number; empty: ReactNode }) {
+function Group({ label, k, open, items, now }: { label: string; k: GroupKey; open: boolean; items: Item[]; now: number }) {
+  if (items.length === 0) {
+    // Nothing here: one quiet line, nothing to expand.
+    return (
+      <div className="tb-group tb-group-empty">
+        <div className="tb-sum">
+          <span className="tb-chev-space" aria-hidden="true" />
+          <Icon name={k} className={`tb-${k}`} />
+          <span className="tb-group-label">{label}</span>
+          <span className="tb-count">0</span>
+        </div>
+      </div>
+    );
+  }
   return (
     <details className="tb-group" open={open}>
-      <summary>
-        <span className="tb-chev" aria-hidden="true" />
+      <summary className="tb-sum">
+        <Glyph name="chevron" size={14} className="tb-chev" />
         <Icon name={k} className={`tb-${k}`} />
         <span className="tb-group-label">{label}</span>
         <span className="tb-count">{items.length}</span>
       </summary>
-      {items.length === 0 ? (
-        <p className="tb-empty">{empty}</p>
-      ) : (
-        <ul className="tb-rows">
-          {items.map((it) => (
-            <Row key={it.key} it={it} now={now} />
-          ))}
-        </ul>
-      )}
+      <ul className="tb-rows">
+        {items.map((it) => (
+          <Row key={it.key} it={it} now={now} />
+        ))}
+      </ul>
     </details>
   );
 }
@@ -168,34 +178,48 @@ function Face({ m, me, now, selected, onPick }: { m: BoardMember; me: string; no
   const label = `${m.login}${m.login === me ? "（你）" : ""}：${line}${s ? `（${relTime(s.updated, now)}更新）` : ""}`;
   return (
     <button type="button" className={`tb-face${selected ? " is-sel" : ""}`} aria-pressed={selected} aria-label={label} title={label} onClick={onPick}>
-      <Avatar login={m.login} size={28} />
+      <Avatar login={m.login} size={32} />
       <i className={`tb-dot${s?.blocked ? " is-blocked" : fresh ? " is-fresh" : ""}`} aria-hidden="true" />
     </button>
   );
 }
 
+/** "#15 標題" (or a URL ending in /15) → number and title, so waiting rows read like the other rows. */
+function splitNumber(title: string, url: string): { num: string | null; title: string } {
+  const m = title.match(/^#(\d+)\s+(.+)$/);
+  if (m) return { num: m[1]!, title: m[2]! };
+  return { num: url.match(/\/(\d+)\/?$/)?.[1] ?? null, title };
+}
+
 function WaitGroup({ items, now }: { items: WaitingItem[]; now: number }) {
   return (
     <details className="tb-group tb-group-wait" open>
-      <summary>
-        <span className="tb-chev" aria-hidden="true" />
+      <summary className="tb-sum">
+        <Glyph name="chevron" size={14} className="tb-chev" />
         <Icon name="wait" className="tb-wait-ic" />
         <span className="tb-group-label">等你</span>
-        <span className="tb-count">{items.length}</span>
+        <span className="tb-count tb-count-strong">{items.length}</span>
       </summary>
       <ul className="tb-rows">
-        {items.map((w, i) => (
+        {items.map((w, i) => {
+          const { num, title } = splitNumber(w.title, w.url);
+          return (
           <li key={i} className="tb-row">
-            <Icon name="wait" className="tb-wait-ic" />
-            <span className="tb-kind">{WAIT_KIND[w.kind]}</span>
-            <Ext href={w.url} className="tb-title">
-              {w.title}
-            </Ext>
-            <span className="tb-meta">
-              @{w.from}・{waitedFor(w.since, now)}
-            </span>
+            <div className="tb-item-top">
+              <Icon name="wait" className="tb-wait-ic" />
+              {num && <span className="tb-num">#{num}</span>}
+              <Ext href={w.url} className="tb-title">
+                {title}
+              </Ext>
+            </div>
+            <div className="tb-item-meta">
+              <span className="tb-kind">{WAIT_KIND[w.kind]}</span>
+              <span>@{w.from}</span>
+              <span>{waitedFor(w.since, now)}</span>
+            </div>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </details>
   );
@@ -328,20 +352,36 @@ export function TaskBoard({ board, now, onTaskCreated }: { board: ProjectBoard; 
             </button>
           </p>
         ) : (
-          <div className="tb-pills" role="group" aria-label="範圍">
-            <button type="button" className={scope === "all" ? "is-on" : undefined} aria-pressed={scope === "all"} onClick={() => setScope("all")}>
-              所有任務
+          <div className="seg" role="group" aria-label="範圍">
+            <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")}>
+              全部
             </button>
-            <button type="button" className={scope === "mine" ? "is-on" : undefined} aria-pressed={scope === "mine"} onClick={() => setScope("mine")}>
+            <button type="button" aria-pressed={scope === "mine"} onClick={() => setScope("mine")}>
               我負責
             </button>
           </div>
         )}
-        <button ref={addButton} type="button" className="tb-new-btn" aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
-          新增任務
-        </button>
-        <label className="tb-member-filter"><span className="sr-only">依成員篩選</span><select className="input" value={person??""} onChange={e=>setPerson(e.target.value||null)}><option value="">所有成員</option>{members.map(m=><option key={m.login} value={m.login}>@{m.login}</option>)}</select></label>
-        <div className="tb-layout-switch" role="group" aria-label="任務檢視"><button type="button" className="btn btn-small" aria-pressed={layout==="list"} onClick={()=>changeLayout("list")}>清單</button><button type="button" className="btn btn-small" aria-pressed={layout==="board"} onClick={()=>changeLayout("board")}>看板</button></div>
+        {members.length > 1 && (
+          <div className="tb-faces" role="group" aria-label="依成員篩選">
+            {members.map((m) => (
+              <Face key={m.login} m={m} me={board.me} now={now} selected={person === m.login} onPick={() => setPerson((p) => (p === m.login ? null : m.login))} />
+            ))}
+          </div>
+        )}
+        <div className="tb-bar-end">
+          <div className="seg seg-icons" role="group" aria-label="任務檢視">
+            <button type="button" aria-pressed={layout === "list"} aria-label="清單" title="清單" onClick={() => changeLayout("list")}>
+              <Glyph name="list" />
+            </button>
+            <button type="button" aria-pressed={layout === "board"} aria-label="看板" title="看板" onClick={() => changeLayout("board")}>
+              <Glyph name="columns" />
+            </button>
+          </div>
+          <button ref={addButton} type="button" className="ctl" aria-expanded={adding} aria-label="新增任務" title="新增任務" onClick={() => setAdding((a) => !a)}>
+            <Glyph name="plus" />
+            <span className="ctl-label">新增任務</span>
+          </button>
+        </div>
       </div>
 
       {adding && (
@@ -372,7 +412,6 @@ export function TaskBoard({ board, now, onTaskCreated }: { board: ProjectBoard; 
           open={g.open}
           now={now}
           items={items.filter((it) => it.group === g.key)}
-          empty={g.key === "ready" ? "沒有開著的 PR" : g.key === "working" ? "沒有進行中的草稿 PR 或任務" : "最近兩週沒有完成的項目"}
         />
       ))}</div>
     </div>

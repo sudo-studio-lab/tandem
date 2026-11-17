@@ -27,7 +27,8 @@
   --radius-sm: 8px;
   --shadow: 0 1px 2px rgb(16 24 40 / 0.05), 0 1px 3px rgb(16 24 40 / 0.06);
   --shadow-lg: 0 10px 30px rgb(16 24 40 / 0.16);
-  --topbar-h: 56px;
+  --topbar-h: 48px;
+  --ctl-h: 32px;
   --avatar-l: 88%;
   --avatar-fg-l: 28%;
   font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
@@ -244,8 +245,8 @@ a.btn {
 .icon-btn {
   font: inherit;
   font-size: 1.1rem;
-  width: 34px;
-  height: 34px;
+  min-width: var(--ctl-h);
+  height: var(--ctl-h);
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background: transparent;
@@ -399,52 +400,58 @@ label {
 .topbar-inner {
   max-width: 1240px;
   margin: 0 auto;
-  padding: 10px 20px;
+  padding: 8px 16px;
   min-height: var(--topbar-h);
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
+  gap: 4px;
 }
 .brand {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  letter-spacing: 0.01em;
+  flex: none;
+  margin-right: 4px;
 }
 .brand-mark {
   color: var(--accent);
-  font-size: 0.95rem;
 }
 .switcher {
   position: relative;
+  min-width: 0;
 }
 .switcher-btn {
   font: inherit;
+  font-size: 0.92rem;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 5px 10px;
+  max-width: 100%;
+  height: var(--ctl-h);
+  padding: 0 8px;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background: transparent;
   color: var(--text);
   cursor: pointer;
+  white-space: nowrap;
+}
+.switcher-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .switcher-btn:hover,
 .switcher-btn[aria-expanded="true"] {
   background: var(--surface-2);
-  border-color: var(--border);
 }
 .switcher-btn .dot-badge {
   margin-left: 6px;
 }
 .chev {
-  margin-left: 6px;
+  margin-left: 4px;
   color: var(--muted);
-  font-size: 0.8rem;
+  flex: none;
 }
 .view-tabs {
   display: inline-flex;
@@ -474,43 +481,82 @@ label {
   color: var(--text);
   box-shadow: var(--shadow);
 }
-.sync-pill {
+/* One quiet status: dot + words, no filled pill. Only trouble gets colour. */
+.status {
   font: inherit;
   font-size: 0.8rem;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  max-width: 340px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid transparent;
+  min-width: 0;
+  max-width: 300px;
+  height: var(--ctl-h);
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
   cursor: pointer;
 }
-.sync-pill:disabled {
+.status:disabled {
   cursor: default;
 }
-.sync-pill:hover:not(:disabled) {
-  border-color: currentColor;
+.status:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
 }
-.sync-text {
+.status-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sync-dot {
+.status-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: currentColor;
+  background: var(--border-strong);
   flex: none;
 }
-.sync-icon {
-  opacity: 0;
-  transition: opacity 0.12s;
+.status-busy .status-dot {
+  background: var(--accent);
 }
-.sync-pill:hover:not(:disabled) .sync-icon,
-.sync-pill.pill-bad .sync-icon {
-  opacity: 1;
+.status-warn {
+  color: var(--warn-fg);
+}
+.status-warn .status-dot {
+  background: var(--warn-fg);
+}
+.status-bad {
+  color: var(--bad-fg);
+}
+.status-bad .status-dot {
+  background: var(--bad-fg);
+}
+.topbar-members {
+  padding: 0 6px;
+  width: auto;
+}
+.topbar-faces {
+  display: inline-flex;
+}
+.topbar-faces .avatar + .avatar {
+  margin-left: -5px;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.topbar-invite {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+/* Narrow (side panel, phone): drop what the board already shows. A healthy
+   status says nothing; teammates' faces are in the board's own bar; the
+   members dialog stays in the ⋯ menu. */
+@media (max-width: 640px) {
+  .brand-name,
+  .switcher-owner,
+  .status-ok,
+  .topbar-members {
+    display: none;
+  }
 }
 .more-menu {
   position: relative;
@@ -1631,8 +1677,8 @@ dialog.modal::backdrop {
   .list > li.row {
     flex-wrap: wrap;
   }
-  .sync-pill {
-    max-width: 160px;
+  .status {
+    max-width: 180px;
   }
 }
 
@@ -1645,16 +1691,87 @@ dialog.modal::backdrop {
 .tb-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   margin-bottom: 8px;
+}
+.tb-bar-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+/* Shared control system: every control in a toolbar is var(--ctl-h) tall,
+   8px corners, one border colour; the selected state is the only accent. */
+.ctl {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--ctl-h);
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  flex: none;
+}
+.ctl:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+.ctl[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.seg {
+  display: inline-flex;
+  height: var(--ctl-h);
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  flex: none;
+}
+.seg button {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.seg-icons button {
+  padding: 0 6px;
+}
+.seg button:hover {
+  color: var(--text);
+}
+.seg button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgb(16 24 40 / 0.08);
 }
 .tb-faces {
   display: flex;
   gap: 4px;
-  margin-left: auto;
 }
 .tb-face {
   position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
   border: 0;
   padding: 0;
   background: none;
@@ -1684,49 +1801,49 @@ dialog.modal::backdrop {
   border: 2px solid var(--bg);
 }
 .tb-dot.is-fresh {
-  background: var(--ok-fg);
+  background: var(--accent);
 }
 .tb-dot.is-blocked {
   background: var(--bad-fg);
+}
+@media (pointer: coarse) {
+  :root {
+    --ctl-h: 44px;
+  }
+  .tb-face .avatar {
+    width: 40px !important;
+    height: 40px !important;
+  }
+}
+/* Below 760px the board view is one column anyway, so the switch has nothing to switch. */
+@media (max-width: 760px) {
+  .tb-bar .seg-icons {
+    display: none;
+  }
+}
+@media (max-width: 420px) {
+  .tb-bar .ctl .ctl-label {
+    display: none;
+  }
+  .tb-bar .ctl {
+    padding: 0;
+    width: var(--ctl-h);
+    justify-content: center;
+  }
 }
 .tb-picked {
   margin-bottom: 8px;
 }
 .tb-wait-ic {
-  color: var(--warn-fg);
+  color: var(--accent);
 }
 .tb-kind {
-  color: var(--warn-fg);
-  font-size: 0.8rem;
+  color: var(--accent);
   font-weight: 600;
-  white-space: nowrap;
 }
-.tb-meta {
-  color: var(--muted);
-  font-size: 0.78rem;
-  white-space: nowrap;
-}
-.tb-group-wait > summary {
-  background: var(--warn-bg);
-}
-.tb-pills {
-  display: flex;
-  gap: 4px;
-}
-.tb-pills button {
-  border: 0;
-  background: none;
-  font: inherit;
-  font-size: 0.9rem;
-  color: var(--muted);
-  padding: 4px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-}
-.tb-pills button.is-on {
-  background: var(--surface-2);
-  color: var(--text);
-  font-weight: 600;
+.tb-count.tb-count-strong {
+  color: var(--accent);
+  font-weight: 700;
 }
 .tb-filter-note {
   margin: 0;
@@ -1744,7 +1861,7 @@ dialog.modal::backdrop {
 .tb-group {
   margin-top: 6px;
 }
-.tb-group > summary {
+.tb-sum {
   list-style: none;
   display: flex;
   align-items: center;
@@ -1756,20 +1873,26 @@ dialog.modal::backdrop {
   font-size: 0.9rem;
   cursor: pointer;
 }
-.tb-group > summary::-webkit-details-marker {
+.tb-sum::-webkit-details-marker {
   display: none;
 }
 .tb-chev {
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 5px solid var(--muted);
+  color: var(--muted);
+  flex: none;
   transform: rotate(-90deg);
   transition: transform 0.15s;
 }
 .tb-group[open] .tb-chev {
   transform: none;
+}
+.tb-chev-space {
+  width: 14px;
+  flex: none;
+}
+.tb-group-empty .tb-sum {
+  cursor: default;
+  color: var(--muted);
+  font-weight: 500;
 }
 .tb-count {
   margin-left: auto;
@@ -1783,10 +1906,7 @@ dialog.modal::backdrop {
   padding: 2px 0;
 }
 .tb-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px 7px 26px;
+  padding: 12px 8px;
   font-size: 0.9rem;
   border-radius: var(--radius-sm);
 }
@@ -1810,31 +1930,6 @@ dialog.modal::backdrop {
 .tb-title:hover {
   text-decoration: underline;
 }
-.tb-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 1px 8px 1px 6px;
-  font-size: 0.76rem;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.tb-chip-ready .tb-ic {
-  color: var(--accent);
-}
-.tb-chip-done .tb-ic {
-  color: var(--ok-fg);
-}
-.tb-owners {
-  display: inline-flex;
-  flex: none;
-}
-.tb-owners .avatar + .avatar {
-  margin-left: -6px;
-  box-shadow: 0 0 0 2px var(--surface);
-}
 .tb-ic {
   width: 15px;
   height: 15px;
@@ -1847,11 +1942,6 @@ dialog.modal::backdrop {
   color: var(--muted);
 }
 .tb-done {
-  color: var(--ok-fg);
-}
-.tb-empty {
-  margin: 6px 0 4px 26px;
-  font-size: 0.85rem;
   color: var(--muted);
 }
 .tb-log {
@@ -1859,40 +1949,9 @@ dialog.modal::backdrop {
   flex-direction: column;
   gap: 20px;
 }
-@media (max-width: 480px) {
-  .tb-row {
-    padding-left: 10px;
-  }
-  .tb-chip {
-    padding: 2px 5px;
-    font-size: 0;
-    gap: 0;
-  }
-}
 .tb-back {
   margin: 0;
   font-size: 0.88rem;
-}
-.tb-new-btn {
-  flex: none;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  font: inherit;
-  font-size: 0.85rem;
-  color: var(--text);
-  padding: 3px 10px;
-  border-radius: 999px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.tb-new-btn:hover,
-.tb-new-btn[aria-expanded="true"] {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.tb-new-btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 .tb-new {
   display: flex;
@@ -1923,16 +1982,6 @@ dialog.modal::backdrop {
   color: var(--muted);
   margin-right: 2px;
 }
-.tb-new-who {
-  opacity: 0.45;
-}
-.tb-new-who.is-sel {
-  opacity: 1;
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
-}
-.tb-new-who:disabled {
-  cursor: default;
-}
 .tb-new .field-error {
   margin: 0;
   font-size: 0.85rem;
@@ -1941,14 +1990,6 @@ dialog.modal::backdrop {
   display: flex;
   justify-content: flex-end;
   gap: 6px;
-}
-@media (max-width: 480px) {
-  .tb-bar {
-    gap: 8px;
-  }
-  .tb-pills button {
-    padding: 4px 9px;
-  }
 }
 
 /* Light Markdown (room notes, shared context) */
