@@ -32,6 +32,8 @@ function fakeContext(): Context {
     saveState: async () => {},
     token: "",
     gitEnv: {},
+    dataRoot: root,
+    dataRepo: { owner: "o", name: "r", url: "https://github.com/o/r", separate: false },
     store: openFsDataStore(root),
   };
 }

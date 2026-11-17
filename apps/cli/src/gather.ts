@@ -72,7 +72,7 @@ export async function buildBrief(ctx: Context, gh: GitHubData | null): Promise<{
   const since = ctx.state.lastBrief ?? { commit: null, time: null };
   const [local, changes, head] = await Promise.all([
     gatherLocal(ctx),
-    changesSince(ctx.repoRoot, since.commit, [PRODUCT.dataDir]),
+    changesSince(ctx.dataRoot, since.commit, [PRODUCT.dataDir]),
     ctx.store.snapshot(),
   ]);
   const added = new Set(
@@ -85,6 +85,7 @@ export async function buildBrief(ctx: Context, gh: GitHubData | null): Promise<{
   const brief = computeBrief({
     me: ctx.me,
     repo: { owner: ctx.remote.owner, name: ctx.remote.name },
+    dataRepo: { owner: ctx.dataRepo.owner, name: ctx.dataRepo.name },
     since: { commit: since.commit, time: since.time },
     decisions: local.decisions,
     addedDecisionPaths: added,
@@ -136,6 +137,7 @@ export async function buildBoard(ctx: Context, gh: GitHubData, sync: SyncState, 
   const twoWeeksAgo = Date.now() - 14 * 24 * 3600 * 1000;
   return {
     repo: { owner: ctx.remote.owner, name: ctx.remote.name, url: `https://github.com/${ctx.remote.owner}/${ctx.remote.name}` },
+    dataRepo: { owner: ctx.dataRepo.owner, name: ctx.dataRepo.name, url: `https://github.com/${ctx.dataRepo.owner}/${ctx.dataRepo.name}` },
     me: ctx.me,
     members,
     waiting,

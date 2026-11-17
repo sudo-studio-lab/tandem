@@ -5,6 +5,8 @@ import { syncData } from "./sync.ts";
 
 export interface SyncSchedulerOptions {
   dataDir: string;
+  /** Local repo holding team data (a separate data repo copy); defaults to repoRoot. */
+  dataRoot?: string;
   debounceMs?: number;
   fetchIntervalMs?: number;
   onState: (s: SyncState) => void;
@@ -68,7 +70,7 @@ export function createSyncScheduler(
     running = true;
     emit({ state: "syncing", ...last() });
     try {
-      const r = await syncData(repoRoot, { dataDir: opts.dataDir });
+      const r = await syncData(opts.dataRoot ?? repoRoot, { dataDir: opts.dataDir });
       if (r.result === "conflict") {
         conflicted = true;
         if (debounce) clearTimeout(debounce);

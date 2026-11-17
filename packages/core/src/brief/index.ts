@@ -81,6 +81,8 @@ const isAfter = (iso: string | undefined, since: string | null) =>
 export interface BriefInput {
   me: string;
   repo: { owner: string; name: string };
+  /** Where decision files live, for links; defaults to `repo`. */
+  dataRepo?: { owner: string; name: string };
   since: { commit: string | null; time: string | null };
   decisions: readonly Decision[];
   /** Repo-relative paths of decision files added since `since` (from git). */
@@ -96,7 +98,8 @@ export interface BriefInput {
 
 export function computeBrief(input: BriefInput): Brief {
   const { me } = input;
-  const base = `https://github.com/${input.repo.owner}/${input.repo.name}`;
+  const dataRepo = input.dataRepo ?? input.repo;
+  const base = `https://github.com/${dataRepo.owner}/${dataRepo.name}`;
   const waiting = computeWaiting(input);
 
   const newDecisions: BriefDecision[] = input.decisions

@@ -73,6 +73,15 @@ flowchart TB
 
 GitHub 登入用裝置碼流程（像 GitHub Desktop），沒裝 `gh` 也能用。
 
+**團隊資料可以放在另一個 repo**（決定 D-20261117-7m4b）。程式碼 repo 是公開的話，`tandem/` 裡的原話、每個人的狀態也都公開了，所以團隊資料可以搬到另一個私人 repo；程式碼、PR、任務（Issues）、Discussions 留在程式碼 repo。
+
+- 設定：程式碼 repo 根目錄的 `.tandem.json`，例如 `{ "dataRepo": "my-team/team-data" }`。沒有這個檔、或沒寫 `dataRepo`，資料就跟程式碼放在同一個 repo（原本的做法，私人 repo 照舊）。讀的順序：工作資料夾裡的檔案，沒有就讀程式碼 repo 遠端預設分支上的那份，所以還沒切到新分支的人也會跟著改。
+- 本機副本：每個資料 repo 一個資料夾，放在 App 設定旁邊（`<App 設定資料夾>/data/<owner>__<name>/`），只有 `.git`、不 checkout。第一次用到時自動建立（`git init`、遠端設成 GitHub 的 https 網址、`fetch`），認證跟程式碼 repo 一樣（token 用環境變數帶，不寫進設定）。資料 repo 是全新空的也可以，第一筆寫入會建立 `main`。裡面的路徑不變（`tandem/decisions`、`tandem/status`、`tandem/team.md`）。
+- 分工：讀寫紀錄、同步、brief、看板、MCP 工具、hook 讀紀錄都用資料 repo；hook 判斷「這次有沒有改程式碼」、PR、任務、開資料夾都用程式碼 repo。看板上決定的連結指向資料 repo。
+- 邀請：資料分開時，邀請隊友會先邀請程式碼 repo、再邀請資料 repo，兩個結果都會回報；對方接受程式碼 repo 的邀請時，會一起接受資料 repo 的邀請。
+- 搬家（只做一次）：`tandem data move --to owner/name`（可加 `--dry-run` 先看）。它把程式碼 repo 遠端預設分支上的 `tandem/decisions`、`tandem/status`、`tandem/team.md` 用一個 commit 複製到資料 repo（已經有的檔案不覆蓋、不刪任何東西，再跑一次不會多做事），然後在工作資料夾寫入 `.tandem.json`。它**不會**刪掉程式碼 repo 裡的舊檔、不 commit、不推送，只印出要你自己用 PR 做的 `git rm` 和 `git add .tandem.json`。
+- 注意：舊內容還留在程式碼 repo 的 git 歷史裡，公開 repo 的話任何人都看得到。我們不改寫歷史、不 force push。還沒更新 Tandem 的人會繼續寫到程式碼 repo，PR 合併前寫進去的新紀錄可以再跑一次 `tandem data move` 補過去。
+
 ### 5. 主要流程
 
 **開始專案、邀請隊友**

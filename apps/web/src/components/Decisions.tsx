@@ -14,7 +14,8 @@ const SHOWN = 6;
 
 function DecisionItem({ d, board }: { d: Decision; board: BoardData }) {
   const f = d.frontmatter;
-  const repoUrl = board.repo.url;
+  // Decision files live in the data repo (same as the code repo unless .tandem.json says otherwise).
+  const repoUrl = board.dataRepo?.url ?? board.repo.url;
   const superseded = d.supersededBy.length > 0;
   return (
     <li className={superseded ? "dim" : undefined}>

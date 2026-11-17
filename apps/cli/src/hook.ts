@@ -16,7 +16,7 @@ type HookEvent = "session-start" | "stop" | "user-prompt" | "post-compact";
 const HOOK_BUDGET_MS = 12_000;
 
 async function sessionContext(ctx: Awaited<ReturnType<typeof openContext>>): Promise<{ context: string; decisions: Decision[] }> {
-  await withTimeout(syncData(ctx.repoRoot, { gitEnv: ctx.gitEnv }).catch(() => undefined), 6_000, undefined);
+  await withTimeout(syncData(ctx.dataRoot, { gitEnv: ctx.gitEnv }).catch(() => undefined), 6_000, undefined);
   const gh = await withTimeout(gatherGitHub(ctx), 6_000, null);
   const { brief, head, decisions } = await buildBrief(ctx, gh);
   ctx.state.lastBrief = { commit: head, time: new Date().toISOString() };
@@ -30,7 +30,7 @@ async function liveDecisions(ctx: Awaited<ReturnType<typeof openContext>>, s: De
       session: s,
       store: ctx.store,
       me: ctx.me,
-      sync: () => withTimeout(syncData(ctx.repoRoot, { gitEnv: ctx.gitEnv }).catch(() => undefined), 3_000, undefined),
+      sync: () => withTimeout(syncData(ctx.dataRoot, { gitEnv: ctx.gitEnv }).catch(() => undefined), 3_000, undefined),
     });
   } catch {
     return null;
@@ -42,7 +42,7 @@ async function liveDecisions(ctx: Awaited<ReturnType<typeof openContext>>, s: De
  * untracked files. Read-only. Lets the stop hook tell "changed during this session" from "was
  * already dirty when the session started".
  */
-async function workingTreePrint(repoRoot: string): Promise<string> {
+export async function workingTreePrint(repoRoot: string): Promise<string> {
   const spec = ["--", ".", `:(exclude)${PRODUCT.dataDir}`];
   const [diff, status] = await Promise.all([
     runGit(["diff", "HEAD", "--no-ext-diff", ...spec], { cwd: repoRoot, allowFail: true }),
@@ -52,7 +52,7 @@ async function workingTreePrint(repoRoot: string): Promise<string> {
 }
 
 /** Did the user's work change anything since the session started (outside the data folder)? */
-async function workChangedSince(repoRoot: string, head: string | null, tree: string | undefined): Promise<boolean> {
+export async function workChangedSince(repoRoot: string, head: string | null, tree: string | undefined): Promise<boolean> {
   const print = await workingTreePrint(repoRoot);
   // Older sessions (no fingerprint): any uncommitted change counts, as before.
   if (tree === undefined) {
