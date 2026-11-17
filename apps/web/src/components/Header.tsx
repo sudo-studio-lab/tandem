@@ -47,6 +47,8 @@ interface Props {
   onView: (v: View) => void;
   /** Open the decisions / discussions / who-waits-on-whom page. */
   onLog?: () => void;
+  /** Open the shared context page (脈絡). */
+  onContext?: () => void;
   /** Extra tabs (e.g. rooms) appended after TABS. */
   tabs?: { id: View; label: string }[];
 }
@@ -268,6 +270,7 @@ export function Header(p: Props) {
     usable && id
       ? [
           ...(p.onLog ? [{ key: "log", label: "決定和討論", hint: "誰在等誰、團隊的決定、討論", run: p.onLog }] : []),
+          ...(p.onContext ? [{ key: "context", label: "脈絡", hint: "背景、規格和圖，大家和 AI 都讀得到", run: p.onContext }] : []),
           ...agents
             .filter((a) => a.installed && a.terminalAvailable !== false)
             .map((a) => ({

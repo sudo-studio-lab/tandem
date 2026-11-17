@@ -1,4 +1,5 @@
-export type { DataStore, FileChange, WriteResult, GitDataStoreOptions } from "./types.ts";
+export type { DataStore, FileChange, WriteResult, GitDataStoreOptions, TreeEntry, PathChange } from "./types.ts";
+export { gitBlobSha, changeBytes } from "./blob.ts";
 export { openGitDataStore } from "./git-store.ts";
 export { openFsDataStore } from "./fs-store.ts";
 export { withFileLock } from "./lock.ts";

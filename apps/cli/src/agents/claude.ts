@@ -21,7 +21,15 @@ const MODELS: ModelChoice[] = [
 ];
 
 /** Team tools that run without asking: reading, and records the user already confirmed in chat. */
-const AUTO_ALLOWED = ["tandem_brief", "tandem_decisions", "tandem_check", "tandem_decide", "tandem_status"].map(
+const AUTO_ALLOWED = [
+  "tandem_brief",
+  "tandem_context_list",
+  "tandem_context_read",
+  "tandem_decisions",
+  "tandem_check",
+  "tandem_decide",
+  "tandem_status",
+].map(
   (t) => `mcp__tandem__${t}`,
 );
 

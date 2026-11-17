@@ -6,7 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { AgentKind, Chat, ChatUpdate, Room, RoomMessage, RoomRef } from "@tandem/contracts";
 import { api, onAppEvent, projectPath } from "../api.ts";
 import { relTime } from "../time.ts";
-import { Avatar, Spinner, errMsg } from "./ui.tsx";
+import { Avatar, MarkdownLite, Spinner, errMsg } from "./ui.tsx";
 import { Item, applyUpdate, useAgents, usableAgents } from "./Chat.tsx";
 import "./room.css";
 import { useDraft } from "../drafts.ts";
@@ -339,7 +339,7 @@ function RoomPane({ projectId, number, me, now, onError, onChanged }: { projectI
       <aside className="room-notes" aria-label="筆記">
         <h3>筆記</h3>
         {room.notes && room.notes !== "（還沒有筆記）" ? (
-          <Notes text={room.notes} />
+          <MarkdownLite text={room.notes} />
         ) : (
           <p className="muted small">{isHost ? "討論一段後按「整理筆記」，AI 會整理重點、決定和待辦。" : `@${room.host} 按「整理筆記」後會出現在這裡。`}</p>
         )}
@@ -388,21 +388,6 @@ function AiSaid({ text, at, now, streaming }: { text: string; at: string; now: n
           {streaming && <span className="caret" aria-hidden="true" />}
         </div>
       </div>
-    </div>
-  );
-}
-
-/** Just enough Markdown for the notes: headings and bullets. */
-function Notes({ text }: { text: string }) {
-  return (
-    <div className="notes">
-      {text.split("\n").map((line, i) => {
-        const h = /^#{1,6}\s+(.*)$/.exec(line);
-        if (h) return <h4 key={i}>{h[1]}</h4>;
-        const li = /^\s*[-*]\s+(.*)$/.exec(line);
-        if (li) return <p key={i} className="notes-li">{li[1]}</p>;
-        return line.trim() ? <p key={i}>{line}</p> : null;
-      })}
     </div>
   );
 }

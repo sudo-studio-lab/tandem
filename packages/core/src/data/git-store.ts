@@ -2,10 +2,15 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { PATHS, TandemError } from "@tandem/contracts";
-import { runGit, type RunGitResult } from "../git/run.ts";
+import { runGit, runGitBytes, type RunGitResult } from "../git/run.ts";
+import { changeBytes, gitBlobSha } from "./blob.ts";
 import { withFileLock } from "./lock.ts";
 import { assertRelPath, isNetworkError, NETWORK_RE } from "./net.ts";
-import type { DataStore, FileChange, GitDataStoreOptions, WriteResult } from "./types.ts";
+import type { DataStore, FileChange, GitDataStoreOptions, PathChange, TreeEntry, WriteResult } from "./types.ts";
+
+const RS = "\x1e";
+const US = "\x1f";
+const GS = "\x1d";
 
 const NET_TIMEOUT = 60_000;
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
@@ -151,8 +156,80 @@ export function openGitDataStore(repoRoot: string, opts: GitDataStoreOptions = {
       const r = await git(["cat-file", "blob", `${await remoteRef()}:${p}`], { allowFail: true });
       if (r.code === 0) content = r.stdout;
     }
-    for (const { entry } of await readOutbox()) for (const c of entry.changes) if (c.path === p) content = c.content;
+    for (const { entry } of await readOutbox())
+      for (const c of entry.changes)
+        if (c.path === p) content = c.content === null ? null : c.encoding === "base64" ? changeBytes(c).toString("utf8") : c.content;
     return content;
+  }
+
+  async function readBytes(p: string): Promise<Buffer | null> {
+    assertRelPath(p);
+    let content: Buffer | null = null;
+    if (await remoteSha()) {
+      const r = await runGitBytes(["cat-file", "blob", `${await remoteRef()}:${p}`], {
+        cwd: repoRoot,
+        env: { ...opts.gitEnv },
+        allowFail: true,
+      });
+      if (r.code === 0) content = r.stdout;
+    }
+    for (const { entry } of await readOutbox())
+      for (const c of entry.changes) if (c.path === p) content = c.content === null ? null : changeBytes(c);
+    return content;
+  }
+
+  async function tree(prefix: string): Promise<TreeEntry[]> {
+    const pre = prefix.endsWith("/") ? prefix : `${prefix}/`;
+    const out = new Map<string, TreeEntry>();
+    if (await remoteSha()) {
+      const r = await git(["ls-tree", "-r", "-l", "-z", "--full-tree", await remoteRef(), "--", pre], { allowFail: true });
+      if (r.code === 0) {
+        for (const rec of r.stdout.split("\0")) {
+          const m = /^\d+ blob ([0-9a-f]+)\s+(\d+|-)\t(.+)$/s.exec(rec);
+          if (!m || !m[3]!.startsWith(pre)) continue;
+          out.set(m[3]!, { path: m[3]!, version: m[1]!, size: Number(m[2]) || 0 });
+        }
+      }
+    }
+    for (const { entry } of await readOutbox()) {
+      for (const c of entry.changes) {
+        if (!c.path.startsWith(pre)) continue;
+        if (c.content === null) out.delete(c.path);
+        else {
+          const bytes = changeBytes(c);
+          out.set(c.path, { path: c.path, version: gitBlobSha(bytes), size: bytes.length, pending: true });
+        }
+      }
+    }
+    return [...out.values()].sort((a, b) => a.path.localeCompare(b.path));
+  }
+
+  async function history(prefix: string): Promise<Map<string, PathChange>> {
+    const pre = prefix.endsWith("/") ? prefix : `${prefix}/`;
+    const out = new Map<string, PathChange>();
+    // The outbox is newer than anything on the remote; newest entry wins.
+    for (const { entry } of (await readOutbox()).reverse()) {
+      for (const c of entry.changes) {
+        if (!c.path.startsWith(pre) || out.has(c.path)) continue;
+        out.set(c.path, { message: entry.message, authorName: entry.author?.name ?? "", at: entry.createdAt, pending: true });
+      }
+    }
+    if (!(await remoteSha())) return out;
+    const r = await git(
+      ["log", "-n", "300", "--format=%x1e%aI%x1f%an%x1f%B%x1d", "--name-only", "--no-renames", await remoteRef(), "--", pre],
+      { allowFail: true },
+    );
+    if (r.code !== 0) return out;
+    for (const rec of r.stdout.split(RS)) {
+      const [head, names] = rec.split(GS);
+      if (!head || names === undefined) continue;
+      const [at, authorName, ...msg] = head.split(US);
+      for (const name of names.split("\n").map((n) => n.trim())) {
+        if (!name.startsWith(pre) || out.has(name)) continue;
+        out.set(name, { message: msg.join(US).trim(), authorName: authorName ?? "", at: at ?? "" });
+      }
+    }
+    return out;
   }
 
   // ---- flush ----------------------------------------------------------------
@@ -167,9 +244,9 @@ export function openGitDataStore(repoRoot: string, opts: GitDataStoreOptions = {
     throw new TandemError("internal", `git fetch 失敗：${r.stderr.trim()}`, { stderr: r.stderr });
   }
 
-  async function hashContent(content: string): Promise<string> {
+  async function hashContent(c: FileChange): Promise<string> {
     const tmp = await sub(`blob-${process.pid}-${rand()}`);
-    fs.writeFileSync(tmp, content, "utf8");
+    fs.writeFileSync(tmp, changeBytes(c));
     try {
       return (await git(["hash-object", "-w", "--no-filters", "--", tmp])).stdout.trim();
     } finally {
@@ -208,18 +285,33 @@ export function openGitDataStore(repoRoot: string, opts: GitDataStoreOptions = {
       const included: OutboxItem[] = [];
       const conflicted: OutboxItem[] = [];
       const conflictPaths: string[] = [];
+      /** Paths whose expectVersion no longer matched: someone else changed them. */
+      const changed: string[] = [];
       try {
         if (base) await ix(["read-tree", base]);
         else await ix(["read-tree", "--empty"]);
+        const blobAt = async (p: string): Promise<string | null> => {
+          const cur = await ix(["ls-files", "-s", "--", `:(literal)${p}`]);
+          return /^\d+ ([0-9a-f]+) \d\t/.exec(cur.stdout)?.[1] ?? null;
+        };
         for (const item of items) {
           const clashes: string[] = [];
           for (const c of item.entry.changes) {
+            if (c.expectVersion === undefined) continue;
+            const now = await blobAt(c.path);
+            const mine = c.content === null ? null : gitBlobSha(changeBytes(c));
+            // Re-delivery of our own earlier push (already there) is not a conflict.
+            if (now !== c.expectVersion && now !== mine) {
+              clashes.push(c.path);
+              changed.push(c.path);
+            }
+          }
+          for (const c of item.entry.changes) {
             if (!c.createOnly || c.content === null) continue;
-            const cur = await ix(["ls-files", "-s", "--", `:(literal)${c.path}`]);
-            const m = /^\d+ ([0-9a-f]+) \d\t/.exec(cur.stdout);
-            if (!m) continue;
+            const now = await blobAt(c.path);
+            if (!now) continue;
             // Re-delivery of our own earlier push is not a conflict.
-            if (m[1] !== (await hashContent(c.content))) clashes.push(c.path);
+            if (now !== gitBlobSha(changeBytes(c))) clashes.push(c.path);
           }
           if (clashes.length) {
             conflicted.push(item);
@@ -228,7 +320,7 @@ export function openGitDataStore(repoRoot: string, opts: GitDataStoreOptions = {
           }
           for (const c of item.entry.changes) {
             if (c.content === null) await ix(["update-index", "--force-remove", "--", c.path]);
-            else await ix(["update-index", "--add", "--cacheinfo", `100644,${await hashContent(c.content)},${c.path}`]);
+            else await ix(["update-index", "--add", "--cacheinfo", `100644,${await hashContent(c)},${c.path}`]);
           }
           included.push(item);
         }
@@ -248,7 +340,9 @@ export function openGitDataStore(repoRoot: string, opts: GitDataStoreOptions = {
         result: "conflict",
         ...(commit ? { commit } : {}),
         conflicts: conflictPaths,
-        message: `已經有同名檔案，這次的寫入沒有送出：${conflictPaths.join(", ")}`,
+        message: changed.length
+          ? `檔案剛被別人改過，這次的寫入沒有送出：${conflictPaths.join(", ")}`
+          : `已經有同名檔案，這次的寫入沒有送出：${conflictPaths.join(", ")}`,
       });
 
       const baseTree = base ? (await git(["rev-parse", `${base}^{tree}`])).stdout.trim() : EMPTY_TREE;
@@ -296,6 +390,9 @@ export function openGitDataStore(repoRoot: string, opts: GitDataStoreOptions = {
     defaultBranch,
     list,
     read,
+    readBytes,
+    tree,
+    history,
     async write(changes, message) {
       for (const c of changes) assertRelPath(c.path);
       if (changes.length === 0) return { result: "pushed" };

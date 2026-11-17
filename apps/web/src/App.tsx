@@ -14,6 +14,7 @@ import { ProgressView } from "./components/Progress.tsx";
 import { InviteDialog, SettingsDialog } from "./components/Dialogs.tsx";
 import { AgentSettingsDialog, ChatView } from "./components/Chat.tsx";
 import { RoomView } from "./components/Room.tsx";
+import { ContextPage } from "./components/Context.tsx";
 import { Spinner, errMsg } from "./components/ui.tsx";
 
 interface Op {
@@ -33,7 +34,7 @@ export function App() {
   const [op, setOp] = useState<Op | null>(null);
   const [dialog, setDialog] = useState<"invite" | "settings" | "agents" | null>(null);
   const [view, setView] = useState<View>("board");
-  const [boardTab, setBoardTab] = useState<"list" | "log">("list");
+  const [boardTab, setBoardTab] = useState<"list" | "log" | "context">("list");
   const [toast, setToast] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const handledDone = useRef<string | null>(null);
@@ -178,6 +179,10 @@ export function App() {
         setView("board");
         setBoardTab("log");
       }}
+      onContext={() => {
+        setView("board");
+        setBoardTab("context");
+      }}
     />
   );
 
@@ -235,6 +240,8 @@ export function App() {
           )}
           {boardTab === "list" ? (
             <TaskBoard board={board} now={now} onTaskCreated={app.reloadBoard} />
+          ) : boardTab === "context" ? (
+            <ContextPage key={project.id} projectId={project.id} now={now} onBack={() => setBoardTab("list")} />
           ) : (
             <div className="tb-log">
               <p className="tb-back">

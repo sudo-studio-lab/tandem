@@ -117,25 +117,6 @@
   margin: 0 0 8px;
   font-size: 15px;
 }
-.notes h4 {
-  margin: 12px 0 4px;
-  font-size: 13px;
-}
-.notes p {
-  margin: 2px 0;
-  font-size: 13px;
-  line-height: 1.55;
-}
-.notes .notes-li {
-  padding-left: 14px;
-  position: relative;
-}
-.notes .notes-li::before {
-  content: "•";
-  position: absolute;
-  left: 2px;
-  color: var(--muted);
-}
 .room-closed {
   padding: 12px 16px;
   margin: 0;

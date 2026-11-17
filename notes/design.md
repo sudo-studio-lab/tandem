@@ -52,7 +52,7 @@ flowchart TB
 | **網頁介面** | 看板、跟 AI 對話、房間三個分頁 |
 | **共用核心** | 讀寫紀錄、git 同步、呼叫 GitHub、算開工報告、裝 agent 設定 |
 | **`tandem` 指令** | 給人和 agent 用：`init`、`invite`、`join`、`brief`、`decide`、`status`、`ask`、`disagree`、`resolve`、`task`、`sync`、`check`、`doctor` 等 |
-| **MCP 工具** | 讓 agent 直接呼叫：`tandem_brief`、`tandem_decide`、`tandem_decisions`、`tandem_status`、`tandem_ask`、`tandem_disagree`、`tandem_task`、`tandem_check`；效果和指令一樣 |
+| **MCP 工具** | 讓 agent 直接呼叫：`tandem_brief`、`tandem_decide`、`tandem_decisions`、`tandem_status`、`tandem_ask`、`tandem_disagree`、`tandem_task`、`tandem_check`、`tandem_context_list`、`tandem_context_read`、`tandem_context_write`；效果和指令一樣 |
 | **hooks** | 開工時給 agent 開工報告；收工時如果有改動，提醒更新狀態 |
 
 **怎麼接上 agent**：Tandem 在專案裡寫好幾樣設定，兩家都讀同一套：
@@ -67,11 +67,22 @@ flowchart TB
 
 | 放哪 | 放什麼 | 怎麼同步 | 特性 |
 |---|---|---|---|
-| **repo 裡的檔案**（`tandem/`） | 決定（`decisions/`）、每人的狀態（`status/<帳號>.md`）、團隊習慣（`team.md`） | git；紀錄直接推到 main，不開 PR | 離線也能寫、有完整歷史、寫了不改（推翻要新增一筆並寫「取代誰」） |
+| **repo 裡的檔案**（`tandem/`） | 決定（`decisions/`）、每人的狀態（`status/<帳號>.md`）、團隊習慣（`team.md`）、共享脈絡（`context/`） | git；紀錄直接推到 main，不開 PR | 離線也能寫、有完整歷史、寫了不改（推翻要新增一筆並寫「取代誰」） |
 | **GitHub 物件** | 問題和分歧（Discussions，加標籤；沒開 Discussions 就用 Issues）、任務（Issues）、房間（Discussions，內文開頭有房間標記） | GitHub API | 要連網、即時、有通知、每句話有作者和網址 |
 | **本機** | App 設定（`%APPDATA%\Tandem\app.json`）、AI 對話紀錄、每個 repo 的同步狀態（`.git/tandem/`） | 不同步 | 只有自己看得到 |
 
 GitHub 登入用裝置碼流程（像 GitHub Desktop），沒裝 `gh` 也能用。
+
+**共享脈絡**（`tandem/context/`）：一個大家和大家的 agent 都能讀寫的資料夾。`notes.md` 放背景、架構、需求，其他檔案放規格、圖、草圖、比較長的報告。
+
+- 只放在團隊資料 repo（有 `.tandem.json` 就是那個私人 repo，沒有就是程式碼 repo）的 `tandem/context/`，不放別的地方；新隊友加入就自動有。
+- 規則：相對路徑、不能有 `..`、最多 3 層（例如 `specs/api/v1.md`）、名稱只能用文字、數字、`. _ -`；文字檔 `.md .txt .json .csv .svg .mmd`，圖片 `.png .jpg .jpeg .gif .webp`（傳輸用 base64，存成真的二進位檔）；每個檔案最多 2 MB。
+- 讀寫都經過 DataStore，跟決定一樣走 outbox 和同步；commit 訊息是 `tandem: context <路徑> (@帳號)`，第二段是「原因」。清單上的「誰改的」從這行讀出來。
+- 檔案鎖（樂觀鎖）：每次讀都拿到版本（git blob sha）。寫的時候可以帶 `expectVersion`（新檔給 null），如果檔案在那之後被改過就拒絕，訊息是「這個檔案剛被 @x 改過，請重新載入再改」。寫入前先比一次，推送時（outbox 抓到最新的遠端之後）再比一次，所以兩個人同時存也不會互相蓋掉；被拒絕的那筆移到 `.git/tandem/conflicts/`。
+- 金鑰防護：文字內容和原因在寫入前檢查，看起來像金鑰就拒絕，不存也不推送。偵測常見的 token 開頭（GitHub、OpenAI、Anthropic、AWS、Google、Slack、Stripe）、PEM 私鑰、`.env` 式的 `XXX_KEY=` 長隨機值、網址裡的密碼；錯誤訊息只說第幾行、像哪一種，不重複金鑰本身。偵測器在 `packages/core/src/context/secrets.ts`，之後 agent 之間的訊息也會用。
+- agent：`tandem_context_list`、`tandem_context_read`（回傳內容和版本；圖片回傳圖片）不用核准；`tandem_context_write`（path、content、`why` 必填、`expectVersion` 選填）跟其他寫入一樣要核准。說明裡要 agent 大工作前先讀 `notes.md`、只寫使用者要分享的、不放金鑰。
+- 開工報告：列出上次之後隊友改過的脈絡檔案（每個一行，最多 5 個，自己改的不列），有 `notes.md` 就附上前 15 行；對話中間的「新決定」提醒也會一起提到新改的脈絡檔案（同一個節流）。
+- 看板：⋯ 選單的「脈絡」頁。本機服務的路由：`GET /api/projects/:id/context`、`GET|PUT|DELETE /api/projects/:id/context/file`（衝突回 409）。
 
 **團隊資料可以放在另一個 repo**（決定 D-20261117-7m4b）。程式碼 repo 是公開的話，`tandem/` 裡的原話、每個人的狀態也都公開了，所以團隊資料可以搬到另一個私人 repo；程式碼、PR、任務（Issues）、Discussions 留在程式碼 repo。
 

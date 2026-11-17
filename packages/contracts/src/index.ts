@@ -37,6 +37,8 @@ export const PATHS = {
   decisions: `${PRODUCT.dataDir}/decisions`,
   status: `${PRODUCT.dataDir}/status`,
   team: `${PRODUCT.dataDir}/team.md`,
+  /** Shared context folder (see context.ts). */
+  context: `${PRODUCT.dataDir}/context`,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -323,8 +325,19 @@ export interface Brief {
   assignedToMe: { number: number; title: string; url: string }[];
   teammates: BriefTeammate[];
   problems: string[];
+  /** Shared-context files teammates changed since the last brief (newest first). */
+  contextChanges?: BriefContextChange[];
+  /** First lines of `tandem/context/notes.md`, when it exists. */
+  notesHead?: string;
   /** True when nothing relevant changed since the last brief. */
   quiet: boolean;
+}
+
+export interface BriefContextChange {
+  /** Relative to `tandem/context/`. */
+  path: string;
+  by?: string;
+  deleted: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -372,3 +385,4 @@ export const EXIT = { ok: 0, error: 1, usage: 2, needsHuman: 3 } as const;
 export type * from "./app.ts";
 export type * from "./agent.ts";
 export * from "./images.ts";
+export * from "./context.ts";

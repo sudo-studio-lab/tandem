@@ -96,3 +96,29 @@ export function runGit(args: string[], opts: RunGitOptions): Promise<RunGitResul
     });
   });
 }
+
+/** Like runGit but stdout is raw bytes (binary-safe, e.g. `cat-file blob` of an image). */
+export function runGitBytes(args: string[], opts: RunGitOptions): Promise<{ stdout: Buffer; stderr: string; code: number }> {
+  return new Promise((resolve, reject) => {
+    const g = resolveGit();
+    const child = spawn(g.bin, args, {
+      cwd: opts.cwd,
+      env: { ...process.env, ...g.env, ...opts.env, LC_ALL: "C", GIT_TERMINAL_PROMPT: "0" },
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    const chunks: Buffer[] = [];
+    let stderr = "";
+    child.stdout.on("data", (d: Buffer) => chunks.push(d));
+    child.stderr.setEncoding("utf8").on("data", (d: string) => (stderr += d));
+    child.on("error", (err) => reject(new TandemError("internal", `無法執行 git：${err.message}`, { args })));
+    child.on("close", (code) => {
+      const exit = code ?? 1;
+      if (exit !== 0 && !opts.allowFail) {
+        reject(new TandemError("internal", `git ${args.join(" ")} 失敗：${stderr.trim()}`, { args, code: exit, stderr }));
+        return;
+      }
+      resolve({ stdout: Buffer.concat(chunks), stderr, code: exit });
+    });
+  });
+}

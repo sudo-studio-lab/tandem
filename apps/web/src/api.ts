@@ -3,9 +3,12 @@ import type { AppEvent } from "@tandem/contracts";
 /** Error from the local server (`{ error, code }`) or from the network. */
 export class ApiError extends Error {
   code?: string;
-  constructor(message: string, code?: string) {
+  /** Extra data on some errors (e.g. who changed a context file, on a conflict). */
+  details?: unknown;
+  constructor(message: string, code?: string, details?: unknown) {
     super(message);
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -39,8 +42,8 @@ export async function api<T>(method: string, path: string, body?: unknown): Prom
     parsed = undefined;
   }
   if (!res.ok) {
-    const b = parsed as { error?: string; code?: string } | undefined;
-    throw new ApiError(b?.error ?? `發生錯誤（${res.status}）`, b?.code);
+    const b = parsed as { error?: string; code?: string; details?: unknown } | undefined;
+    throw new ApiError(b?.error ?? `發生錯誤（${res.status}）`, b?.code, b?.details);
   }
   return parsed as T;
 }

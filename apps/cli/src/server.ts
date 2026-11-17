@@ -26,6 +26,7 @@ import {
   type AppEvent,
   type AppSession,
   type AppSettings,
+  type ContextWriteInput,
   type DeviceLoginState,
   type Invitation,
   type ProjectBoard,
@@ -46,8 +47,12 @@ import {
   projectIdFor,
   saveToken,
   startDeviceLogin,
+  deleteContext,
+  listContext,
+  readContext,
   syncData,
   updateAppState,
+  writeContext,
 } from "@tandem/core";
 import { openContext, type Context } from "./context.ts";
 import { buildBoard, gatherGitHub, type GitHubData } from "./gather.ts";
@@ -88,7 +93,17 @@ function clientDir(): string {
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const errCode = (e: unknown) => (e instanceof TandemError ? e.code : "internal");
 const httpStatus = (code: string) =>
-  code === "usage" || code === "validation" ? 400 : code === "auth" ? 401 : code === "needs_human" ? 403 : code === "offline" ? 503 : 500;
+  code === "usage" || code === "validation"
+    ? 400
+    : code === "auth"
+      ? 401
+      : code === "needs_human"
+        ? 403
+        : code === "conflict"
+          ? 409
+          : code === "offline"
+            ? 503
+            : 500;
 
 // ---------------------------------------------------------------------------
 // Per-project runtime
@@ -404,7 +419,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
         return await fn(c);
       } catch (e) {
         const code = errCode(e);
-        return c.json({ error: errMsg(e), code }, httpStatus(code) as 400);
+        // Conflicts carry who changed what (e.g. a context file), so the page can say so.
+        const details = code === "conflict" && e instanceof TandemError && e.details && typeof e.details === "object" ? { details: e.details } : {};
+        return c.json({ error: errMsg(e), code, ...details }, httpStatus(code) as 400);
       }
     };
   const body = async <T>(c: HonoContext): Promise<Partial<T>> => ((await c.req.json().catch(() => ({}))) ?? {}) as Partial<T>;
@@ -612,6 +629,43 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
       // Refresh so the new task is on the board (and pushed to open windows) before we answer.
       await rebuild(rt, true).catch(() => undefined);
       return c.json({ number: r.number, url: r.url });
+    }),
+  );
+  // Shared context (tandem/context/ in the data repo). Paths are relative to that folder.
+  app.get("/api/projects/:id/context", handle(async (c) => c.json(await listContext((await projectRt(c)).ctx.store))));
+  app.get(
+    "/api/projects/:id/context/file",
+    handle(async (c) => {
+      const f = await readContext((await projectRt(c)).ctx.store, c.req.query("path") ?? "");
+      if (!f) throw new TandemError("usage", "找不到這個檔案，可能已經被刪掉了");
+      return c.json(f);
+    }),
+  );
+  app.put(
+    "/api/projects/:id/context/file",
+    handle(async (c) => {
+      const b = await body<ContextWriteInput>(c);
+      const rt = await projectRt(c);
+      const r = await writeContext(
+        rt.ctx.store,
+        {
+          path: String(b.path ?? ""),
+          content: typeof b.content === "string" ? b.content : "",
+          ...(b.encoding ? { encoding: b.encoding } : {}),
+          ...(b.expectVersion !== undefined ? { expectVersion: b.expectVersion } : {}),
+          ...(typeof b.why === "string" ? { why: b.why } : {}),
+        },
+        { me: rt.ctx.me },
+      );
+      return c.json(r);
+    }),
+  );
+  app.delete(
+    "/api/projects/:id/context/file",
+    handle(async (c) => {
+      const rt = await projectRt(c);
+      const v = c.req.query("expectVersion");
+      return c.json(await deleteContext(rt.ctx.store, c.req.query("path") ?? "", { me: rt.ctx.me, ...(v ? { expectVersion: v } : {}) }));
     }),
   );
   app.get("/api/agents", handle(async (c) => c.json(await agentStatuses(c.req.query("refresh") === "1"))));
