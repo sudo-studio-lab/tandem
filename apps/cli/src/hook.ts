@@ -3,23 +3,38 @@
  * Must always print valid JSON and never fail the agent.
  */
 import { createHash } from "node:crypto";
-import { PRODUCT } from "@tandem/contracts";
+import { PRODUCT, type Decision } from "@tandem/contracts";
 import { formatHookOutput, headCommit, loadStatuses, readHookInput, renderAgentContext, runGit, syncData } from "@tandem/core";
 import { openContext, withTimeout } from "./context.ts";
 import { buildBrief, gatherGitHub } from "./gather.ts";
 import { readStdin } from "./io.ts";
+import { checkNewDecisions, rememberDecisions, type DecisionWatch } from "./live-decisions.ts";
 
 type Agent = "claude" | "codex";
 type HookEvent = "session-start" | "stop" | "user-prompt" | "post-compact";
 
 const HOOK_BUDGET_MS = 12_000;
 
-async function sessionContext(ctx: Awaited<ReturnType<typeof openContext>>): Promise<string> {
+async function sessionContext(ctx: Awaited<ReturnType<typeof openContext>>): Promise<{ context: string; decisions: Decision[] }> {
   await withTimeout(syncData(ctx.repoRoot, { gitEnv: ctx.gitEnv }).catch(() => undefined), 6_000, undefined);
   const gh = await withTimeout(gatherGitHub(ctx), 6_000, null);
-  const { brief, head } = await buildBrief(ctx, gh);
+  const { brief, head, decisions } = await buildBrief(ctx, gh);
   ctx.state.lastBrief = { commit: head, time: new Date().toISOString() };
-  return renderAgentContext(brief);
+  return { context: renderAgentContext(brief), decisions };
+}
+
+/** New decisions by teammates since the session started; null when none, throttled or on any failure. */
+async function liveDecisions(ctx: Awaited<ReturnType<typeof openContext>>, s: DecisionWatch): Promise<string | null> {
+  try {
+    return await checkNewDecisions({
+      session: s,
+      store: ctx.store,
+      me: ctx.me,
+      sync: () => withTimeout(syncData(ctx.repoRoot, { gitEnv: ctx.gitEnv }).catch(() => undefined), 3_000, undefined),
+    });
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -71,13 +86,16 @@ async function handle(event: HookEvent, agent: Agent, stdin: string): Promise<st
   try {
     switch (event) {
       case "session-start": {
-        const context = await sessionContext(ctx);
+        const { context, decisions } = await sessionContext(ctx);
         const existing = ctx.state.sessions[sessionId];
-        ctx.state.sessions[sessionId] = existing ?? {
+        const s = (ctx.state.sessions[sessionId] = existing ?? {
           startedAt: new Date().toISOString(),
           head: await headCommit(ctx.repoRoot),
           tree: await workingTreePrint(ctx.repoRoot),
-        };
+        });
+        // The brief just covered these; later turns only hear about ones added after this.
+        rememberDecisions(s, decisions);
+        s.decisionsCheckedAt = new Date().toISOString();
         return formatHookOutput(agent, "session-start", { context });
       }
       case "post-compact": {
@@ -89,9 +107,12 @@ async function handle(event: HookEvent, agent: Agent, stdin: string): Promise<st
         const s = ctx.state.sessions[sessionId];
         if (s?.reinject) {
           s.reinject = false;
-          return formatHookOutput(agent, "user-prompt", { context: await sessionContext(ctx) });
+          const { context, decisions } = await sessionContext(ctx);
+          rememberDecisions(s, decisions);
+          return formatHookOutput(agent, "user-prompt", { context });
         }
-        return formatHookOutput(agent, "user-prompt", {});
+        const note = s ? await liveDecisions(ctx, s) : null;
+        return formatHookOutput(agent, "user-prompt", note ? { context: note } : {});
       }
       case "stop": {
         const s = ctx.state.sessions[sessionId];

@@ -21,6 +21,7 @@ import type {
   ProjectRef,
   ProjectStep,
   RepoChoice,
+  TaskSummary,
 } from "@tandem/contracts";
 import { ApiError } from "./api.ts";
 import { mockProjectBoard } from "./mock.ts";
@@ -238,6 +239,14 @@ function runProgress(fullName: string, withAccept: boolean) {
   return { opId };
 }
 
+// --- tasks made on the board (kept per project for this page load) ------------
+const madeTasks = new Map<string, TaskSummary[]>();
+function boardFor(id: string) {
+  const b = mockProjectBoard(id, login ?? ME);
+  const extra = madeTasks.get(id) ?? [];
+  return { ...b, tasks: [...extra, ...b.tasks] };
+}
+
 // --- device login -----------------------------------------------------------
 const deviceStarts = new Map<string, number>();
 
@@ -389,9 +398,28 @@ export async function handle(method: string, path: string, body: unknown): Promi
     }
     if (method === "GET" && tail === "/board") {
       if (!proj.available) throw new ApiError("找不到資料夾", "not_a_repo");
-      return mockProjectBoard(id, login ?? ME);
+      return boardFor(id);
     }
-    if (method === "POST" && tail === "/refresh") return mockProjectBoard(id, login ?? ME);
+    if (method === "POST" && tail === "/refresh") return boardFor(id);
+    if (method === "POST" && tail === "/tasks") {
+      const t = body as { title?: unknown; body?: unknown; assign?: unknown };
+      const title = typeof t.title === "string" ? t.title.trim() : "";
+      if (!title) throw new ApiError("請輸入任務標題", "usage");
+      if (title.length > 256) throw new ApiError("標題最多 256 個字", "usage");
+      if (title.includes("fail")) throw new ApiError("範例：建立任務失敗，請再試一次", "github");
+      const assign = (Array.isArray(t.assign) ? t.assign : []).map((x) => String(x).replace(/^@/, ""));
+      const bad = assign.find((l) => !/^[A-Za-z0-9-]{1,39}$/.test(l));
+      if (bad !== undefined) throw new ApiError(`「${bad}」不是正確的 GitHub 帳號`, "usage");
+      await sleep(500);
+      const list = madeTasks.get(id) ?? [];
+      const number = 40 + list.length;
+      const now = new Date().toISOString();
+      const url = `https://github.com/${proj.owner}/${proj.name}/issues/${number}`;
+      list.unshift({ number, title, url, state: "open", assignees: [...new Set(assign)], labels: ["tandem:task"], author: login ?? ME, blockedBy: [], createdAt: now, updatedAt: now });
+      madeTasks.set(id, list);
+      emit({ type: "board", data: boardFor(id) });
+      return { number, url };
+    }
     if (method === "POST" && tail === "/sync") {
       emit({ type: "sync", data: { projectId: id, state: "syncing" } });
       setTimeout(() => emit({ type: "sync", data: { projectId: id, state: "idle", lastSyncAt: new Date().toISOString() } }), 1200);

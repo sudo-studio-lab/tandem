@@ -5,6 +5,7 @@ import {
   type BoardData,
   type BoardMember,
   type Brief,
+  type Decision,
   type DiscussionSummary,
   type Problem,
   type PullRequestSummary,
@@ -67,7 +68,7 @@ export async function gatherLocal(ctx: Context) {
   return { decisions, statuses, problems };
 }
 
-export async function buildBrief(ctx: Context, gh: GitHubData | null): Promise<{ brief: Brief; head: string | null }> {
+export async function buildBrief(ctx: Context, gh: GitHubData | null): Promise<{ brief: Brief; head: string | null; decisions: Decision[] }> {
   const since = ctx.state.lastBrief ?? { commit: null, time: null };
   const [local, changes, head] = await Promise.all([
     gatherLocal(ctx),
@@ -95,7 +96,7 @@ export async function buildBrief(ctx: Context, gh: GitHubData | null): Promise<{
     problems: local.problems,
   });
   if (!gh) brief.problems.push("這次沒有讀 GitHub（連線逾時或離線），討論和任務可能不是最新的");
-  return { brief, head };
+  return { brief, head, decisions: local.decisions };
 }
 
 const sameLogin = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();

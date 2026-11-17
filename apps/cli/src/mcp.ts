@@ -6,7 +6,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { LABELS, PRODUCT, StatusPatch, TandemError, type DecisionInput, type Problem } from "@tandem/contracts";
+import { PRODUCT, StatusPatch, TandemError, type DecisionInput, type Problem } from "@tandem/contracts";
 import {
   checkRecords,
   createDecision,
@@ -19,6 +19,7 @@ import {
 } from "@tandem/core";
 import { openContext, withTimeout, type Context } from "./context.ts";
 import { buildBrief, gatherGitHub } from "./gather.ts";
+import { createTask } from "./tasks.ts";
 import pkg from "../package.json" with { type: "json" };
 
 type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
@@ -276,12 +277,7 @@ export function createMcpServer(ctx: () => Promise<Context>, approve?: ApproveBr
     },
     guard(async (a: { title: string; body?: string; assign?: string[] }) => {
       const c = await ctx();
-      const r = await c.gh.createIssue({
-        title: a.title,
-        body: a.body,
-        assignees: a.assign?.map((l) => l.replace(/^@/, "")),
-        labels: [LABELS.task],
-      });
+      const r = await createTask(c, a);
       return ok(`已建立任務 #${r.number}：${r.url}`);
     }),
   );
