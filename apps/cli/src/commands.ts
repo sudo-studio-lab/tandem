@@ -2,7 +2,6 @@
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import {
-  LABELS,
   PRODUCT,
   StatusPatch,
   TandemError,
@@ -25,6 +24,7 @@ import { openContext, withTimeout, type Context } from "./context.ts";
 import { buildBrief, gatherGitHub } from "./gather.ts";
 import { info, printJson, readJsonInput } from "./io.ts";
 import { joinProject, rememberProject, setupProject } from "./setup.ts";
+import { createTask } from "./tasks.ts";
 
 interface JsonOpt {
   json?: boolean;
@@ -227,7 +227,7 @@ export async function cmdResolve(target: string, opts: JsonOpt & { decision?: st
 
 export async function cmdTask(title: string, opts: JsonOpt & { assign?: string[]; body?: string }): Promise<void> {
   const ctx = await openContext();
-  const r = await ctx.gh.createIssue({ title, body: opts.body, assignees: opts.assign, labels: [LABELS.task] });
+  const r = await createTask(ctx, { title, body: opts.body, assign: opts.assign });
   if (opts.json) printJson(r);
   else info(`已建立任務 #${r.number}：${r.url}`);
 }

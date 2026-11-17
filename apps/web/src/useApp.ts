@@ -100,6 +100,12 @@ export function useApp() {
     if (currentId && available) void loadBoard(currentId);
   }, [currentId, available, loadBoard]);
 
+  /** Re-read the current board without asking GitHub again (the server already rebuilt it). */
+  const reloadBoard = useCallback(async () => {
+    const id = currentIdRef.current;
+    if (id) await loadBoard(id);
+  }, [loadBoard]);
+
   const refresh = useCallback(async () => {
     const id = currentIdRef.current;
     if (!id) return;
@@ -161,6 +167,7 @@ export function useApp() {
     syncing,
     loadSession,
     refresh,
+    reloadBoard,
     sync,
     selectProject,
     removeProject,

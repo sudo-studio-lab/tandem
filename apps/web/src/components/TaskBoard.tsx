@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import type { BoardMember, ProjectBoard, WaitingItem } from "@tandem/contracts";
+import { api, projectPath } from "../api.ts";
 import { Ext } from "./Ext.tsx";
-import { Avatar } from "./ui.tsx";
+import { Avatar, errMsg } from "./ui.tsx";
 import { PersonCard } from "./People.tsx";
 import { relTime, waitedFor } from "../time.ts";
 
@@ -208,9 +209,109 @@ function WaitGroup({ items, now }: { items: WaitingItem[]; now: number }) {
   );
 }
 
-export function TaskBoard({ board, now }: { board: ProjectBoard; now: number }) {
+/** Inline form under the bar: a person (not an agent) opens a task. Enter in the title submits, Esc cancels. */
+function NewTask({ board, members, onDone, onCancel }: { board: ProjectBoard; members: BoardMember[]; onDone: () => void; onCancel: () => void }) {
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [assign, setAssign] = useState<string[]>([board.me]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const toggle = (login: string) => setAssign((a) => (a.includes(login) ? a.filter((x) => x !== login) : [...a, login]));
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (busy || !title.trim()) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await api<{ number: number; url: string }>("POST", projectPath(board.projectId, "/tasks"), {
+        title: title.trim(),
+        body: body.trim() || undefined,
+        assign,
+      });
+      onDone();
+    } catch (e2) {
+      setErr(errMsg(e2));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form
+      className="tb-new"
+      aria-label="新任務"
+      onSubmit={submit}
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && !busy) {
+          e.preventDefault();
+          onCancel();
+        }
+      }}
+    >
+      <label htmlFor="tb-new-title" className="sr-only">
+        標題
+      </label>
+      <input
+        id="tb-new-title"
+        className="input"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="標題"
+        maxLength={256}
+        autoComplete="off"
+        autoFocus
+        required
+        disabled={busy}
+      />
+      <label htmlFor="tb-new-body" className="sr-only">
+        說明
+      </label>
+      <textarea id="tb-new-body" className="input" rows={3} value={body} onChange={(e) => setBody(e.target.value)} placeholder="說明（選填）" disabled={busy} />
+      <div className="tb-new-assign" role="group" aria-labelledby="tb-new-assign-label">
+        <span id="tb-new-assign-label" className="tb-new-label">
+          指派給
+        </span>
+        {members.map((m) => {
+          const on = assign.includes(m.login);
+          const name = `@${m.login}${m.login === board.me ? "（你）" : ""}`;
+          return (
+            <button
+              key={m.login}
+              type="button"
+              className={`tb-face tb-new-who${on ? " is-sel" : ""}`}
+              aria-pressed={on}
+              aria-label={name}
+              title={name}
+              disabled={busy}
+              onClick={() => toggle(m.login)}
+            >
+              <Avatar login={m.login} size={26} />
+            </button>
+          );
+        })}
+      </div>
+      {err && (
+        <p className="field-error" role="alert">
+          {err}
+        </p>
+      )}
+      <div className="tb-new-actions">
+        <button type="button" className="btn btn-small btn-quiet" onClick={onCancel} disabled={busy}>
+          取消
+        </button>
+        <button type="submit" className="btn btn-small btn-primary" disabled={busy || !title.trim()}>
+          {busy ? "建立中…" : "建立"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+export function TaskBoard({ board, now, onTaskCreated }: { board: ProjectBoard; now: number; onTaskCreated?: () => void | Promise<void> }) {
   const [scope, setScope] = useState<"all" | "mine">("all");
   const [person, setPerson] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const members = [...board.members].sort((a, b) => Number(b.login === board.me) - Number(a.login === board.me));
   const mine = board.waiting
     .filter((w) => w.to === board.me && (!person || person === board.me || w.from === person))
@@ -240,12 +341,27 @@ export function TaskBoard({ board, now }: { board: ProjectBoard; now: number }) 
             </button>
           </div>
         )}
+        <button type="button" className="tb-new-btn" aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
+          ＋ 新任務
+        </button>
         <div className="tb-faces" role="group" aria-label="成員（點一下只看這個人）">
           {members.map((m) => (
             <Face key={m.login} m={m} me={board.me} now={now} selected={person === m.login} onPick={() => setPerson(person === m.login ? null : m.login)} />
           ))}
         </div>
       </div>
+
+      {adding && (
+        <NewTask
+          board={board}
+          members={members}
+          onCancel={() => setAdding(false)}
+          onDone={() => {
+            setAdding(false);
+            void onTaskCreated?.();
+          }}
+        />
+      )}
 
       {picked && (
         <div className="tb-picked">

@@ -1873,3 +1873,80 @@ dialog.modal::backdrop {
   margin: 0;
   font-size: 0.88rem;
 }
+.tb-new-btn {
+  flex: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  padding: 3px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tb-new-btn:hover,
+.tb-new-btn[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.tb-new-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.tb-new {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.tb-new .input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.tb-new textarea.input {
+  resize: vertical;
+  min-height: 60px;
+}
+.tb-new-assign {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.tb-new-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-right: 2px;
+}
+.tb-new-who {
+  opacity: 0.45;
+}
+.tb-new-who.is-sel {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+}
+.tb-new-who:disabled {
+  cursor: default;
+}
+.tb-new .field-error {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.tb-new-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+@media (max-width: 480px) {
+  .tb-bar {
+    gap: 8px;
+  }
+  .tb-pills button {
+    padding: 4px 9px;
+  }
+}

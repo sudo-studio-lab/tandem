@@ -234,7 +234,7 @@ export function App() {
             </p>
           )}
           {boardTab === "list" ? (
-            <TaskBoard board={board} now={now} />
+            <TaskBoard board={board} now={now} onTaskCreated={app.reloadBoard} />
           ) : (
             <div className="tb-log">
               <p className="tb-back">
