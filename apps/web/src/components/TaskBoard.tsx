@@ -175,7 +175,7 @@ function Face({ m, me, now, selected, onPick }: { m: BoardMember; me: string; no
   const label = `${m.login}${m.login === me ? "（你）" : ""}：${line}${s ? `（${relTime(s.updated, now)}更新）` : ""}`;
   return (
     <button type="button" className={`tb-face${selected ? " is-sel" : ""}`} aria-pressed={selected} aria-label={label} title={label} onClick={onPick}>
-      <Avatar login={m.login} size={26} />
+      <Avatar login={m.login} size={28} />
       <i className={`tb-dot${s?.blocked ? " is-blocked" : fresh ? " is-fresh" : ""}`} aria-hidden="true" />
     </button>
   );
@@ -198,9 +198,8 @@ function WaitGroup({ items, now }: { items: WaitingItem[]; now: number }) {
             <Ext href={w.url} className="tb-title">
               {w.title}
             </Ext>
-            <span className="tb-meta">{waitedFor(w.since, now)}</span>
-            <span className="tb-owners" title={`@${w.from}`}>
-              <Avatar login={w.from} size={22} />
+            <span className="tb-meta">
+              @{w.from}・{waitedFor(w.since, now)}
             </span>
           </li>
         ))}
@@ -213,7 +212,9 @@ export function TaskBoard({ board, now }: { board: ProjectBoard; now: number }) 
   const [scope, setScope] = useState<"all" | "mine">("all");
   const [person, setPerson] = useState<string | null>(null);
   const members = [...board.members].sort((a, b) => Number(b.login === board.me) - Number(a.login === board.me));
-  const mine = board.waiting.filter((w) => w.to === board.me).sort((a, b) => Date.parse(a.since) - Date.parse(b.since));
+  const mine = board.waiting
+    .filter((w) => w.to === board.me && (!person || person === board.me || w.from === person))
+    .sort((a, b) => Date.parse(a.since) - Date.parse(b.since));
 
   const who = person ?? (scope === "mine" ? board.me : null);
   const items = collect(board).filter((it) => !who || it.owners.includes(who));

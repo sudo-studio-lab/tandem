@@ -8,10 +8,22 @@ const AGENT_NAME: Record<AgentKind, string> = { claude: "Claude Code", codex: "C
 
 /** Top-level screens. Add a tab here and in TABS. */
 export type View = "board" | "chat" | "room";
+
+/**
+ * Chat and rooms are hidden for now: you talk to AI in your own editor, and
+ * shared rooms are postponed (D-20261117-qb70). The code stays; set this to
+ * true to bring the tabs back.
+ */
+const SHOW_CHAT_AND_ROOM = false;
+
 export const TABS: { id: View; label: string }[] = [
   { id: "board", label: "看板" },
-  { id: "chat", label: "跟 AI 對話" },
-  { id: "room", label: "房間" },
+  ...(SHOW_CHAT_AND_ROOM
+    ? [
+        { id: "chat" as const, label: "跟 AI 對話" },
+        { id: "room" as const, label: "房間" },
+      ]
+    : []),
 ];
 
 interface Props {
@@ -279,7 +291,7 @@ export function Header(p: Props) {
           Tandem
         </h1>
         <Switcher {...p} />
-        {usable && (
+        {usable && tabs.length > 1 && (
           <nav className="view-tabs" aria-label="畫面">
             {tabs.map((t) => (
               <button key={t.id} type="button" aria-pressed={p.view === t.id} onClick={() => p.onView(t.id)}>
