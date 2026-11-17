@@ -84,6 +84,7 @@ export function mockBoard(): BoardData {
   const prs = [
     {
       number: 15,
+      closes:[8],
       title: "加入看板頁面",
       url: `${REPO}/pull/15`,
       author: "theroyatlas",

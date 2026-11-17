@@ -51,6 +51,15 @@ function manager(script: Parameters<typeof fakeAdapter>[0]) {
   });
 }
 
+it("forks into a local chat without a model call, then supplies external context on the first send",async()=>{
+ const m=manager((_text,o)=>{o.onEvent({type:"turnDone"});});
+ const source={id:"a".repeat(64),project:"team/code",owner:"bob",source:"codex" as const,title:"Login",sharedAt:new Date().toISOString(),messages:[{role:"user" as const,text:"Historical request"},{role:"assistant" as const,text:"Remaining work"}]};
+ const fork=await m.forkShared("team/code","claude","",source);expect(started).toHaveLength(0);expect((await m.get(fork.id)).agentSessionId).toBeUndefined();
+ expect(JSON.stringify(await m.list("team/code"))).not.toContain("Historical request");
+ await m.send(fork.id,"Now verify the error state",dir);expect(sent[0]).toContain("外部資料");expect(sent[0]).toContain("Remaining work");expect(sent[0]).toContain("Now verify the error state");
+ expect(source.messages).toHaveLength(2);await expect(m.forkShared("other/code","claude","",source)).rejects.toThrow("另一個專案");await m.closeAll();
+});
+
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 beforeEach(async () => {

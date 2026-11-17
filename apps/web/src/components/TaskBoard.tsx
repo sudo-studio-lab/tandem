@@ -1,10 +1,11 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { BoardMember, ProjectBoard, WaitingItem } from "@tandem/contracts";
 import { api, projectPath } from "../api.ts";
 import { Ext } from "./Ext.tsx";
 import { Avatar, errMsg } from "./ui.tsx";
 import { PersonCard } from "./People.tsx";
 import { relTime, waitedFor } from "../time.ts";
+import "./collaboration.css";
 
 /*
  * The board as one narrow column (fits an editor's side panel), laid out
@@ -27,6 +28,7 @@ interface Item {
   blocked: boolean;
   draft: boolean;
   time: string;
+  prs?: { number:number;url:string }[];
 }
 
 const GROUPS: { key: GroupKey; label: string; open: boolean }[] = [
@@ -95,6 +97,7 @@ function collect(board: ProjectBoard): Item[] {
   const items: Item[] = [];
   for (const p of board.pullRequests) {
     if (p.state === "closed") continue;
+    if(p.closes?.some(n=>board.tasks.some(t=>t.number===n))) continue;
     items.push({
       key: `pr${p.number}`,
       number: p.number,
@@ -109,6 +112,7 @@ function collect(board: ProjectBoard): Item[] {
     });
   }
   for (const t of board.tasks) {
+    const linked=board.pullRequests.filter(p=>p.closes?.includes(t.number));
     items.push({
       key: `task${t.number}`,
       number: t.number,
@@ -116,10 +120,11 @@ function collect(board: ProjectBoard): Item[] {
       url: t.url,
       kind: "task",
       owners: t.assignees.length ? t.assignees : [t.author],
-      group: t.state === "closed" ? "done" : "working",
+      group: t.state === "closed" ? "done" : linked.some(p=>p.state==="open"&&!p.draft)?"ready":"working",
       blocked: t.state === "open" && t.blockedBy.length > 0,
       draft: false,
       time: t.closedAt ?? t.updatedAt,
+      prs:linked.map(p=>({number:p.number,url:p.url})),
     });
   }
   return items.sort((a, b) => Date.parse(b.time) - Date.parse(a.time));
@@ -128,21 +133,8 @@ function collect(board: ProjectBoard): Item[] {
 function Row({ it, now }: { it: Item; now: number }) {
   return (
     <li className="tb-row">
-      <Icon name={it.group} className={`tb-${it.group}`} />
-      <span className="tb-num">#{it.number}</span>
-      <Ext href={it.url} className="tb-title">
-        {it.title}
-      </Ext>
-      {it.blocked && <span className="tag tag-bad">被卡住</span>}
-      <span className={`tb-chip${it.kind === "pr" ? ` tb-chip-${it.group}` : ""}`} title={relTime(it.time, now)}>
-        <Icon name={it.kind} />
-        {it.kind === "pr" ? (it.draft ? "草稿" : "PR") : "任務"}
-      </span>
-      <span className="tb-owners" title={it.owners.map((o) => `@${o}`).join("、")}>
-        {it.owners.slice(0, 2).map((o) => (
-          <Avatar key={o} login={o} size={22} />
-        ))}
-      </span>
+      <div className="tb-item-top"><Icon name={it.group} className={`tb-${it.group}`} /><span className="tb-num">#{it.number}</span><Ext href={it.url} className="tb-title">{it.title}</Ext></div>
+      <div className="tb-item-meta"><span title={relTime(it.time,now)}>{it.kind==="pr"?(it.draft?"草稿 PR":"PR"):"任務"}</span>{it.blocked&&<span className="tag tag-bad">被卡住</span>}<span>負責 {it.owners.map(o=>`@${o}`).join("、")}</span>{it.prs?.map(p=><Ext key={p.number} href={p.url}>PR #{p.number}</Ext>)}</div>
     </li>
   );
 }
@@ -279,14 +271,14 @@ function NewTask({ board, members, onDone, onCancel }: { board: ProjectBoard; me
             <button
               key={m.login}
               type="button"
-              className={`tb-face tb-new-who${on ? " is-sel" : ""}`}
+              className={`btn btn-small co-assign${on ? " is-sel" : ""}`}
               aria-pressed={on}
               aria-label={name}
               title={name}
               disabled={busy}
               onClick={() => toggle(m.login)}
             >
-              <Avatar login={m.login} size={26} />
+              <Avatar login={m.login} size={22} /><span>@{m.login}</span>
             </button>
           );
         })}
@@ -312,6 +304,10 @@ export function TaskBoard({ board, now, onTaskCreated }: { board: ProjectBoard; 
   const [scope, setScope] = useState<"all" | "mine">("all");
   const [person, setPerson] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const addButton=useRef<HTMLButtonElement>(null);
+  const closeNew=()=>{setAdding(false);requestAnimationFrame(()=>addButton.current?.focus());};
+  const [layout,setLayout]=useState<"list"|"board">(()=>{try{return localStorage.getItem(`tandem-layout:${board.projectId}`)==="board"?"board":"list";}catch{return "list";}});
+  const changeLayout=(next:"list"|"board")=>{setLayout(next);try{localStorage.setItem(`tandem-layout:${board.projectId}`,next);}catch{/* session-only when storage is unavailable */}};
   const members = [...board.members].sort((a, b) => Number(b.login === board.me) - Number(a.login === board.me));
   const mine = board.waiting
     .filter((w) => w.to === board.me && (!person || person === board.me || w.from === person))
@@ -322,7 +318,7 @@ export function TaskBoard({ board, now, onTaskCreated }: { board: ProjectBoard; 
   const picked = person ? members.find((m) => m.login === person) : undefined;
 
   return (
-    <div className="tb">
+    <div className={`tb tb-layout-${layout}`}>
       <div className="tb-bar">
         {person ? (
           <p className="tb-filter-note">
@@ -334,30 +330,27 @@ export function TaskBoard({ board, now, onTaskCreated }: { board: ProjectBoard; 
         ) : (
           <div className="tb-pills" role="group" aria-label="範圍">
             <button type="button" className={scope === "all" ? "is-on" : undefined} aria-pressed={scope === "all"} onClick={() => setScope("all")}>
-              全部
+              所有任務
             </button>
             <button type="button" className={scope === "mine" ? "is-on" : undefined} aria-pressed={scope === "mine"} onClick={() => setScope("mine")}>
-              我的
+              我負責
             </button>
           </div>
         )}
-        <button type="button" className="tb-new-btn" aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
-          ＋ 新任務
+        <button ref={addButton} type="button" className="tb-new-btn" aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
+          新增任務
         </button>
-        <div className="tb-faces" role="group" aria-label="成員（點一下只看這個人）">
-          {members.map((m) => (
-            <Face key={m.login} m={m} me={board.me} now={now} selected={person === m.login} onPick={() => setPerson(person === m.login ? null : m.login)} />
-          ))}
-        </div>
+        <label className="tb-member-filter"><span className="sr-only">依成員篩選</span><select className="input" value={person??""} onChange={e=>setPerson(e.target.value||null)}><option value="">所有成員</option>{members.map(m=><option key={m.login} value={m.login}>@{m.login}</option>)}</select></label>
+        <div className="tb-layout-switch" role="group" aria-label="任務檢視"><button type="button" className="btn btn-small" aria-pressed={layout==="list"} onClick={()=>changeLayout("list")}>清單</button><button type="button" className="btn btn-small" aria-pressed={layout==="board"} onClick={()=>changeLayout("board")}>看板</button></div>
       </div>
 
       {adding && (
         <NewTask
           board={board}
           members={members}
-          onCancel={() => setAdding(false)}
+          onCancel={closeNew}
           onDone={() => {
-            setAdding(false);
+            closeNew();
             void onTaskCreated?.();
           }}
         />
@@ -371,7 +364,7 @@ export function TaskBoard({ board, now, onTaskCreated }: { board: ProjectBoard; 
 
       {mine.length > 0 && <WaitGroup items={mine} now={now} />}
 
-      {GROUPS.map((g) => (
+      <div className="tb-groups">{GROUPS.map((g) => (
         <Group
           key={g.key}
           k={g.key}
@@ -381,7 +374,7 @@ export function TaskBoard({ board, now, onTaskCreated }: { board: ProjectBoard; 
           items={items.filter((it) => it.group === g.key)}
           empty={g.key === "ready" ? "沒有開著的 PR" : g.key === "working" ? "沒有進行中的草稿 PR 或任務" : "最近兩週沒有完成的項目"}
         />
-      ))}
+      ))}</div>
     </div>
   );
 }

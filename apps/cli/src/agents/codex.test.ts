@@ -61,6 +61,25 @@ const send = (f: Fake, m: Msg) => f.stdout.write(`${JSON.stringify(m)}\n`);
 const flush = () => new Promise((r) => setTimeout(r, 20));
 
 describe("codex adapter", () => {
+  it("uses an ephemeral, tool-restricted answering session and fails closed on inherited servers",async()=>{
+    let inherited=false;
+    server=(f,m)=>{
+      if(m.method==="initialize")send(f,{id:m.id,result:{}});
+      if(m.method==="config/read")send(f,{id:m.id,result:{config:{features:{shell_tool:false,apps:false,plugins:false,hooks:false,multi_agent:false},web_search:"disabled",mcp_servers:inherited?{tandem:{},other:{}}:{tandem:{}}}}});
+      if(m.method==="thread/start")send(f,{id:m.id,result:{thread:{id:"answer"}}});
+      if(m.method==="turn/start")send(f,{id:m.id,result:{turn:{id:"a"}}});
+    };
+    const events:AdapterEvent[]=[];
+    const start=()=>codexAdapter.start({chatId:"answer",cwd:"/empty",model:"model",resumeId:"private-main",mcp:{command:"t",args:[],env:{TANDEM_READ_ONLY:"1"}},answerOnly:{instructions:"answer only"},requestApproval:async()=>{throw new Error("must never ask");},onEvent:e=>events.push(e)});
+    const a=start();await a.send("question");
+    const f=fakes.at(-1)!;
+    expect(f.args).toContain("features.shell_tool=false");
+    expect(f.got.find(m=>m.method==="thread/start")?.params).toMatchObject({sandbox:"read-only",approvalPolicy:"never",ephemeral:true,environments:[],selectedCapabilityRoots:[],baseInstructions:"answer only",serviceTier:"default"});
+    expect(f.got.some(m=>m.method==="thread/resume")).toBe(false);await a.close();
+    inherited=true;const b=start();await b.send("question");
+    expect(fakes.at(-1)!.got.some(m=>m.method==="turn/start")).toBe(false);
+    expect(events.some(e=>e.type==="error")).toBe(true);await b.close();
+  });
   it("does not start a delayed first turn after stop was requested during connection", async () => {
     server = (f, m) => {
       if (m.method === "initialize") setTimeout(() => send(f, { id: m.id, result: {} }), 10);

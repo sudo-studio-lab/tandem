@@ -15,6 +15,7 @@ import {
   type EtagCache,
   type LocalState,
 } from "@tandem/core";
+import {TandemError} from "@tandem/contracts";
 
 export type GitHubClient = ReturnType<typeof createGitHubClient>;
 
@@ -33,6 +34,7 @@ export type CliState = LocalState & {
       decisionsCheckedAt?: string;
       /** Shared-context path -> version this session already knows (see live-context.ts). */
       contextSeen?: Record<string, string>;
+      agentMessageSeen?: string[];
     }
   >;
 };
@@ -60,6 +62,13 @@ export interface Context {
   gitEnv: Record<string, string>;
   /** Records live on the remote default branch. */
   store: DataStore;
+}
+
+/** A different repo is not necessarily private. GitHub must confirm visibility before sharing. */
+export async function requirePrivateDataRepo(ctx:Context):Promise<void>{
+  if(!ctx.dataRepo.separate||!ctx.dataGh)throw new TandemError("validation","請先設定獨立的私人團隊資料 repo");
+  const info=await ctx.dataGh.getRepo();
+  if(!info.private)throw new TandemError("validation","團隊資料 repo 目前是公開的，已停止新的訊息與對話分享。請由管理者確認資料存放位置。");
 }
 
 /** Commit author for records: the repo's git identity, else the GitHub noreply address. */

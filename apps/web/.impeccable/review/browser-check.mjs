@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-const { chromium } = await import(process.env.TANDEM_PLAYWRIGHT_MODULE || "file:///C:/Users/User/AppData/Local/npm-cache/_npx/e41f203b7505f1fb/node_modules/playwright/index.mjs");
-const browser = await chromium.launch({ headless: true, executablePath: process.env.TANDEM_CHROMIUM || "C:/Users/User/AppData/Local/ms-playwright/chromium-1234/chrome-win64/chrome.exe" });
+const { chromium } = await import(process.env.TANDEM_PLAYWRIGHT_MODULE || "playwright");
+const browser = await chromium.launch({ headless: true, ...(process.env.TANDEM_CHROMIUM ? { executablePath: process.env.TANDEM_CHROMIUM } : {}) });
 const context = await browser.newContext({ viewport: { width: 1536, height: 1024 }, colorScheme: "light" });
 const page = await context.newPage();
 const errors = [];

@@ -37,6 +37,8 @@ export interface StartOptions {
   /** "" = agent default. */
   model: string;
   reasoningEffort?: string;
+  /** Ephemeral answering session: no filesystem, commands, approvals, or write tools. */
+  answerOnly?: { instructions: string };
   /** Continue this conversation (Claude session_id / Codex thread id). */
   resumeId?: string;
   mcp: McpLaunch;

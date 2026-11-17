@@ -53,6 +53,14 @@ const line = (c: FakeChild, j: unknown) => c.stdout.write(`${JSON.stringify(j)}\
 const flush = () => new Promise((r) => setTimeout(r, 10));
 
 describe("claude adapter", () => {
+  it("starts answering mode without builtins, hooks, memories, persistence or an approval bridge",async()=>{
+    const session=claudeAdapter.start({chatId:"answer",cwd:home,model:"",resumeId:"private-main",mcp:{command:"node",args:[],env:{TANDEM_READ_ONLY:"1"}},answerOnly:{instructions:"only answer"},approveBridge:{url:"http://127.0.0.1:9",token:"not-forwarded"},requestApproval:async()=>"deny",onEvent:()=>{}});
+    await session.send("question");const args=children[0]!.args;
+    for(const option of ["--restricted","--strict-mcp-config","--no-session-persistence"])expect(args).toContain(option);
+    expect(args).not.toContain("--bare");
+    expect(args[args.indexOf("--tools")+1]).toBe("");expect(args).not.toContain("--resume");expect(args).not.toContain("--permission-prompt-tool");
+    const config=JSON.parse(await readFile(args[args.indexOf("--mcp-config")+1]!,"utf8"));expect(config.mcpServers.tandem.env.TANDEM_APPROVE_TOKEN).toBeUndefined();await session.close();
+  });
   it("sends pasted image bytes as a multimodal content block", async () => {
     const session = claudeAdapter.start({ chatId: "image", cwd: home, model: "sonnet", mcp: { command: "node", args: [], env: {} }, requestApproval: async () => "deny", onEvent: () => {} });
     await session.send("看這張圖", [{ id: "i", name: "screen.png", dataUrl: "data:image/png;base64,aGVsbG8=" }]);

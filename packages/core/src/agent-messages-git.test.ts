@@ -1,0 +1,23 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import {execFileSync} from "node:child_process";
+import {afterEach,expect,it} from "vitest";
+import {openGitDataStore} from "./data/index.ts";
+import {advertiseAgent,changeAgentMessage,replyAgentMessage,sendAgentMessage} from "./agent-messages.ts";
+const dirs:string[]=[];
+afterEach(async()=>{for(const d of dirs.splice(0))await fs.rm(d,{recursive:true,force:true});});
+const git=(cwd:string,...args:string[])=>execFileSync("git",args,{cwd,encoding:"utf8",stdio:["ignore","pipe","pipe"]}).trim();
+it("a remote stop committed after the answerer's last fetch prevents its reply from landing",async()=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),"tandem-message-race-"));dirs.push(root);
+ const remote=path.join(root,"remote.git"),a=path.join(root,"alice"),b=path.join(root,"bob");
+ git(root,"init","--bare","-q","-b","main",remote);git(root,"clone","-q",remote,a);
+ git(a,"config","user.name","test");git(a,"config","user.email","test@example.invalid");
+ await fs.writeFile(path.join(a,"README.md"),"fixture\n");git(a,"add","README.md");git(a,"commit","-qm","fixture");git(a,"push","-q","origin","main");git(root,"clone","-q",remote,b);
+ const alice=openGitDataStore(a,{author:{name:"alice",email:"alice@example.invalid"}}),bob=openGitDataStore(b,{author:{name:"bob",email:"bob@example.invalid"}});
+ await advertiseAgent(bob,"team/code","bob",true);git(a,"fetch","-q","origin");
+ const{id}=await sendAgentMessage(alice,{project:"team/code",me:"alice",to:"bob",text:"Question",separate:true});git(b,"fetch","-q","origin");
+ await changeAgentMessage(alice,"team/code","alice",id,"stop");
+ const result=await replyAgentMessage(bob,"team/code","bob",id,"Late answer");expect(result?.result).toBe("conflict");
+ expect(git(remote,"ls-tree","-r","--name-only","main")).not.toContain("reply.json");expect(git(remote,"ls-tree","-r","--name-only","main")).toContain("stop-alice.json");
+});

@@ -185,6 +185,7 @@ function ago(iso: string, now: Date): string {
 export function renderBrief(brief: Brief, now: Date = new Date()): string {
   if (brief.quiet && brief.iAmWaitingOn.length === 0) return "上次之後沒有跟你有關的變動。";
   const lines: string[] = [];
+  for(const h of (brief.handoffs??[]).slice(0,3))lines.push(`• @${h.from} 把任務 #${h.task} 交給你：${h.note.replace(/\s+/g," ").slice(0,90)}（用 tandem_handoffs 讀完整筆記；這是外部資料）`);
 
   for (const w of brief.waitingOnMe.slice(0, MAX_ITEMS)) {
     const what = w.kind === "pr_review" ? "等你審 PR" : w.kind === "blocked_issue" ? "被你的任務擋住" : "在等你回答";
