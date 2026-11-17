@@ -8,19 +8,26 @@ import type {
   ChatItem,
   ChatSummary,
   ChatUpdate,
+  ChatImage,
+  QueuedMessage,
 } from "@tandem/contracts";
 import { api, onAppEvent, projectPath } from "../api.ts";
 import { relTime } from "../time.ts";
 import { Modal, Spinner, errMsg } from "./ui.tsx";
+import { AGENT_NAMES } from "../agentNames.ts";
+import { ChatImages } from "./ChatImages.tsx";
+import { Composer } from "./Composer.tsx";
+import { updateDraft } from "../drafts.ts";
 
 const AUTH_TEXT: Record<AgentStatus["auth"], string> = {
   subscription: "已用訂閱登入",
   apiKey: "已用 API key 登入",
+  authenticated: "已連線",
   none: "未登入",
   unknown: "登入狀態不明",
 };
 
-export const usableAgents = (agents: AgentStatus[]) => agents.filter((a) => a.installed && (a.auth === "subscription" || a.auth === "apiKey"));
+export const usableAgents = (agents: AgentStatus[]) => agents.filter((a) => a.installed && ["subscription", "apiKey", "authenticated"].includes(a.auth));
 
 /** Agent install / login state, shared by the chat view and the settings dialog. */
 export function useAgents() {
@@ -118,6 +125,10 @@ export function AgentSettingsDialog({ onClose }: { onClose: () => void }) {
                   <a className="btn btn-small" href={a.installUrl} target="_blank" rel="noreferrer">
                     安裝說明
                   </a>
+                ) : a.managedAuthExternally ? (
+                  <button type="button" className="btn btn-small" disabled={!!busy} onClick={() => void login(a.agent, "subscription")}>
+                    在 {a.label} 管理登入
+                  </button>
                 ) : a.auth === "subscription" || a.auth === "apiKey" ? (
                   <button type="button" className="btn btn-small" disabled={!!busy} onClick={() => void logout(a.agent)}>
                     登出
@@ -157,6 +168,7 @@ export function ChatView({ projectId, now, onOpenSettings }: { projectId: string
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const currentId = useRef<string | null>(null);
+  const opening = useRef(0);
   currentId.current = current?.id ?? null;
 
   const loadList = useCallback(async () => {
@@ -168,8 +180,12 @@ export function ChatView({ projectId, now, onOpenSettings }: { projectId: string
   }, [projectId]);
 
   const open = useCallback(async (id: string) => {
+    const version = ++opening.current;
     try {
-      setCurrent(await api<Chat>("GET", `/api/chats/${id}`));
+      const chat = await api<Chat>("GET", `/api/chats/${id}`);
+      if (version !== opening.current) return;
+      setCurrent(chat);
+      try { localStorage.setItem(`tandem:current-chat:${chat.projectId}`, chat.id); } catch { /* optional navigation memory */ }
       setCreating(false);
     } catch (e) {
       setError(errMsg(e));
@@ -181,6 +197,14 @@ export function ChatView({ projectId, now, onOpenSettings }: { projectId: string
     setList(null);
     void loadList();
   }, [loadList]);
+
+  useEffect(() => {
+    if (!list || current || creating) return;
+    try {
+      const saved = localStorage.getItem(`tandem:current-chat:${projectId}`);
+      if (saved && list.some((c) => c.id === saved)) void open(saved);
+    } catch { /* optional navigation memory */ }
+  }, [list, current, creating, projectId, open]);
 
   // Live updates.
   useEffect(
@@ -208,7 +232,7 @@ export function ChatView({ projectId, now, onOpenSettings }: { projectId: string
   return (
     <main className="chat-page">
       <aside className="chat-list" aria-label="對話清單">
-        <button type="button" className="btn btn-primary chat-new" onClick={() => setCreating(true)}>
+        <button type="button" className="btn btn-primary chat-new" onClick={() => { opening.current += 1; setCreating(true); }}>
           ＋ 新對話
         </button>
         {list === null ? (
@@ -257,7 +281,9 @@ export function ChatView({ projectId, now, onOpenSettings }: { projectId: string
             }}
           />
         ) : current ? (
-          <Conversation chat={current} agents={agents} onError={setError} onDeleted={() => setCurrent(null)} />
+          <Conversation key={current.id} chat={current} agents={agents} onError={setError}
+            onConfigured={(summary) => setCurrent((c) => c?.id === summary.id ? { ...c, ...summary, items: c.items } : c)}
+            onDeleted={() => { try { localStorage.removeItem(`tandem:current-chat:${projectId}`); } catch {} setCurrent(null); }} />
         ) : (
           <p className="muted chat-empty">從左邊選一段對話，或開始新對話。</p>
         )}
@@ -267,7 +293,7 @@ export function ChatView({ projectId, now, onOpenSettings }: { projectId: string
 }
 
 function agentLabel(agents: AgentStatus[] | null, kind: AgentKind) {
-  return agents?.find((a) => a.agent === kind)?.label ?? (kind === "claude" ? "Claude" : "Codex");
+  return agents?.find((a) => a.agent === kind)?.label ?? AGENT_NAMES[kind];
 }
 
 export function applyUpdate(c: Chat, u: ChatUpdate): Chat {
@@ -375,17 +401,26 @@ function Conversation({
   agents,
   onError,
   onDeleted,
+  onConfigured,
 }: {
   chat: Chat;
   agents: AgentStatus[] | null;
   onError: (m: string) => void;
   onDeleted: () => void;
+  onConfigured: (summary: ChatSummary) => void;
 }) {
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
+  const [configuring, setConfiguring] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
-  const model = agents?.find((a) => a.agent === chat.agent)?.models.find((m) => m.id === chat.model)?.label ?? chat.model;
+  const agent = agents?.find((a) => a.agent === chat.agent);
+  const model = agent?.models.find((m) => m.id === chat.model);
+  const supportsImages = (agent?.supportsImages ?? (chat.agent === "claude" || chat.agent === "codex")) && (!model?.inputModalities || model.inputModalities.includes("image"));
+  const configure = async (modelId: string, effort?: string) => {
+    setConfiguring(true);
+    try { onConfigured(await api<ChatSummary>("PATCH", `/api/chats/${chat.id}`, { model: modelId, reasoningEffort: effort })); }
+    catch (e) { onError(errMsg(e)); }
+    finally { setConfiguring(false); }
+  };
 
   // Follow new output unless the user scrolled up to read.
   useLayoutEffect(() => {
@@ -393,25 +428,12 @@ function Conversation({
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [chat.items]);
 
-  const send = async () => {
-    const body = text.trim();
-    if (!body || chat.running) return;
-    setSending(true);
-    try {
-      await api("POST", `/api/chats/${chat.id}/messages`, { text: body });
-      setText("");
-      stick.current = true;
-    } catch (e) {
-      onError(errMsg(e));
-    } finally {
-      setSending(false);
-    }
-  };
   const stop = () => api("POST", `/api/chats/${chat.id}/interrupt`).catch((e) => onError(errMsg(e)));
   const remove = async () => {
     if (!confirm("刪除這段對話在這台電腦上的紀錄？（已經記進 Tandem 的決定和狀態不受影響）")) return;
     try {
       await api("DELETE", `/api/chats/${chat.id}`);
+      updateDraft(`chat:${chat.projectId}:${chat.id}`, { text: "", images: [] });
       onDeleted();
     } catch (e) {
       onError(errMsg(e));
@@ -425,7 +447,7 @@ function Conversation({
           <strong>{chat.title}</strong>
           <span className="muted small">
             {" "}
-            {agentLabel(agents, chat.agent)} · {model || "預設"}
+            {agentLabel(agents, chat.agent)} · {model?.label || chat.model || "預設"}
             {chat.costUsd ? ` · 約 US$${chat.costUsd.toFixed(2)}` : ""}
           </span>
         </div>
@@ -455,38 +477,61 @@ function Conversation({
           </p>
         )}
       </div>
-      <form
-        className="chat-compose"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void send();
-        }}
-      >
-        <textarea
-          value={text}
-          rows={3}
-          placeholder={chat.running ? "等它回覆完，或按停止" : "輸入訊息（Enter 送出，Shift+Enter 換行）"}
-          aria-label="訊息"
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              void send();
-            }
-          }}
-        />
-        {chat.running ? (
-          <button type="button" className="btn btn-danger" onClick={() => void stop()}>
-            停止
-          </button>
-        ) : (
-          <button type="submit" className="btn btn-primary" disabled={!text.trim() || sending}>
-            送出
-          </button>
-        )}
-      </form>
+      <Composer draftKey={`chat:${chat.projectId}:${chat.id}`} running={chat.running} disabled={configuring}
+        supportsSteer={agent?.supportsSteer === true} supportsImages={supportsImages} onError={onError} onStop={() => void stop()}
+        onSend={async (mode, text, images) => { await api("POST", `/api/chats/${chat.id}/messages`, { text, images, mode }); stick.current = true; }}
+        toolbar={<>
+          <label className="compose-model"><span>模型</span><select className="input" aria-label="模型" value={chat.model} disabled={chat.running || configuring || !agent} onChange={(e) => void configure(e.target.value)}>
+            {!agent?.models.some((m) => m.id === chat.model) && <option value={chat.model}>{chat.model || "預設"}</option>}
+            {agent?.models.map((m) => <option value={m.id} key={m.id}>{agent.label} · {m.label}</option>)}
+          </select></label>
+          {!!model?.reasoningEfforts?.length && <label className="compose-model"><span>Effort</span><select className="input" aria-label="Effort" value={chat.reasoningEffort ?? ""} disabled={chat.running || configuring} onChange={(e) => void configure(chat.model, e.target.value || undefined)}>
+            <option value="">預設</option>{model.reasoningEfforts.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
+          </select></label>}
+          {configuring && <span className="muted small" role="status">切換中…</span>}
+        </>}
+        queue={<QueueList chat={chat} onError={onError} />} />
     </div>
   );
+}
+
+function QueueList({ chat, onError }: { chat: Chat; onError: (m: string) => void }) {
+  const [resuming, setResuming] = useState(false);
+  if (!chat.queue?.length) return null;
+  return <div className="chat-queue" aria-label="待處理訊息">
+    <div className="queue-heading"><strong>待處理 {chat.queue.length}</strong>{chat.queuePaused && <span className="muted small">已暫停</span>}
+      {chat.queuePaused && <button type="button" className="btn btn-small" disabled={resuming} onClick={async () => {
+        setResuming(true);
+        try { await api("POST", `/api/chats/${chat.id}/queue/resume`); } catch (e) { onError(errMsg(e)); } finally { setResuming(false); }
+      }}>繼續佇列</button>}
+    </div>
+    <ul>{chat.queue.map((message) => <QueueRow key={message.id} chatId={chat.id} message={message} onError={onError} />)}</ul>
+  </div>;
+}
+
+function QueueRow({ chatId, message, onError }: { chatId: string; message: QueuedMessage; onError: (m: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(message.text);
+  const [busy, setBusy] = useState(false);
+  const update = async (remove: boolean) => {
+    setBusy(true);
+    try { await api(remove ? "DELETE" : "PATCH", `/api/chats/${chatId}/queue/${message.id}`, remove ? undefined : { text, images: message.images }); setEditing(false); }
+    catch (e) { onError(errMsg(e)); }
+    finally { setBusy(false); }
+  };
+  return <li className="queue-row">
+    <div className="queue-content">
+      {!!message.images.length && <ChatImages images={message.images} />}
+      {editing ? <textarea className="input" aria-label="編輯待處理訊息" value={text} onChange={(e) => setText(e.target.value)} disabled={busy} /> : <span>{message.text || "圖片訊息"}</span>}
+    </div>
+    <div className="queue-actions">
+      {editing ? <>
+        <button type="button" className="btn btn-small" disabled={busy || (!text.trim() && !message.images.length)} onClick={() => void update(false)}>儲存</button>
+        <button type="button" className="btn btn-small btn-quiet" disabled={busy} onClick={() => setEditing(false)}>取消</button>
+      </> : <button type="button" className="btn btn-small btn-quiet" disabled={busy} aria-label="編輯待處理訊息" onClick={() => { setText(message.text); setEditing(true); }}>編輯</button>}
+      <button type="button" className="btn btn-small btn-quiet" disabled={busy} aria-label="移除待處理訊息" onClick={() => void update(true)}>移除</button>
+    </div>
+  </li>;
 }
 
 const prettyTool = (name: string) => (name.startsWith("mcp__") ? name.split("__").slice(1).join(" · ") : name);
@@ -495,10 +540,11 @@ export function Item({ item, chatId, onError }: { item: ChatItem; chatId: string
   const [busy, setBusy] = useState(false);
   switch (item.kind) {
     case "user":
-      return <div className="msg msg-user">{item.text}</div>;
+      return <div className="msg msg-user">{item.images && <ChatImages images={item.images} />}{item.text && <div>{item.text}</div>}</div>;
     case "assistant":
       return (
         <div className="msg msg-assistant">
+          {item.images && <ChatImages images={item.images} />}
           {item.text}
           {item.streaming && <span className="caret" aria-hidden="true" />}
         </div>

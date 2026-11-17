@@ -19,7 +19,7 @@ export async function enableMock(): Promise<void> {
 export const isMock = () => mockServer !== null;
 
 export async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
-  if (mockServer) return (await mockServer.handle(method, path, body)) as T;
+  if (mockServer) return structuredClone(await mockServer.handle(method, path, body)) as T;
   let res: Response;
   try {
     res = await fetch(path, {

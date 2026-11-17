@@ -1,0 +1,18 @@
+{
+  "evidence": "MOCK browser acceptance, synthesized clipboard event; not real model or physical mobile evidence",
+  "checks": [
+    "five providers are selectable in the explicitly labelled mock",
+    "clipboard image is previewed and draft persistence completes",
+    "text, attachment and current conversation survive leaving the page",
+    "drafts are isolated by conversation",
+    "draft and image survive a full browser reload",
+    "sent image appears in the transcript and opens at full size",
+    "queued message can be edited before dispatch",
+    "steer and queue use separate paths",
+    "stop pauses queued work and resume dispatches it explicitly",
+    "queued message can be removed",
+    "desktop and 390px mobile layouts captured without horizontal overflow",
+    "failed sends preserve the original draft"
+  ],
+  "pageErrors": []
+}

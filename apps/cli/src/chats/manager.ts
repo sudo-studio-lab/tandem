@@ -8,12 +8,14 @@ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   TandemError,
+  validateChatImages,
   type AgentKind,
   type ApprovalDecision,
   type Chat,
   type ChatItem,
   type ChatSummary,
   type ChatUpdate,
+  type ChatImage,
 } from "@tandem/contracts";
 import { appStateDir } from "@tandem/core";
 import type { AdapterEvent, AgentAdapter, AgentSession, ApprovalRequest, McpLaunch } from "../agents/types.ts";
@@ -48,6 +50,12 @@ export class ChatManager {
   private chats = new Map<string, Chat>();
   private loaded: Promise<void> | null = null;
   private live = new Map<string, Live>();
+  private configuring = new Set<string>();
+  private generations = new Map<string, number>();
+  private queueCwds = new Map<string, string>();
+  private draining = new Set<string>();
+  private failedTurns = new Set<string>();
+  private closing = false;
   private approvals = new Map<string, PendingApproval>();
   /** Every approval's outcome, kept so a bridge call that re-asks after a long wait still gets it. */
   private decisions = new Map<string, Promise<ApprovalDecision>>();
@@ -71,6 +79,7 @@ export class ChatManager {
         try {
           const c = JSON.parse(await readFile(path.join(this.dir, f), "utf8")) as Chat;
           c.running = false; // nothing survives a restart
+          if (c.queue?.length) c.queuePaused = true; // never restart work without a user action
           for (const it of c.items) {
             if (it.kind === "assistant") it.streaming = false;
             if (it.kind === "tool" && it.status === "running") it.status = "error";
@@ -149,14 +158,104 @@ export class ChatManager {
     return summaryOf(chat);
   }
 
-  async send(chatId: string, text: string, cwd: string): Promise<void> {
+  async configure(chatId: string, model: string, reasoningEffort?: string): Promise<ChatSummary> {
+    const chat = await this.need(chatId);
+    if (chat.running || this.configuring.has(chatId) || this.draining.has(chatId)) throw new TandemError("usage", "請等目前的工作完成，再切換模型");
+    if (typeof model !== "string" || model.length > 200 || (reasoningEffort !== undefined && !/^[a-z]{1,20}$/.test(reasoningEffort))) throw new TandemError("usage", "模型設定不正確");
+    this.configuring.add(chatId);
+    try {
+      const live = this.live.get(chatId);
+      this.live.delete(chatId);
+      this.generations.set(chatId, (this.generations.get(chatId) ?? 0) + 1);
+      await live?.session.close();
+      chat.model = model;
+      chat.reasoningEffort = reasoningEffort;
+      this.touch(chat);
+      return summaryOf(chat);
+    } finally {
+      this.configuring.delete(chatId);
+    }
+  }
+
+  async send(chatId: string, text: string, cwd: string, attachments?: unknown, fromQueue = false): Promise<void> {
     const chat = await this.need(chatId);
     const body = text.trim();
-    if (!body) throw new TandemError("usage", "訊息是空的");
+    const images = validateChatImages(attachments);
+    if (!body && !images.length) throw new TandemError("usage", "訊息是空的");
+    if (this.configuring.has(chatId)) throw new TandemError("usage", "正在切換模型，請稍候");
+    if (!fromQueue && this.draining.has(chatId)) throw new TandemError("usage", "正在送出待處理訊息，請排入下一則");
     if (chat.running) throw new TandemError("usage", "agent 還在回覆，請等它做完或按停止");
-    if (chat.items.length === 0 || chat.title === "新對話") chat.title = body.replace(/\s+/g, " ").slice(0, 40);
-    this.upsert(chat, { kind: "user", id: randomUUID(), at: now(), text: body });
-    await this.sendToAgent(chat.id, body, cwd);
+    if (chat.items.length === 0 || chat.title === "新對話") chat.title = body.replace(/\s+/g, " ").slice(0, 40) || images[0]!.name || "圖片";
+    this.upsert(chat, { kind: "user", id: randomUUID(), at: now(), text: body, ...(images.length ? { images } : {}) });
+    await this.sendToAgent(chat.id, body, cwd, images);
+  }
+
+  async steer(chatId: string, text: string, attachments?: unknown): Promise<void> {
+    const chat = await this.need(chatId);
+    const images = validateChatImages(attachments);
+    const body = text.trim();
+    if (!body && !images.length) throw new TandemError("usage", "訊息是空的");
+    const live = this.live.get(chatId);
+    if (!chat.running || !live?.session.steer) throw new TandemError("usage", "這個 provider 目前無法即時補充，請排入下一則");
+    await live.session.steer(body, images);
+    this.upsert(chat, { kind: "user", id: randomUUID(), at: now(), text: body, ...(images.length ? { images } : {}) });
+    this.touch(chat);
+  }
+
+  async enqueue(chatId: string, text: string, cwd: string, attachments?: unknown): Promise<void> {
+    const chat = await this.need(chatId);
+    const images = validateChatImages(attachments);
+    const body = text.trim();
+    if (!body && !images.length) throw new TandemError("usage", "訊息是空的");
+    if ((chat.queue?.length ?? 0) >= 20) throw new TandemError("usage", "待處理訊息已達 20 則，請先處理或移除");
+    (chat.queue ??= []).push({ id: randomUUID(), text: body, images, at: now() });
+    this.queueCwds.set(chatId, cwd);
+    this.touch(chat);
+    void this.drain(chatId);
+  }
+
+  async updateQueued(chatId: string, id: string, update?: { text: string; images?: unknown }): Promise<void> {
+    const chat = await this.need(chatId);
+    const queued = chat.queue?.find((q) => q.id === id);
+    if (!queued) throw new TandemError("usage", "這則訊息已送出或移除");
+    if (update) {
+      const images = validateChatImages(update.images);
+      if (!update.text.trim() && !images.length) throw new TandemError("usage", "訊息是空的");
+      queued.text = update.text.trim(); queued.images = images;
+    } else chat.queue = chat.queue!.filter((q) => q.id !== id);
+    this.touch(chat);
+  }
+
+  async resumeQueue(chatId: string, cwd: string): Promise<void> {
+    const chat = await this.need(chatId);
+    chat.queuePaused = false;
+    this.queueCwds.set(chatId, cwd);
+    this.touch(chat);
+    void this.drain(chatId);
+  }
+
+  private async drain(chatId: string): Promise<void> {
+    if (this.closing || this.draining.has(chatId)) return;
+    this.draining.add(chatId);
+    try {
+      const chat = await this.need(chatId);
+      const cwd = this.queueCwds.get(chatId);
+      if (!cwd || chat.running || chat.queuePaused || this.configuring.has(chatId)) return;
+      const next = chat.queue?.shift();
+      if (!next) return;
+      this.touch(chat);
+      try { await this.send(chatId, next.text, cwd, next.images, true); }
+      catch (e) {
+        chat.queue!.unshift(next); chat.queuePaused = true;
+        this.upsert(chat, { kind: "error", id: randomUUID(), at: now(), message: "待處理訊息未能送出，已暫停佇列", detail: (e as Error).message });
+        this.touch(chat);
+      }
+    } catch { /* A chat may have been deleted while the drain was scheduled. */ }
+    finally {
+      this.draining.delete(chatId);
+      const chat = this.chats.get(chatId);
+      if (chat && !chat.running && !chat.queuePaused && chat.queue?.length && !this.closing && this.queueCwds.has(chatId) && !this.configuring.has(chatId)) queueMicrotask(() => void this.drain(chatId));
+    }
   }
 
   /** The room chat that answers discussion `number`, if this computer hosts it. */
@@ -173,16 +272,19 @@ export class ChatManager {
   }
 
   /** Send text to the agent without adding a user item (rooms add their own, with the author). */
-  async sendToAgent(chatId: string, body: string, cwd: string): Promise<void> {
+  async sendToAgent(chatId: string, body: string, cwd: string, images: ChatImage[] = []): Promise<void> {
     const chat = await this.need(chatId);
     if (chat.running) throw new TandemError("usage", "agent 還在回覆，請等它做完或按停止");
+    if (this.configuring.has(chatId)) throw new TandemError("usage", "正在切換模型，請稍候");
     chat.running = true;
+    this.failedTurns.delete(chatId);
     this.turnStart.set(chat.id, chat.items.length);
     this.touch(chat);
     try {
-      await this.session(chat, cwd).send(body);
+      await this.session(chat, cwd).send(body, images);
     } catch (e) {
       chat.running = false;
+      chat.queuePaused = true;
       this.upsert(chat, { kind: "error", id: randomUUID(), at: now(), message: "沒辦法啟動 agent", detail: (e as Error).message });
       this.touch(chat);
     }
@@ -190,6 +292,8 @@ export class ChatManager {
 
   async interrupt(chatId: string): Promise<void> {
     const chat = await this.need(chatId);
+    chat.queuePaused = true;
+    this.touch(chat);
     const wasRunning = chat.running;
     for (const [id, a] of this.approvals) if (a.chatId === chatId) this.settle(id, "deny", "已停止");
     const live = this.live.get(chatId);
@@ -227,6 +331,7 @@ export class ChatManager {
   }
 
   async closeAll(): Promise<void> {
+    this.closing = true;
     for (const l of this.live.values()) await l.session.close().catch(() => undefined);
     this.live.clear();
     await this.flush();
@@ -275,15 +380,20 @@ export class ChatManager {
     const existing = this.live.get(chat.id);
     if (existing && existing.cwd === cwd) return existing.session;
     const adapter = this.opts.adapters[chat.agent];
+    const generation = (this.generations.get(chat.id) ?? 0) + 1;
+    this.generations.set(chat.id, generation);
     const session = adapter.start({
       chatId: chat.id,
       cwd,
       model: chat.model,
+      reasoningEffort: chat.reasoningEffort,
       resumeId: chat.agentSessionId,
       mcp: this.opts.mcp(),
       approveBridge: chat.agent === "claude" ? this.opts.approveBridge() : undefined,
       requestApproval: async (req) => (await this.requestApproval(chat.id, req)).decision,
-      onEvent: (e) => this.onEvent(chat.id, e),
+      onEvent: (e) => {
+        if (this.generations.get(chat.id) === generation) this.onEvent(chat.id, e);
+      },
     });
     this.live.set(chat.id, { session, cwd });
     return session;
@@ -318,7 +428,18 @@ export class ChatManager {
         const id = `a:${e.id}`;
         const it = chat.items.find((x) => x.id === id);
         if (!e.text.trim() && !it) return;
-        this.upsert(chat, { kind: "assistant", id, at: it?.at ?? now(), text: e.text, streaming: false });
+        this.upsert(chat, { kind: "assistant", id, at: it?.at ?? now(), text: e.text, ...(it?.kind === "assistant" && it.images ? { images: it.images } : {}), streaming: false });
+        return;
+      }
+      case "image": {
+        const id = `a:${e.id}`;
+        const previous = chat.items.find((item) => item.id === id);
+        try {
+          const images = validateChatImages([...(previous?.kind === "assistant" ? previous.images ?? [] : []), e.image]);
+          this.upsert(chat, { kind: "assistant", id, at: previous?.at ?? now(), text: previous?.kind === "assistant" ? previous.text : "", images, streaming: true });
+        } catch {
+          this.upsert(chat, { kind: "notice", id: randomUUID(), at: now(), text: "Provider 回傳的圖片格式或大小無法直接顯示。" });
+        }
         return;
       }
       case "tool": {
@@ -339,6 +460,7 @@ export class ChatManager {
       }
       case "turnDone": {
         chat.running = false;
+        if (this.failedTurns.has(chatId)) chat.queuePaused = true;
         if (e.costUsd !== undefined) chat.costUsd = (chat.costUsd ?? 0) + e.costUsd;
         this.finishStreaming(chat);
         this.touch(chat);
@@ -346,9 +468,11 @@ export class ChatManager {
         this.turnStart.delete(chatId);
         const texts = chat.items.slice(from).flatMap((it) => (it.kind === "assistant" && it.text.trim() ? [it.text] : []));
         this.opts.onTurnDone?.(chat, texts);
+        void this.drain(chatId);
         return;
       }
       case "error":
+        this.failedTurns.add(chatId);
         this.upsert(chat, { kind: "error", id: randomUUID(), at: now(), message: e.message, detail: e.detail });
         return;
       case "exit":
@@ -356,6 +480,7 @@ export class ChatManager {
         for (const [id, a] of this.approvals) if (a.chatId === chatId) this.settle(id, "deny", "agent 已經結束");
         if (chat.running) {
           chat.running = false;
+          chat.queuePaused = true;
           this.finishStreaming(chat);
           this.touch(chat);
         }

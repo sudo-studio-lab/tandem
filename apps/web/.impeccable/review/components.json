@@ -1,0 +1,445 @@
+{
+  "schemaVersion": 3,
+  "stage": "components",
+  "id": "components",
+  "title": "Plan and asset review · src/components/Chat.tsx",
+  "comp": {
+    "path": ".impeccable/mocks/chat-a.png",
+    "width": 1536,
+    "height": 1024
+  },
+  "specSha256": "ae1d480ca6a8a49576710bd9847310944a8faf6f5975f06e7655b379ac39d755",
+  "components": [
+    {
+      "id": "header-status",
+      "name": "Header status",
+      "kind": "chrome",
+      "role": "plan",
+      "box": {
+        "x": 0.6497,
+        "y": 0.0137,
+        "w": 0.1536,
+        "h": 0.0332
+      },
+      "note": "Synthetic data and synchronization state badges",
+      "medium": "code",
+      "preview": {
+        "kind": "comp-crop"
+      },
+      "codeDrawn": false,
+      "dependencies": []
+    },
+    {
+      "id": "user-bubble",
+      "name": "User bubble",
+      "kind": "chrome",
+      "role": "plan",
+      "box": {
+        "x": 0.7728,
+        "y": 0.1465,
+        "w": 0.1341,
+        "h": 0.043
+      },
+      "note": "Sent user message surface",
+      "medium": "code",
+      "preview": {
+        "kind": "comp-crop"
+      },
+      "codeDrawn": false,
+      "dependencies": []
+    },
+    {
+      "id": "working-state",
+      "name": "Working state",
+      "kind": "chrome",
+      "role": "plan",
+      "box": {
+        "x": 0.2865,
+        "y": 0.2852,
+        "w": 0.0326,
+        "h": 0.0195
+      },
+      "note": "Live response progress indicator",
+      "medium": "code",
+      "preview": {
+        "kind": "comp-crop"
+      },
+      "codeDrawn": false,
+      "dependencies": []
+    }
+  ],
+  "codeRegions": [
+    {
+      "id": "header",
+      "name": "Header",
+      "kind": "chrome",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 0.0605
+      },
+      "note": "Existing global navigation bar"
+    },
+    {
+      "id": "brand",
+      "name": "Brand",
+      "kind": "text",
+      "box": {
+        "x": 0.0931,
+        "y": 0.0176,
+        "w": 0.0508,
+        "h": 0.0244
+      },
+      "note": "Tandem product name"
+    },
+    {
+      "id": "project",
+      "name": "Project",
+      "kind": "control",
+      "box": {
+        "x": 0.1543,
+        "y": 0.0137,
+        "w": 0.14,
+        "h": 0.0303
+      },
+      "note": "Existing project selector"
+    },
+    {
+      "id": "tabs",
+      "name": "Tabs",
+      "kind": "control",
+      "box": {
+        "x": 0.3079,
+        "y": 0.0117,
+        "w": 0.1445,
+        "h": 0.0391
+      },
+      "note": "Existing three view navigation buttons"
+    },
+    {
+      "id": "header-actions",
+      "name": "Header actions",
+      "kind": "control",
+      "box": {
+        "x": 0.8079,
+        "y": 0.0117,
+        "w": 0.1107,
+        "h": 0.0361
+      },
+      "note": "Invite and settings actions"
+    },
+    {
+      "id": "new-chat",
+      "name": "New chat",
+      "kind": "control",
+      "box": {
+        "x": 0.0833,
+        "y": 0.0762,
+        "w": 0.1745,
+        "h": 0.0381
+      },
+      "note": "Create conversation button"
+    },
+    {
+      "id": "selected-chat",
+      "name": "Selected chat",
+      "kind": "control",
+      "box": {
+        "x": 0.0833,
+        "y": 0.1211,
+        "w": 0.1738,
+        "h": 0.0615
+      },
+      "note": "Current conversation selection with title and provider metadata"
+    },
+    {
+      "id": "settings",
+      "name": "Settings",
+      "kind": "control",
+      "box": {
+        "x": 0.1191,
+        "y": 0.9561,
+        "w": 0.1263,
+        "h": 0.0234
+      },
+      "note": "Existing account settings action"
+    },
+    {
+      "id": "frame",
+      "name": "Frame",
+      "kind": "chrome",
+      "box": {
+        "x": 0.2682,
+        "y": 0.0762,
+        "w": 0.6484,
+        "h": 0.8975
+      },
+      "note": "Single enclosing conversation panel"
+    },
+    {
+      "id": "chat-title",
+      "name": "Chat title",
+      "kind": "text",
+      "box": {
+        "x": 0.2813,
+        "y": 0.0918,
+        "w": 0.2318,
+        "h": 0.0264
+      },
+      "note": "Current conversation title"
+    },
+    {
+      "id": "delete",
+      "name": "Delete",
+      "kind": "control",
+      "box": {
+        "x": 0.8737,
+        "y": 0.0918,
+        "w": 0.0293,
+        "h": 0.0273
+      },
+      "note": "Delete conversation action"
+    },
+    {
+      "id": "user-text",
+      "name": "User text",
+      "kind": "text",
+      "box": {
+        "x": 0.7858,
+        "y": 0.1563,
+        "w": 0.1126,
+        "h": 0.0254
+      },
+      "note": "User request text in the conversation"
+    },
+    {
+      "id": "assistant-text",
+      "name": "Assistant text",
+      "kind": "text",
+      "box": {
+        "x": 0.3086,
+        "y": 0.2041,
+        "w": 0.3034,
+        "h": 0.0273
+      },
+      "note": "Assistant response text"
+    },
+    {
+      "id": "tool-text",
+      "name": "Tool text",
+      "kind": "text",
+      "box": {
+        "x": 0.3079,
+        "y": 0.2412,
+        "w": 0.1178,
+        "h": 0.0254
+      },
+      "note": "Read tool event summary"
+    },
+    {
+      "id": "model-label",
+      "name": "Model label",
+      "kind": "text",
+      "box": {
+        "x": 0.2832,
+        "y": 0.6699,
+        "w": 0.0234,
+        "h": 0.0244
+      },
+      "note": "Model field label"
+    },
+    {
+      "id": "model",
+      "name": "Model",
+      "kind": "control",
+      "box": {
+        "x": 0.3112,
+        "y": 0.6641,
+        "w": 0.1387,
+        "h": 0.0391
+      },
+      "note": "Provider and model selection control"
+    },
+    {
+      "id": "effort-label",
+      "name": "Effort label",
+      "kind": "text",
+      "box": {
+        "x": 0.4701,
+        "y": 0.6699,
+        "w": 0.0436,
+        "h": 0.0244
+      },
+      "note": "Effort field label"
+    },
+    {
+      "id": "effort",
+      "name": "Effort",
+      "kind": "control",
+      "box": {
+        "x": 0.5143,
+        "y": 0.6641,
+        "w": 0.0801,
+        "h": 0.0391
+      },
+      "note": "Effort selection control"
+    },
+    {
+      "id": "draft-state",
+      "name": "Draft state",
+      "kind": "text",
+      "box": {
+        "x": 0.8418,
+        "y": 0.6699,
+        "w": 0.0664,
+        "h": 0.0244
+      },
+      "note": "Saved draft status"
+    },
+    {
+      "id": "queue",
+      "name": "Queue",
+      "kind": "chrome",
+      "box": {
+        "x": 0.2793,
+        "y": 0.7158,
+        "w": 0.6283,
+        "h": 0.0391
+      },
+      "note": "Single compact row for waiting work"
+    },
+    {
+      "id": "queue-count",
+      "name": "Queue count",
+      "kind": "text",
+      "box": {
+        "x": 0.3079,
+        "y": 0.7266,
+        "w": 0.0456,
+        "h": 0.0225
+      },
+      "note": "Queue item count"
+    },
+    {
+      "id": "queue-text",
+      "name": "Queue text",
+      "kind": "text",
+      "box": {
+        "x": 0.3789,
+        "y": 0.7266,
+        "w": 0.3457,
+        "h": 0.0225
+      },
+      "note": "Waiting message text"
+    },
+    {
+      "id": "queue-edit",
+      "name": "Queue edit",
+      "kind": "control",
+      "box": {
+        "x": 0.8034,
+        "y": 0.7207,
+        "w": 0.0436,
+        "h": 0.0313
+      },
+      "note": "Edit waiting message"
+    },
+    {
+      "id": "queue-remove",
+      "name": "Queue remove",
+      "kind": "control",
+      "box": {
+        "x": 0.8561,
+        "y": 0.7207,
+        "w": 0.0469,
+        "h": 0.0313
+      },
+      "note": "Remove waiting message"
+    },
+    {
+      "id": "editor",
+      "name": "Editor",
+      "kind": "chrome",
+      "box": {
+        "x": 0.2793,
+        "y": 0.7715,
+        "w": 0.6283,
+        "h": 0.126
+      },
+      "note": "Single draft editor with attachment and text"
+    },
+    {
+      "id": "attachment",
+      "name": "Attachment",
+      "kind": "control",
+      "box": {
+        "x": 0.2897,
+        "y": 0.7832,
+        "w": 0.0755,
+        "h": 0.0967
+      },
+      "note": "Interactive preview button for the selected user file"
+    },
+    {
+      "id": "draft-text",
+      "name": "Draft text",
+      "kind": "text",
+      "box": {
+        "x": 0.3854,
+        "y": 0.7842,
+        "w": 0.4245,
+        "h": 0.0283
+      },
+      "note": "Unsent message beside its attachment"
+    },
+    {
+      "id": "attach-button",
+      "name": "Attach button",
+      "kind": "control",
+      "box": {
+        "x": 0.2793,
+        "y": 0.9121,
+        "w": 0.0872,
+        "h": 0.0449
+      },
+      "note": "Select user image attachment"
+    },
+    {
+      "id": "steer",
+      "name": "Steer",
+      "kind": "control",
+      "box": {
+        "x": 0.6309,
+        "y": 0.9121,
+        "w": 0.0938,
+        "h": 0.0449
+      },
+      "note": "Steer the currently running turn"
+    },
+    {
+      "id": "enqueue",
+      "name": "Enqueue",
+      "kind": "control",
+      "box": {
+        "x": 0.7305,
+        "y": 0.9121,
+        "w": 0.0983,
+        "h": 0.0449
+      },
+      "note": "Queue a later turn"
+    },
+    {
+      "id": "stop",
+      "name": "Stop",
+      "kind": "control",
+      "box": {
+        "x": 0.8366,
+        "y": 0.9121,
+        "w": 0.071,
+        "h": 0.0449
+      },
+      "note": "Stop running work and pause the queue"
+    }
+  ]
+}

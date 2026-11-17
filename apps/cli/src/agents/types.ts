@@ -2,7 +2,7 @@
  * The one interface both agents are driven through (plan "統一的轉接介面"). The chat manager only
  * sees these events, so Claude and Codex look the same to the rest of Tandem.
  */
-import type { AgentKind, AgentLoginStart, AgentStatus, ApprovalDecision } from "@tandem/contracts";
+import type { AgentKind, AgentLoginStart, AgentStatus, ApprovalDecision, ChatImage } from "@tandem/contracts";
 
 export type AdapterEvent =
   | { type: "session"; agentSessionId: string }
@@ -10,6 +10,7 @@ export type AdapterEvent =
   | { type: "text"; id: string; delta: string }
   /** Final text for a message (replaces whatever was streamed). */
   | { type: "message"; id: string; text: string }
+  | { type: "image"; id: string; image: ChatImage }
   | { type: "tool"; id: string; name: string; summary: string; input?: unknown; status: "running" | "done" | "error"; output?: string }
   | { type: "turnDone"; costUsd?: number }
   | { type: "error"; message: string; detail?: string }
@@ -35,6 +36,7 @@ export interface StartOptions {
   cwd: string;
   /** "" = agent default. */
   model: string;
+  reasoningEffort?: string;
   /** Continue this conversation (Claude session_id / Codex thread id). */
   resumeId?: string;
   mcp: McpLaunch;
@@ -46,7 +48,8 @@ export interface StartOptions {
 }
 
 export interface AgentSession {
-  send(text: string): Promise<void>;
+  send(text: string, images?: ChatImage[]): Promise<void>;
+  steer?(text: string, images?: ChatImage[]): Promise<void>;
   /** Stop the current turn. The conversation can continue with the next send(). */
   interrupt(): Promise<void>;
   close(): Promise<void>;

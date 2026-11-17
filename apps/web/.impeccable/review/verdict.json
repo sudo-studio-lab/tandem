@@ -1,0 +1,11 @@
+{
+  "disposition": "fix",
+  "scope": "Independent verdict pass over four previously listed fixes; not whole-product acceptance",
+  "findings": [
+    { "id": "mobile-actions", "status": "resolved", "evidence": "mobile.png: queue and action row visible without clipping" },
+    { "id": "composer-density", "status": "resolved", "evidence": "desktop.png: attachment beside text, compact queue" },
+    { "id": "workflow-evidence", "status": "partial", "evidence": "Measured spec and final diff exist; spec closed. Plates gate still asks for separate human review despite 0 raster assets; no approval fabricated." },
+    { "id": "close-icon", "status": "resolved", "evidence": "Stroke SVG retained accessible name and 44px target" }
+  ],
+  "limitations": ["MOCK screenshots", "synthesized ClipboardEvent", "390px emulated viewport", "no real model prompts", "Antigravity requires native authentication"]
+}

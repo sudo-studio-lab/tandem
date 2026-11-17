@@ -1,0 +1,113 @@
+{
+  "tool": "build-phase",
+  "version": 2,
+  "startedAt": "2026-11-16T05:51:55.677Z",
+  "comp": ".impeccable/mocks/chat-a.png",
+  "direction": null,
+  "breakpoint": "1536x1024",
+  "artifact": "src/components/Chat.tsx",
+  "phase": "plates",
+  "phases": {
+    "comps": {
+      "status": "skipped",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [
+        {
+          "at": "2026-11-16T05:51:55.677Z",
+          "text": "started with an approved comp; the comp round happened before this state (surface round or manual)"
+        }
+      ],
+      "gate": null,
+      "forced": null
+    },
+    "spec": {
+      "status": "closed",
+      "openedAt": "2026-11-16T05:51:55.677Z",
+      "closedAt": "2026-11-16T06:20:19.964Z",
+      "attempts": 5,
+      "notes": [
+        {
+          "at": "2026-11-16T06:19:23.533Z",
+          "text": "Font-match ranked Google Fonts and skipped the pinned Windows system faces; its Orbitron recommendation is not applicable to this existing Traditional Chinese product. Keep the user-approved incumbent system stack in DESIGN.md. No new raster artwork is shipped; attachment content is dynamic user input."
+        }
+      ],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "34 regions, 0 plates, 11 text regions measured",
+        "at": "2026-11-16T06:20:19.964Z"
+      },
+      "forced": null
+    },
+    "plates": {
+      "status": "open",
+      "openedAt": "2026-11-16T06:20:19.964Z",
+      "closedAt": null,
+      "attempts": 1,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "no plates owed",
+        "at": "2026-11-16T06:20:20.006Z"
+      },
+      "forced": null
+    },
+    "hero": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "sections": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "motion": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "responsive": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "review": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    }
+  },
+  "finish": {
+    "disposition": "fix",
+    "at": "2026-11-16T06:37:04.835Z",
+    "phaseAtFinish": "plates",
+    "artifactInputsSha256": "fdda1ae0f09b7da3b5f9b3e347ed9f29490ca695a8d091cfc0c1dbc39f374b70",
+    "artifactSha256": "1c7fe0761a46a75434bfa24e0219ad9026308b1eb89392d39b01e1ef31323681"
+  },
+  "sessionId": "01a1e2bf-23fd-7681-b9ab-5f56b7e70ee9",
+  "plates": {}
+}

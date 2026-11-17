@@ -14,3 +14,6 @@ coverage/
 
 # Agent conformance output (npm run test:agents)
 tests/agents/last-report.md
+
+# Local font-ranking proofs/cache; the implemented UI keeps its existing system fonts.
+apps/web/.impeccable/build/font-match/

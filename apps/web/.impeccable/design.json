@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-16T06:27:43.908810Z",
+  "title": "Design System: Tandem",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "操作藍"
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "工作區灰白底"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "面板表面"
+      },
+      "surface-secondary": {
+        "role": "neutral",
+        "displayName": "次表面"
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "主要文字"
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "次要文字"
+      }
+    },
+    "typographyMeta": {
+      "body": {
+        "displayName": "正文",
+        "purpose": "一般介面文字；對話訊息另採 1.6 行高。"
+      },
+      "control": {
+        "displayName": "控制項",
+        "purpose": "一般按鈕與分頁。"
+      },
+      "caption": {
+        "displayName": "次要資訊",
+        "purpose": "草稿狀態、提示與圖片名稱。"
+      }
+    },
+    "shadows": [
+      {
+        "name": "surface",
+        "value": "0 1px 2px rgb(16 24 40 / 0.05), 0 1px 3px rgb(16 24 40 / 0.06)",
+        "purpose": "既有淺色面板與選取項"
+      },
+      {
+        "name": "overlay",
+        "value": "0 10px 30px rgb(16 24 40 / 0.16)",
+        "purpose": "既有淺色彈出層與對話框"
+      },
+      {
+        "name": "surface-dark",
+        "value": "none",
+        "purpose": "深色模式的面板與選取項"
+      },
+      {
+        "name": "overlay-dark",
+        "value": "0 10px 30px rgb(0 0 0 / 0.5)",
+        "purpose": "深色模式彈出層與對話框"
+      }
+    ],
+    "motion": [
+      {
+        "name": "control-transition",
+        "value": "background 0.12s, border-color 0.12s",
+        "purpose": "既有按鈕狀態切換，未增加移動或縮放。"
+      },
+      {
+        "name": "loading-spin",
+        "value": "spin 0.9s linear infinite",
+        "purpose": "既有旋轉載入指示；prefers-reduced-motion 時改為 3s。"
+      },
+      {
+        "name": "streaming-caret",
+        "value": "blink 1s steps(2) infinite",
+        "purpose": "既有串流游標的透明度閃爍。"
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "board",
+        "value": "900px"
+      },
+      {
+        "name": "compact",
+        "value": "760px"
+      },
+      {
+        "name": "small-page",
+        "value": "560px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "主要按鈕",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "既有按鈕變體；對話輸入區另由容器規則將最小高度提高至 44px。",
+      "html": "<button type=\"button\" class=\"ds-button-primary\">送出</button>",
+      "css": ".ds-button-primary{font-family:system-ui, -apple-system, \"Segoe UI\", \"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", sans-serif;font-size:0.9rem;font-weight:500;line-height:1.55;padding:6px 14px;border:1px solid var(--border-strong,#cfd4dc);border-radius:var(--radius-sm,8px);background:var(--surface,#ffffff);color:var(--text,#1a2130);cursor:pointer;min-height:34px;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:background 0.12s,border-color 0.12s;background:var(--accent,#2259d6);color:var(--accent-contrast,#ffffff);border-color:var(--accent,#2259d6);}.ds-button-primary:hover:not(:disabled){border-color:var(--accent,#2259d6);background:var(--surface-2,#f7f8fa);background:var(--accent,#2259d6);filter:brightness(1.08);}.ds-button-primary:focus-visible{outline:3px solid var(--focus,#2259d6);outline-offset:2px;border-radius:4px;}.ds-button-primary:disabled{opacity:0.55;cursor:default;}"
+    },
+    {
+      "name": "次要按鈕",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "既有按鈕變體；對話輸入區另由容器規則將最小高度提高至 44px。",
+      "html": "<button type=\"button\" class=\"ds-button-secondary\">排入下一則</button>",
+      "css": ".ds-button-secondary{font-family:system-ui, -apple-system, \"Segoe UI\", \"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", sans-serif;font-size:0.9rem;font-weight:500;line-height:1.55;padding:6px 14px;border:1px solid var(--border-strong,#cfd4dc);border-radius:var(--radius-sm,8px);background:var(--surface,#ffffff);color:var(--text,#1a2130);cursor:pointer;min-height:34px;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:background 0.12s,border-color 0.12s;}.ds-button-secondary:hover:not(:disabled){border-color:var(--accent,#2259d6);background:var(--surface-2,#f7f8fa);}.ds-button-secondary:focus-visible{outline:3px solid var(--focus,#2259d6);outline-offset:2px;border-radius:4px;}.ds-button-secondary:disabled{opacity:0.55;cursor:default;}"
+    },
+    {
+      "name": "安靜按鈕",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "既有按鈕變體；對話輸入區另由容器規則將最小高度提高至 44px。",
+      "html": "<button type=\"button\" class=\"ds-button-quiet\">刪除</button>",
+      "css": ".ds-button-quiet{font-family:system-ui, -apple-system, \"Segoe UI\", \"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", sans-serif;font-size:0.9rem;font-weight:500;line-height:1.55;padding:6px 14px;border:1px solid var(--border-strong,#cfd4dc);border-radius:var(--radius-sm,8px);background:var(--surface,#ffffff);color:var(--text,#1a2130);cursor:pointer;min-height:34px;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:background 0.12s,border-color 0.12s;border-color:transparent;background:transparent;color:var(--muted,#667085);}.ds-button-quiet:hover:not(:disabled){border-color:var(--accent,#2259d6);background:var(--surface-2,#f7f8fa);color:var(--text,#1a2130);border-color:var(--border,#e2e5ea);}.ds-button-quiet:focus-visible{outline:3px solid var(--focus,#2259d6);outline-offset:2px;border-radius:4px;}.ds-button-quiet:disabled{opacity:0.55;cursor:default;}"
+    },
+    {
+      "name": "危險操作按鈕",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "既有按鈕變體；對話輸入區另由容器規則將最小高度提高至 44px。",
+      "html": "<button type=\"button\" class=\"ds-button-danger\">停止</button>",
+      "css": ".ds-button-danger{font-family:system-ui, -apple-system, \"Segoe UI\", \"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", sans-serif;font-size:0.9rem;font-weight:500;line-height:1.55;padding:6px 14px;border:1px solid var(--border-strong,#cfd4dc);border-radius:var(--radius-sm,8px);background:var(--surface,#ffffff);color:var(--text,#1a2130);cursor:pointer;min-height:34px;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:background 0.12s,border-color 0.12s;background:var(--bad-bg,#fde8e6);color:var(--bad-fg,#a3231a);border-color:var(--bad-line,#f1a9a2);}.ds-button-danger:hover:not(:disabled){border-color:var(--accent,#2259d6);background:var(--surface-2,#f7f8fa);}.ds-button-danger:focus-visible{outline:3px solid var(--focus,#2259d6);outline-offset:2px;border-radius:4px;}.ds-button-danger:disabled{opacity:0.55;cursor:default;}"
+    },
+    {
+      "name": "模型選擇",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "輸入區既有有標籤的原生 select；預覽文字為示例，非可用模型保證。",
+      "html": "<label class=\"ds-model\"><span>模型</span><select class=\"ds-model-input\" aria-label=\"模型\"><option>Codex · GPT-6.1 Sol</option></select></label>",
+      "css": ".ds-model{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;font-family:system-ui, -apple-system, \"Segoe UI\", \"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", sans-serif;font-size:0.9rem;line-height:1.55;color:var(--text,#1a2130);}.ds-model-input{font:inherit;padding:7px 10px;border:1px solid var(--border-strong,#cfd4dc);border-radius:var(--radius-sm,8px);background:var(--surface,#ffffff);color:var(--text,#1a2130);min-width:0;width:auto;max-width:290px;min-height:38px;}.ds-model-input:focus-visible{outline:3px solid var(--focus,#2259d6);outline-offset:2px;border-radius:4px;}@media(max-width:760px){.ds-model{flex-wrap:nowrap;max-width:100%;}.ds-model-input{max-width:230px;}}"
+    },
+    {
+      "name": "主要分頁導覽",
+      "kind": "nav",
+      "description": "次表面容器、白底選取項與低陰影；窄螢幕整列等分。",
+      "html": "<nav class=\"ds-tabs\" aria-label=\"主要檢視\"><button type=\"button\" aria-pressed=\"false\">看板</button><button type=\"button\" aria-pressed=\"true\">跟 AI 對話</button><button type=\"button\" aria-pressed=\"false\">房間</button></nav>",
+      "css": ".ds-tabs{display:inline-flex;gap:2px;padding:3px;background:var(--surface-2,#f7f8fa);border:1px solid var(--border,#e2e5ea);border-radius:10px;margin-left:6px;font-family:system-ui, -apple-system, \"Segoe UI\", \"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", sans-serif;line-height:1.55;}.ds-tabs button{border:0;background:transparent;color:var(--muted,#667085);padding:4px 14px;font:inherit;font-size:0.9rem;font-weight:500;border-radius:7px;cursor:pointer;}.ds-tabs button:hover{color:var(--text,#1a2130);}.ds-tabs button[aria-pressed=\"true\"]{background:var(--surface,#ffffff);color:var(--text,#1a2130);box-shadow:var(--shadow,0 1px 2px rgb(16 24 40 / 0.05),0 1px 3px rgb(16 24 40 / 0.06));}.ds-tabs button:focus-visible{outline:3px solid var(--focus,#2259d6);outline-offset:2px;border-radius:4px;}@media(max-width:760px){.ds-tabs{order:10;margin-left:0;flex-basis:100%;}.ds-tabs button{flex:1;}}"
+    },
+    {
+      "name": "登入狀態標籤",
+      "kind": "chip",
+      "description": "既有成功語意膠囊，以文字和顏色共同標示狀態。",
+      "html": "<span class=\"ds-pill\">已用訂閱登入</span>",
+      "css": ".ds-pill{display:inline-flex;align-items:center;gap:4px;font-family:system-ui, -apple-system, \"Segoe UI\", \"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", sans-serif;font-size:0.78rem;font-weight:500;line-height:1.6;padding:0 8px;border-radius:999px;background:var(--ok-bg,#e3f5ea);color:var(--ok-fg,#166534);border:1px solid transparent;white-space:nowrap;vertical-align:middle;}"
+    },
+    {
+      "name": "一般面板",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "現有 card 與 pad 組合：語意表面、細框與低陰影。非互動容器沒有 hover 或 focus 偽狀態。",
+      "html": "<section class=\"ds-card\"><strong>專案狀態</strong><p class=\"ds-card-muted\">團隊最近的決定和進度</p></section>",
+      "css": ".ds-card{font-family:system-ui, -apple-system, \"Segoe UI\", \"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", sans-serif;font-size:15px;line-height:1.55;background:var(--surface,#ffffff);color:var(--text,#1a2130);border:1px solid var(--border,#e2e5ea);border-radius:var(--radius,12px);box-shadow:var(--shadow,0 1px 2px rgb(16 24 40 / 0.05),0 1px 3px rgb(16 24 40 / 0.06));padding:14px 16px;}.ds-card-muted{margin:0;color:var(--muted,#667085);}"
+    }
+  ],
+  "narrative": {
+    "overview": "記錄現有 prototype 的視覺系統，來源為 `src/styles.css`、`Chat.tsx`、`Composer.tsx` 與 `ChatImages.tsx`。已選定的 A 參考圖為 `.impeccable/mocks/chat-a.png`；完成畫面的桌面及手機截圖位於 `.impeccable/review/desktop.png`、`.impeccable/review/mobile.png`，使用明確標示的 MOCK 資料。截圖不代表真實 provider、正式環境或實體手機驗收。\n\n介面以完成協作任務為目的：文字、訊息和操作為主，藍色表示主要操作與目前選擇。使用者本次沒有新增風格偏好，功能擴充沿用現有系統；三版參考圖比較新增控制項的安排，不改品牌。",
+    "keyCharacteristics": [
+      "灰白表面、語意色彩及系統中文字體。",
+      "模型、草稿、待處理訊息及輸入操作集中於既有對話面板。",
+      "桌面並排、窄螢幕換行與單欄，圖片保留實際內容。"
+    ],
+    "rules": [],
+    "dos": [
+      "Do 沿用現有色彩變數、元件與導覽，讓新功能容易找到。",
+      "Do 對 loading、running、queued、failed 與 disabled 提供可辨識狀態。",
+      "Do 保留繁中可讀性、鍵盤操作與手機上的觸控目標。"
+    ],
+    "donts": [
+      "Don't 因這次對話功能擴充更換全站配色、字體、品牌或導覽結構。",
+      "Don't 以圖片取代實際介面的文字、按鈕或輸入欄位。"
+    ]
+  }
+}

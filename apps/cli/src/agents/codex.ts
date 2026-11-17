@@ -5,7 +5,7 @@
  */
 import type { ChildProcess } from "node:child_process";
 import { appendFileSync } from "node:fs";
-import type { AgentLoginStart, AgentStatus, ApprovalDecision, ModelChoice } from "@tandem/contracts";
+import type { AgentLoginStart, AgentStatus, ApprovalDecision, ChatImage, ModelChoice } from "@tandem/contracts";
 import open from "open";
 import pkg from "../../package.json" with { type: "json" };
 import { agentEnv, killTree, onLines, openTerminal, resolveCommand, runCapture, spawnAgent } from "./proc.ts";
@@ -119,8 +119,10 @@ function mcpOverrides(mcp: McpLaunch): string[] {
 async function startRpc(cwd: string, extraArgs: string[] = []): Promise<Rpc> {
   const child = spawnAgent("codex", [...extraArgs, "app-server"], { cwd, env: agentEnv() });
   const rpc = new Rpc(child);
-  await rpc.request("initialize", { clientInfo: { name: "tandem", title: "Tandem", version: pkg.version } }, 30_000);
-  rpc.notify("initialized");
+  try {
+    await rpc.request("initialize", { clientInfo: { name: "tandem", title: "Tandem", version: pkg.version } }, 30_000);
+    rpc.notify("initialized");
+  } catch (e) { killTree(child); throw e; }
   return rpc;
 }
 
@@ -137,6 +139,8 @@ export const codexAdapter: AgentAdapter = {
       auth: "none",
       models: [{ id: "", label: "預設", isDefault: true }],
       installUrl: "https://developers.openai.com/codex",
+      supportsSteer: true,
+      supportsImages: true,
     };
     if (!resolveCommand("codex")) return base;
     const ver = await runCapture("codex", ["--version"]);
@@ -145,13 +149,20 @@ export const codexAdapter: AgentAdapter = {
     try {
       rpc = await startRpc(process.cwd());
       const acct = await rpc.request<{ account: { type: string; planType?: string } | null }>("account/read", { refreshToken: false });
-      const models = await rpc
-        .request<{ data: { id?: string; model?: string; displayName?: string; isDefault?: boolean }[] }>("model/list", {})
-        .then((r) => r.data ?? [])
-        .catch(() => []);
+      const models: Json[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await rpc.request<{ data: Json[]; nextCursor?: string | null }>("model/list", { ...(cursor ? { cursor } : {}), includeHidden: false });
+        models.push(...(page.data ?? []));
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor);
       const choices: ModelChoice[] = [
         { id: "", label: "預設", isDefault: true },
-        ...models.map((m) => ({ id: m.model ?? m.id ?? "", label: m.displayName ?? m.model ?? m.id ?? "" })).filter((m) => m.id),
+        ...models.filter((m) => !m.hidden).map((m) => ({
+          id: m.model ?? m.id ?? "", label: m.displayName ?? m.model ?? m.id ?? "",
+          reasoningEfforts: m.supportedReasoningEfforts?.map((e: Json) => e.reasoningEffort),
+          inputModalities: m.inputModalities,
+        })).filter((m) => m.id),
       ];
       const a = acct.account;
       return {
@@ -211,6 +222,8 @@ class CodexSession implements AgentSession {
   private threadId: string | undefined;
   private turnId: string | undefined;
   private items = new Map<string, Json>();
+  private completion?: { promise: Promise<void>; resolve(): void; done: boolean };
+  private closing = false;
 
   constructor(private opts: StartOptions) {
     this.threadId = opts.resumeId;
@@ -222,14 +235,17 @@ class CodexSession implements AgentSession {
 
   private connect(): Promise<Rpc> {
     if (this.rpc) return this.rpc;
+    this.closing = false;
     const p = (async () => {
       const rpc = await startRpc(this.opts.cwd, mcpOverrides(this.opts.mcp));
+      if (this.closing) { killTree(rpc.child); throw new Error("已停止"); }
       rpc.onNotify = (m, params) => this.onNotify(m, params);
       rpc.onRequest = (m, params) => this.onRequest(m, params);
       rpc.onClose = (code, stderr) => {
         if (this.rpc === p) this.rpc = null;
-        if (this.turnId) this.emit({ type: "error", message: "Codex 意外結束了", detail: `exit ${code}\n${stderr}`.trim() });
+        if (this.turnId && !this.closing) this.emit({ type: "error", message: "Codex 意外結束了", detail: `exit ${code}\n${stderr}`.trim() });
         this.turnId = undefined;
+        this.completion?.resolve();
         this.emit({ type: "exit" });
       };
       const params: Json = { cwd: this.opts.cwd, ...(this.opts.model ? { model: this.opts.model } : {}) };
@@ -289,6 +305,7 @@ class CodexSession implements AgentSession {
         return;
       case "turn/completed": {
         this.turnId = undefined;
+        this.completion?.resolve();
         const t = p.turn ?? {};
         if (t.status === "failed") this.emit({ type: "error", message: plainError(t.error?.message ?? ""), detail: JSON.stringify(t.error ?? {}) });
         this.emit({ type: "turnDone" });
@@ -315,27 +332,60 @@ class CodexSession implements AgentSession {
     return { decision: "decline" };
   }
 
-  async send(text: string): Promise<void> {
+  async send(text: string, images: ChatImage[] = []): Promise<void> {
+    let resolve!: () => void;
+    const promise = new Promise<void>((r) => { resolve = r; });
+    const completion = { promise, done: false, resolve() { this.done = true; resolve(); } };
+    this.completion = completion;
     try {
       const rpc = await this.connect();
-      const r = await rpc.request<{ turn?: { id: string } }>("turn/start", { threadId: this.threadId, input: [{ type: "text", text }] });
-      this.turnId = r.turn?.id ?? this.turnId;
+      if (this.closing) { completion.resolve(); return; }
+      const r = await rpc.request<{ turn?: { id: string } }>("turn/start", {
+        threadId: this.threadId,
+        input: [...(text ? [{ type: "text", text }] : []), ...images.map((image) => ({ type: "image", url: image.dataUrl }))],
+        ...(this.opts.reasoningEffort ? { effort: this.opts.reasoningEffort } : {}),
+      });
+      if (!completion.done) this.turnId = r.turn?.id ?? this.turnId;
     } catch (e) {
-      this.emit({ type: "error", message: "沒辦法把訊息交給 Codex", detail: (e as Error).message });
+      if (!this.closing) this.emit({ type: "error", message: "沒辦法把訊息交給 Codex", detail: (e as Error).message });
       this.emit({ type: "turnDone" });
+      completion.resolve();
     }
   }
 
   async interrupt(): Promise<void> {
     const p = this.rpc;
-    if (!p || !this.turnId) return;
+    if (!p) return;
+    if (!this.turnId) {
+      this.closing = true;
+      const peer = await p.catch(() => undefined);
+      if (peer) killTree(peer.child);
+      this.rpc = null;
+      this.completion?.resolve();
+      return;
+    }
     const rpc = await p;
     await rpc.request("turn/interrupt", { threadId: this.threadId, turnId: this.turnId }, 10_000).catch(() => {
+      this.closing = true;
       killTree(rpc.child);
+    });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (this.completion) await Promise.race([this.completion.promise, new Promise<void>((resolve) => { timer = setTimeout(() => { this.closing = true; killTree(rpc.child); resolve(); }, 10_000); })]);
+    clearTimeout(timer);
+  }
+
+  async steer(text: string, images: ChatImage[] = []): Promise<void> {
+    if (!this.turnId || !this.rpc) throw new Error("目前沒有可補充的工作，請直接送出或排入下一則");
+    const turnId = this.turnId;
+    const rpc = await this.rpc;
+    await rpc.request("turn/steer", {
+      threadId: this.threadId, expectedTurnId: turnId,
+      input: [...(text ? [{ type: "text", text }] : []), ...images.map((image) => ({ type: "image", url: image.dataUrl }))],
     });
   }
 
   async close(): Promise<void> {
+    this.closing = true;
     const p = this.rpc;
     this.rpc = null;
     if (p) killTree((await p.catch(() => null))?.child ?? ({ exitCode: 0 } as ChildProcess));

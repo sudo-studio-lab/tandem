@@ -53,6 +53,16 @@ const line = (c: FakeChild, j: unknown) => c.stdout.write(`${JSON.stringify(j)}\
 const flush = () => new Promise((r) => setTimeout(r, 10));
 
 describe("claude adapter", () => {
+  it("sends pasted image bytes as a multimodal content block", async () => {
+    const session = claudeAdapter.start({ chatId: "image", cwd: home, model: "sonnet", mcp: { command: "node", args: [], env: {} }, requestApproval: async () => "deny", onEvent: () => {} });
+    await session.send("看這張圖", [{ id: "i", name: "screen.png", dataUrl: "data:image/png;base64,aGVsbG8=" }]);
+    expect(JSON.parse(String(children[0]!.stdin.read())).message.content).toEqual([
+      { type: "text", text: "看這張圖" },
+      { type: "image", source: { type: "base64", media_type: "image/png", data: "aGVsbG8=" } },
+    ]);
+    await session.close();
+  });
+
   it("starts claude with stream-json, our MCP server and the approve tool; maps the stream to events", async () => {
     const events: AdapterEvent[] = [];
     const s = claudeAdapter.start({

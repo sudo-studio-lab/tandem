@@ -24,6 +24,8 @@ let server: (f: Fake, m: Msg) => void = () => {};
 
 vi.mock("./proc.ts", async (orig) => ({
   ...(await orig<typeof import("./proc.ts")>()),
+  resolveCommand: () => "codex",
+  runCapture: async () => ({ stdout: "codex 0.166.0", stderr: "", code: 0 }),
   spawnAgent: (_cmd: string, args: string[]) => {
     const f = Object.assign(new EventEmitter(), {
       stdin: new PassThrough(),
@@ -59,6 +61,47 @@ const send = (f: Fake, m: Msg) => f.stdout.write(`${JSON.stringify(m)}\n`);
 const flush = () => new Promise((r) => setTimeout(r, 20));
 
 describe("codex adapter", () => {
+  it("does not start a delayed first turn after stop was requested during connection", async () => {
+    server = (f, m) => {
+      if (m.method === "initialize") setTimeout(() => send(f, { id: m.id, result: {} }), 10);
+    };
+    const events: AdapterEvent[] = [];
+    const session = codexAdapter.start({ chatId: "cancel-start", cwd: "/r", model: "", mcp: { command: "t", args: [], env: {} }, requestApproval: async () => "deny", onEvent: (e) => events.push(e) });
+    const sending = session.send("不要在停止後執行");
+    await session.interrupt(); await sending;
+    expect(fakes.at(-1)!.got.some((m) => m.method === "turn/start")).toBe(false);
+    expect(events.some((e) => e.type === "error")).toBe(false);
+  });
+  it("reads all model pages and preserves advertised effort and image support", async () => {
+    server = (f, m) => {
+      if (m.method === "initialize") send(f, { id: m.id, result: {} });
+      if (m.method === "account/read") send(f, { id: m.id, result: { account: { type: "chatgpt" } } });
+      if (m.method === "model/list") send(f, { id: m.id, result: m.params.cursor ? {
+        data: [{ model: "second", displayName: "Second" }], nextCursor: null,
+      } : {
+        data: [{ model: "first", displayName: "First", supportedReasoningEfforts: [{ reasoningEffort: "high" }], inputModalities: ["text", "image"] }, { model: "hidden", hidden: true }], nextCursor: "page2",
+      } });
+    };
+    const status = await codexAdapter.status();
+    expect(status.auth).toBe("subscription");
+    expect(status.models.map((m) => m.id)).toEqual(["", "first", "second"]);
+    expect(status.models[1]).toMatchObject({ reasoningEfforts: ["high"], inputModalities: ["text", "image"] });
+  });
+
+  it("sends an image-only turn and the selected effort as protocol fields", async () => {
+    server = (f, m) => {
+      if (m.method === "initialize") send(f, { id: m.id, result: {} });
+      if (m.method === "thread/start") send(f, { id: m.id, result: { thread: { id: "TI" } } });
+      if (m.method === "turn/start") send(f, { id: m.id, result: { turn: { id: "UI" } } });
+    };
+    const session = codexAdapter.start({ chatId: "image", cwd: "/r", model: "first", reasoningEffort: "high", mcp: { command: "t", args: [], env: {} }, requestApproval: async () => "deny", onEvent: () => {} });
+    await session.send("", [{ id: "i", name: "screen.png", dataUrl: "data:image/png;base64,aGVsbG8=" }]);
+    expect(fakes.at(-1)!.got.find((m) => m.method === "turn/start")!.params).toEqual({
+      threadId: "TI", input: [{ type: "image", url: "data:image/png;base64,aGVsbG8=" }], effort: "high",
+    });
+    await session.close();
+  });
+
   it("runs a turn: thread/start, turn/start, streaming, approvals answered, MCP passed with -c", async () => {
     const approvals: ApprovalRequest[] = [];
     const events: AdapterEvent[] = [];
@@ -122,6 +165,7 @@ describe("codex adapter", () => {
       if (m.method === "initialize") send(f, { id: m.id, result: {} });
       if (m.method === "thread/resume") send(f, { id: m.id, result: { thread: { id: "T9" } } });
       if (m.method === "turn/start") send(f, { id: m.id, result: { turn: { id: "U9" } } });
+      if (m.method === "turn/steer") send(f, { id: m.id, result: { turnId: "U9" } });
       if (m.method === "turn/interrupt") {
         send(f, { id: m.id, result: {} });
         send(f, { method: "turn/completed", params: { turn: { id: "U9", status: "interrupted" } } });
@@ -131,6 +175,8 @@ describe("codex adapter", () => {
     const s = codexAdapter.start({ chatId: "c", cwd: "/r", model: "", resumeId: "T9", mcp: { command: "t", args: [], env: {} }, requestApproval: async () => "deny", onEvent: (e) => events.push(e) });
     await s.send("長任務");
     await flush();
+    await s.steer!("先修輸入框");
+    expect(fakes.at(-1)!.got.find((m) => m.method === "turn/steer")!.params).toEqual({ threadId: "T9", expectedTurnId: "U9", input: [{ type: "text", text: "先修輸入框" }] });
     await s.interrupt();
     await flush();
     const f = fakes.at(-1)!;
