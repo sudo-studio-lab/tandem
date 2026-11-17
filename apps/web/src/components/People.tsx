@@ -1,6 +1,6 @@
 import type { ActivityItem, ActivityKind, BoardMember, ProjectBoard } from "@tandem/contracts";
 import { Ext } from "./Ext.tsx";
-import { Avatar, Panel } from "./ui.tsx";
+import { Avatar } from "./ui.tsx";
 import { relTime } from "../time.ts";
 
 const DECISION_ID_RE = /^D-\d{8}-[0-9a-z]{4}$/;
@@ -32,7 +32,7 @@ function Activity({ items, now }: { items: ActivityItem[]; now: number }) {
   );
 }
 
-function PersonCard({ m, board, now }: { m: BoardMember; board: ProjectBoard; now: number }) {
+export function PersonCard({ m, board, now }: { m: BoardMember; board: ProjectBoard; now: number }) {
   const s = m.status;
   const isMe = m.login === board.me;
   const repoUrl = board.repo.url;
@@ -178,22 +178,5 @@ function PersonCard({ m, board, now }: { m: BoardMember; board: ProjectBoard; no
         </details>
       )}
     </article>
-  );
-}
-
-export function People({ board, now }: { board: ProjectBoard; now: number }) {
-  const members = [...board.members].sort((a, b) => Number(b.login === board.me) - Number(a.login === board.me));
-  return (
-    <Panel title="大家在做什麼" icon="👥" count={members.length}>
-      {members.length === 0 ? (
-        <p className="muted empty">還沒有成員</p>
-      ) : (
-        <div className="people-grid">
-          {members.map((m) => (
-            <PersonCard key={m.login} m={m} board={board} now={now} />
-          ))}
-        </div>
-      )}
-    </Panel>
   );
 }

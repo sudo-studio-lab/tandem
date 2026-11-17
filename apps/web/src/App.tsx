@@ -3,11 +3,9 @@ import { api } from "./api.ts";
 import { useApp } from "./useApp.ts";
 import { useNow } from "./time.ts";
 import { Header, type View } from "./components/Header.tsx";
-import { Mine } from "./components/Mine.tsx";
-import { People } from "./components/People.tsx";
+import { TaskBoard } from "./components/TaskBoard.tsx";
 import { Waiting } from "./components/Waiting.tsx";
 import { Discussions } from "./components/Discussions.tsx";
-import { Tasks } from "./components/Tasks.tsx";
 import { Decisions } from "./components/Decisions.tsx";
 import { Problems } from "./components/Problems.tsx";
 import { SignIn } from "./components/SignIn.tsx";
@@ -35,6 +33,7 @@ export function App() {
   const [op, setOp] = useState<Op | null>(null);
   const [dialog, setDialog] = useState<"invite" | "settings" | "agents" | null>(null);
   const [view, setView] = useState<View>("board");
+  const [boardTab, setBoardTab] = useState<"list" | "log">("list");
   const [toast, setToast] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const handledDone = useRef<string | null>(null);
@@ -227,18 +226,23 @@ export function App() {
               {app.boardError}
             </p>
           )}
-          <Mine items={board.waiting} me={board.me} now={now} />
-          <div className="board-grid">
-            <div className="board-main">
-              <People board={board} now={now} />
+          <div className="tb-seg" role="tablist" aria-label="看板內容">
+            <button type="button" role="tab" aria-selected={boardTab === "list"} className={boardTab === "list" ? "is-on" : undefined} onClick={() => setBoardTab("list")}>
+              清單
+            </button>
+            <button type="button" role="tab" aria-selected={boardTab === "log"} className={boardTab === "log" ? "is-on" : undefined} onClick={() => setBoardTab("log")}>
+              紀錄
+            </button>
+          </div>
+          {boardTab === "list" ? (
+            <TaskBoard board={board} now={now} />
+          ) : (
+            <div className="tb-log">
               <Waiting items={board.waiting} now={now} />
-            </div>
-            <aside className="board-side" aria-label="決定、討論和任務">
               <Decisions board={board} />
               <Discussions items={board.discussions} now={now} />
-              <Tasks items={board.tasks} />
-            </aside>
-          </div>
+            </div>
+          )}
           <Problems items={board.problems} />
         </main>
       )}
