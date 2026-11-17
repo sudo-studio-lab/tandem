@@ -1,14 +1,15 @@
 ---
 login: theroyatlas
-updated: 2026-11-16T14:37:47+08:00
-doing: "已按 A 版完成本機對話功能：模型／effort、貼圖與對話圖片、草稿、steer／queue，以及 Antigravity／Grok／Cursor ACP；草稿 PR #10 已開。"
-next: 檢查 PR 和本機範例介面；由使用者完成 Antigravity 原廠登入，再另行驗收真實 provider 回合與桌面更新。
-blocked: Antigravity 尚需原廠登入。真實模型回合與實體手機未驗收；設計工具的 0 assets 額外人審關卡仍未關閉。
+updated: 2026-11-17T14:27:42+08:00
+doing: "#10（對話換模型、圖片、草稿、steer／queue、三家 ACP provider）已合併並發佈 0.2.2；實測 tandem MCP 在 Claude Code、Codex、Cursor、Antigravity 都接得上。"
+next: 兩邊重開 App 確認自動更新到 0.2.2；討論 tandem init 要不要多寫幾家的 MCP 設定。
+blocked: ""
 fyi:
-  - text: 221 項測試通過、8 項略過；typecheck、build、diff check 通過。12 項瀏覽器檢查使用 MOCK、合成貼圖事件與 390px 模擬尺寸。
-  - text: 本機認證與模型 metadata probe：Grok／Cursor 通過，Antigravity 可啟動但要求登入；未送出真實模型 prompt。原生 steer 目前僅 Codex，其他 provider 使用 queue。
-  - text: 獨立複查三項介面修正 resolved、工作流證據 partial；未合併、未發布、未替換已安裝桌面 App。
+  - text: 現階段 PR 不用等對方審，可以直接合併（D-20261117-cb6g）
+  - text: 接 MCP 的實測：Cursor 要放 .cursor/mcp.json 並核准一次；Antigravity 要改全域設定，T3 裡的 Antigravity 又讀另一份；終端機的 claude 第一次也要核准。Gemini CLI、Grok 還沒接上。
 deliverables:
-  - title: A 版對話控制與三家 ACP provider 草稿 PR
+  - title: Tandem 0.2.2
+    url: https://github.com/sudo-studio-lab/tandem-releases/releases/tag/v0.2.2
+  - title: "#10 對話控制與三家 ACP provider"
     url: https://github.com/sudo-studio-lab/tandem/pull/10
 ---
