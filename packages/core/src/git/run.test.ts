@@ -46,3 +46,38 @@ describe.skipIf(process.platform !== "win32" || !existsSync(dugiteGit))("bundled
     expect(e.stdout.trim().toLowerCase()).toContain("dugite");
   });
 });
+
+describe("git env isolation", () => {
+  it("ignores GIT_DIR and friends inherited from a git hook", async () => {
+    const { inheritedGitEnv } = await import("./run.ts");
+    const env = inheritedGitEnv({ GIT_DIR: "/x/.git", git_index_file: "/x/index", GIT_WORK_TREE: "/x", PATH: "p", GIT_TERMINAL_PROMPT: "0" });
+    expect(env).toEqual({ PATH: "p", GIT_TERMINAL_PROMPT: "0" });
+  });
+
+  it("runs in cwd even when GIT_DIR points at another repo", async () => {
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const path = await import("node:path");
+    const { runGit } = await import("./run.ts");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "tandem-env-"));
+    const a = path.join(root, "a");
+    const b = path.join(root, "b");
+    for (const d of [a, b]) {
+      fs.mkdirSync(d);
+      await runGit(["init", "-q"], { cwd: d });
+    }
+    const saved = process.env.GIT_DIR;
+    process.env.GIT_DIR = path.join(a, ".git");
+    try {
+      await runGit(["remote", "add", "origin", "https://example.invalid/b.git"], { cwd: b });
+    } finally {
+      if (saved === undefined) delete process.env.GIT_DIR;
+      else process.env.GIT_DIR = saved;
+    }
+    const inA = await runGit(["remote"], { cwd: a });
+    const inB = await runGit(["remote"], { cwd: b });
+    expect(inA.stdout.trim()).toBe("");
+    expect(inB.stdout.trim()).toBe("origin");
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
