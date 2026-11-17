@@ -31,6 +31,8 @@ export type CliState = LocalState & {
       /** Recent decision ids this session already knows (see live-decisions.ts). */
       seenDecisions?: string[];
       decisionsCheckedAt?: string;
+      /** Shared-context path -> version this session already knows (see live-context.ts). */
+      contextSeen?: Record<string, string>;
     }
   >;
 };

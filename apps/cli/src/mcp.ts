@@ -6,15 +6,18 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { PRODUCT, StatusPatch, TandemError, type DecisionInput, type Problem } from "@tandem/contracts";
+import { CONTEXT_NOTES, PRODUCT, StatusPatch, TandemError, type ContextConflict, type DecisionInput, type Problem } from "@tandem/contracts";
 import {
   checkRecords,
   createDecision,
   createDiscussionOrIssue,
+  listContext,
   loadDecisions,
+  readContext,
   renderBrief,
   syncData,
   updateStatus,
+  writeContext,
   type WriteResult,
 } from "@tandem/core";
 import { openContext, withTimeout, type Context } from "./context.ts";
@@ -22,7 +25,8 @@ import { buildBrief, gatherGitHub } from "./gather.ts";
 import { createTask } from "./tasks.ts";
 import pkg from "../package.json" with { type: "json" };
 
-type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
+type ToolContent = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
+type ToolResult = { content: ToolContent[]; isError?: boolean };
 
 const ok = (text: string): ToolResult => ({ content: [{ type: "text", text }] });
 const fail = (text: string): ToolResult => ({ content: [{ type: "text", text }], isError: true });
@@ -108,6 +112,7 @@ export function createMcpServer(ctx: () => Promise<Context>, approve?: ApproveBr
         "使用者說出會影響別人的決定時：先用 tandem_decide（dryRun 預設 true）產生紀錄給使用者看，問「我記成這樣，對嗎？」，確認後用 dryRun:false 再呼叫一次。原話必須逐字，不能改寫。",
         "需要別人回答才能繼續：tandem_ask。可以先做、之後再改的事，直接記決定。",
         "一段工作告一段落：tandem_status 更新使用者自己的狀態。不要改別人的狀態或決定。",
+        `做比較大的工作前，先用 tandem_context_read 讀共享脈絡的 ${CONTEXT_NOTES}（背景、架構、需求）。`,
         DATA_NOTE,
       ].join("\n"),
     },
@@ -279,6 +284,93 @@ export function createMcpServer(ctx: () => Promise<Context>, approve?: ApproveBr
       const c = await ctx();
       const r = await createTask(c, a);
       return ok(`已建立任務 #${r.number}：${r.url}`);
+    }),
+  );
+
+  // --- shared context -------------------------------------------------------------
+  const size = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+  server.registerTool(
+    "tandem_context_list",
+    {
+      title: "列出共享脈絡的檔案",
+      description: `列出團隊共享脈絡（背景、架構、需求、規格、圖）裡的檔案：誰、什麼時候改的。${CONTEXT_NOTES} 是背景說明，開始比較大的工作前先讀它。`,
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
+    },
+    guard(async () => {
+      const c = await ctx();
+      const files = await listContext(c.store);
+      if (!files.length) return ok(`共享脈絡還是空的。使用者要分享背景或規格時，可以用 tandem_context_write 建立 ${CONTEXT_NOTES}。`);
+      const lines = files.map(
+        (f) =>
+          `- ${f.path}｜${f.kind === "image" ? "圖片" : "文字"}｜${size(f.size)}` +
+          (f.by ? `｜@${f.by}` : "") +
+          (f.at ? ` ${f.at.slice(0, 16).replace("T", " ")}` : "") +
+          (f.pending ? "｜還沒同步" : ""),
+      );
+      return ok(`${DATA_NOTE}\n\n${lines.join("\n")}`);
+    }),
+  );
+
+  server.registerTool(
+    "tandem_context_read",
+    {
+      title: "讀共享脈絡的檔案",
+      description: `讀團隊共享脈絡裡的一個檔案，回傳內容和版本。開始比較大的工作前先讀 ${CONTEXT_NOTES}。要改檔案時，把這裡的版本帶給 tandem_context_write 的 expectVersion。`,
+      inputSchema: {
+        path: z.string().default(CONTEXT_NOTES).describe(`相對於共享脈絡資料夾的路徑，例如 ${CONTEXT_NOTES}、specs/api.md`),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    guard(async ({ path }: { path: string }) => {
+      const c = await ctx();
+      const f = await readContext(c.store, path);
+      if (!f) return fail(`找不到 ${path}。用 tandem_context_list 看有哪些檔案。`);
+      const head = [
+        `路徑：${f.path}`,
+        `版本：${f.version}`,
+        f.by || f.at ? `最後修改：${f.by ? `@${f.by} ` : ""}${f.at ?? ""}`.trim() : "",
+        f.pending ? "（這台電腦的修改還沒同步）" : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      if (f.kind === "image") {
+        return { content: [{ type: "text", text: `${DATA_NOTE}\n\n${head}` }, { type: "image", data: f.content, mimeType: f.mime }] };
+      }
+      return ok(`${DATA_NOTE}\n\n${head}\n\n${f.content}`);
+    }),
+  );
+
+  server.registerTool(
+    "tandem_context_write",
+    {
+      title: "寫入共享脈絡",
+      description:
+        "新增或改寫團隊共享脈絡裡的一個檔案，隊友和隊友的 agent 都會看到。只寫使用者要你分享的東西；絕對不要放金鑰、token、密碼或個資（看起來像金鑰的內容會被拒絕）。" +
+        "改既有檔案前先用 tandem_context_read 讀，並把版本帶進 expectVersion；如果別人剛改過會被拒絕，這時重新讀、合併後再寫，不要直接覆蓋。",
+      inputSchema: {
+        path: z.string().describe("相對路徑，最多 3 層；可用 .md .txt .json .csv .svg .mmd，或圖片 .png .jpg .jpeg .gif .webp"),
+        content: z.string().describe("文字內容；圖片給 base64 並設 encoding: base64。每個檔案最多 2 MB"),
+        why: z.string().min(1).describe("一行說明為什麼改（會記在紀錄裡）"),
+        expectVersion: z.string().nullable().optional().describe("讀到的版本；新檔案給 null。省略代表直接覆蓋"),
+        encoding: z.enum(["utf8", "base64"]).optional(),
+      },
+    },
+    guard(async (a: { path: string; content: string; why: string; expectVersion?: string | null; encoding?: "utf8" | "base64" }) => {
+      const c = await ctx();
+      try {
+        const r = await writeContext(c.store, a, { me: c.me });
+        const note = r.result === "pushed" ? "" : "\n（先存在這台電腦，連上網後會自動同步）";
+        return ok(`已存 ${r.path}（版本 ${r.version}）${note}`);
+      } catch (e) {
+        if (e instanceof TandemError && e.code === "conflict") {
+          const d = e.details as ContextConflict | undefined;
+          return fail(
+            `${e.message}。${d?.version ? `目前版本是 ${d.version}。` : "這個檔案已經被刪掉了。"}請先用 tandem_context_read 讀最新內容，跟你的修改合併後再寫；不要直接覆蓋別人的修改。`,
+          );
+        }
+        throw e;
+      }
     }),
   );
 

@@ -87,6 +87,8 @@ export async function checkNewDecisions(opts: {
   me: string;
   sync?: () => Promise<unknown>;
   now?: Date;
+  /** Other checks that share this throttle and sync (e.g. shared-context changes); run after the decisions check. */
+  more?: () => Promise<string | null>;
 }): Promise<string | null> {
   const { session: s } = opts;
   const now = opts.now ?? new Date();
@@ -95,9 +97,9 @@ export async function checkNewDecisions(opts: {
   s.decisionsCheckedAt = now.toISOString();
   await opts.sync?.();
   const { decisions } = await loadDecisions(opts.store);
-  if (!s.seenDecisions) {
-    rememberDecisions(s, decisions, now);
-    return null;
-  }
-  return newDecisionsNote(s, decisions, opts.me, now);
+  let note: string | null = null;
+  if (!s.seenDecisions) rememberDecisions(s, decisions, now);
+  else note = newDecisionsNote(s, decisions, opts.me, now);
+  const extra = opts.more ? await opts.more().catch(() => null) : null;
+  return [note, extra].filter(Boolean).join("\n\n") || null;
 }

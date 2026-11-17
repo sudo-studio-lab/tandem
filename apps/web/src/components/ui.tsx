@@ -90,6 +90,30 @@ export function Panel({
   );
 }
 
+/** Just enough Markdown for notes: headings, bullets, paragraphs and ``` code blocks. Never renders HTML. */
+export function MarkdownLite({ text, className }: { text: string; className?: string }) {
+  const out: ReactNode[] = [];
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (/^\s*```/.test(line)) {
+      const code: string[] = [];
+      while (i + 1 < lines.length && !/^\s*```/.test(lines[i + 1]!)) code.push(lines[++i]!);
+      i++;
+      out.push(<pre key={i} className="notes-code">{code.join("\n")}</pre>);
+      continue;
+    }
+    const h = /^#{1,6}\s+(.*)$/.exec(line);
+    if (h) out.push(<h4 key={i}>{h[1]}</h4>);
+    else {
+      const li = /^\s*(?:[-*]|\d+\.)\s+(.*)$/.exec(line);
+      if (li) out.push(<p key={i} className="notes-li">{li[1]}</p>);
+      else if (line.trim()) out.push(<p key={i}>{line}</p>);
+    }
+  }
+  return <div className={`notes${className ? ` ${className}` : ""}`}>{out}</div>;
+}
+
 const HUES = [210, 150, 25, 280, 340, 190, 45, 110];
 /** Initial in a colored circle; the color is stable per login. */
 export function Avatar({ login, size = 32 }: { login: string; size?: number }) {

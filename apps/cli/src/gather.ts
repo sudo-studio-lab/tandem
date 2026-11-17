@@ -1,7 +1,10 @@
 /** Collect everything brief and board need from records, git and GitHub. */
 import {
+  CONTEXT_DIR,
   PATHS,
   PRODUCT,
+  type BriefContextChange,
+  type ContextFileInfo,
   type BoardData,
   type BoardMember,
   type Brief,
@@ -12,7 +15,17 @@ import {
   type SyncState,
   type TaskSummary,
 } from "@tandem/contracts";
-import { changesSince, checkRecords, computeBrief, computeWaiting, loadDecisions, loadStatuses } from "@tandem/core";
+import {
+  changesSince,
+  checkRecords,
+  computeBrief,
+  computeWaiting,
+  contextHistory,
+  listContext,
+  loadDecisions,
+  loadStatuses,
+  notesHead,
+} from "@tandem/core";
 import type { Context } from "./context.ts";
 
 export interface GitHubData {
@@ -68,13 +81,42 @@ export async function gatherLocal(ctx: Context) {
   return { decisions, statuses, problems };
 }
 
-export async function buildBrief(ctx: Context, gh: GitHubData | null): Promise<{ brief: Brief; head: string | null; decisions: Decision[] }> {
+const sameLogin = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+
+/** Context files someone else changed, given repo-relative paths that changed (newest first). */
+export async function contextChangesFor(
+  ctx: Pick<Context, "store" | "me">,
+  changedPaths: string[],
+  files: ContextFileInfo[],
+): Promise<BriefContextChange[]> {
+  const prefix = `${CONTEXT_DIR}/`;
+  const rels = [...new Set(changedPaths.filter((p) => p.startsWith(prefix)).map((p) => p.slice(prefix.length)))];
+  if (!rels.length) return [];
+  const hist = await contextHistory(ctx.store);
+  const present = new Set(files.map((f) => f.path));
+  return rels
+    .map((path) => ({ path, by: hist.get(path)?.by, deleted: !present.has(path) }))
+    .filter((c) => !(c.by && sameLogin(c.by, ctx.me)))
+    .map((c) => ({ path: c.path, deleted: c.deleted, ...(c.by ? { by: c.by } : {}) }));
+}
+
+export async function buildBrief(
+  ctx: Context,
+  gh: GitHubData | null,
+): Promise<{ brief: Brief; head: string | null; decisions: Decision[]; contextFiles: ContextFileInfo[] }> {
   const since = ctx.state.lastBrief ?? { commit: null, time: null };
-  const [local, changes, head] = await Promise.all([
+  const [local, changes, head, contextFiles, notes] = await Promise.all([
     gatherLocal(ctx),
     changesSince(ctx.dataRoot, since.commit, [PRODUCT.dataDir]),
     ctx.store.snapshot(),
+    listContext(ctx.store).catch(() => [] as ContextFileInfo[]),
+    notesHead(ctx.store).catch(() => undefined),
   ]);
+  const contextChanges = await contextChangesFor(
+    ctx,
+    changes.files.map((f) => f.path),
+    contextFiles,
+  ).catch(() => [] as BriefContextChange[]);
   const added = new Set(
     changes.files.filter((f) => f.status === "A" && f.path.startsWith(`${PATHS.decisions}/`)).map((f) => f.path),
   );
@@ -95,12 +137,12 @@ export async function buildBrief(ctx: Context, gh: GitHubData | null): Promise<{
     pullRequests: data.pullRequests,
     tasks: data.tasks,
     problems: local.problems,
+    contextChanges,
+    ...(notes ? { notesHead: notes } : {}),
   });
   if (!gh) brief.problems.push("這次沒有讀 GitHub（連線逾時或離線），討論和任務可能不是最新的");
-  return { brief, head, decisions: local.decisions };
+  return { brief, head, decisions: local.decisions, contextFiles };
 }
-
-const sameLogin = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
 /** `extraLogins`: collaborators and people seen in activity, so nobody with access is missing. */
 export async function buildBoard(ctx: Context, gh: GitHubData, sync: SyncState, extraLogins: string[] = []): Promise<BoardData> {

@@ -26,6 +26,16 @@ import type {
 import { ApiError } from "./api.ts";
 import { mockProjectBoard } from "./mock.ts";
 import { validateChatImages } from "../../../packages/contracts/src/images.ts";
+import {
+  CONTEXT_MAX_BYTES,
+  base64Bytes,
+  contextConflictMessage,
+  contextKind,
+  sortContextFiles,
+  validateContextPath,
+} from "../../../packages/contracts/src/context.ts";
+import type { ContextFile, ContextFileInfo, ContextWriteInput } from "@tandem/contracts";
+import { describeSecrets, findSecrets } from "../../../packages/core/src/context/secrets.ts";
 
 const params = new URLSearchParams(location.search);
 const ME = "jielle2453";
@@ -247,6 +257,124 @@ function boardFor(id: string) {
   return { ...b, tasks: [...extra, ...b.tasks] };
 }
 
+// --- shared context (脈絡) ----------------------------------------------------
+// Saving "specs/conflict-demo.md" the first time pretends a teammate changed it just before.
+const FLOW_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 200" font-family="system-ui, sans-serif" font-size="14">
+  <rect width="480" height="200" fill="#f7f8fa"/>
+  <g fill="#ffffff" stroke="#cfd4dc" stroke-width="1.5">
+    <rect x="16" y="70" width="120" height="60" rx="10"/>
+    <rect x="180" y="56" width="120" height="88" rx="10" fill="#e8efff" stroke="#2259d6"/>
+    <rect x="344" y="70" width="120" height="60" rx="10"/>
+  </g>
+  <g stroke="#667085" stroke-width="2" fill="none">
+    <path d="M136 100 H172"/><path d="M164 94 L172 100 L164 106"/>
+    <path d="M344 100 H308"/><path d="M316 94 L308 100 L316 106"/>
+  </g>
+  <g fill="#1a2130" text-anchor="middle">
+    <text x="76" y="105">你的 AI</text>
+    <text x="240" y="95" font-weight="600">共享脈絡</text>
+    <text x="240" y="117" fill="#667085" font-size="12">notes.md・規格・圖</text>
+    <text x="404" y="105">隊友的 AI</text>
+  </g>
+</svg>
+`;
+
+interface MockContextFile {
+  content: string;
+  encoding: "utf8" | "base64";
+  by: string;
+  at: string;
+}
+const contextFiles = new Map<string, Map<string, MockContextFile>>();
+let conflictDemoUsed = false;
+
+/** FNV-1a: a stand-in for the git blob sha. */
+function mockVersion(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+  return h.toString(16).padStart(8, "0").repeat(5);
+}
+
+function contextFor(projectId: string): Map<string, MockContextFile> {
+  let m = contextFiles.get(projectId);
+  if (!m) {
+    m = new Map([
+      [
+        "notes.md",
+        {
+          content: [
+            "# 專案背景",
+            "",
+            "做一個給小團隊的記帳 app，先做網頁版。",
+            "",
+            "## 架構",
+            "- 前端：React",
+            "- 資料：先存在瀏覽器，之後再接雲端",
+            "",
+            "## 需求",
+            "- 三個人以內可以一起記",
+            "- 每月自動結算",
+          ].join("\n"),
+          encoding: "utf8",
+          by: "theroyatlas",
+          at: ago(3 * 3_600_000),
+        },
+      ],
+      ["diagrams/flow.svg", { content: FLOW_SVG, encoding: "utf8", by: ME, at: ago(26 * 3_600_000) }],
+      ["specs/conflict-demo.md", { content: "# 衝突示範\n\n改這個檔案再按儲存，會看到別人剛改過的提示。\n", encoding: "utf8", by: ME, at: ago(2 * 86_400_000) }],
+    ]);
+    contextFiles.set(projectId, m);
+  }
+  return m;
+}
+
+function contextInfo(path: string, f: MockContextFile): ContextFileInfo {
+  const k = contextKind(path)!;
+  const size = f.encoding === "base64" ? base64Bytes(f.content) : new TextEncoder().encode(f.content).length;
+  return { path, kind: k.kind, mime: k.mime, size, version: mockVersion(f.content), by: f.by, at: f.at };
+}
+
+function contextConflict(path: string, by: string, version: string | null): never {
+  throw new ApiError(contextConflictMessage(by), "conflict", { path, version, by });
+}
+
+function writeMockContext(projectId: string, input: Partial<ContextWriteInput>, del = false): unknown {
+  let path: string;
+  try {
+    path = validateContextPath(String(input.path ?? ""));
+  } catch (e) {
+    throw new ApiError((e as Error).message, "validation");
+  }
+  const files = contextFor(projectId);
+  const cur = files.get(path);
+  const curVersion = cur ? mockVersion(cur.content) : null;
+  if (input.expectVersion !== undefined && input.expectVersion !== curVersion) contextConflict(path, cur?.by ?? "theroyatlas", curVersion);
+  if (path === "specs/conflict-demo.md" && cur && !conflictDemoUsed && !del) {
+    conflictDemoUsed = true;
+    cur.content += "\n（@theroyatlas 剛補了一行）\n";
+    cur.by = "theroyatlas";
+    cur.at = new Date().toISOString();
+    contextConflict(path, "theroyatlas", mockVersion(cur.content));
+  }
+  if (del) {
+    if (!cur) throw new ApiError(`找不到 ${path}`, "validation");
+    files.delete(path);
+    return { path, version: null, result: "pushed" };
+  }
+  const content = String(input.content ?? "");
+  const encoding = input.encoding === "base64" ? "base64" : "utf8";
+  const kind = contextKind(path)!.kind;
+  if (kind === "image" && encoding !== "base64") throw new ApiError("圖片要用 base64 傳", "validation");
+  const bytes = encoding === "base64" ? base64Bytes(content) : new TextEncoder().encode(content).length;
+  if (bytes > CONTEXT_MAX_BYTES) throw new ApiError("檔案太大，每個檔案最多 2 MB", "validation");
+  if (kind === "text") {
+    const msg = describeSecrets(findSecrets(content));
+    if (msg) throw new ApiError(msg, "validation");
+  }
+  files.set(path, { content, encoding, by: login ?? ME, at: new Date().toISOString() });
+  return { path, version: mockVersion(content), result: "pushed" };
+}
+
 // --- device login -----------------------------------------------------------
 const deviceStarts = new Map<string, number>();
 
@@ -434,6 +562,20 @@ export async function handle(method: string, path: string, body: unknown): Promi
         shareText: `@${who}，我邀請你一起用 Tandem 做「${proj.name}」。\n1. 下載 Tandem：https://example.com/tandem\n2. 用 GitHub 登入，就會看到邀請\n（專案：${url2}）`,
         url: url2,
       };
+    }
+    if (method === "GET" && tail === "/context") {
+      return sortContextFiles([...contextFor(id)].map(([path, f]) => contextInfo(path, f)));
+    }
+    if (tail === "/context/file") {
+      const q = url.searchParams;
+      if (method === "GET") {
+        const path = q.get("path") ?? "";
+        const f = contextFor(id).get(path);
+        if (!f) throw new ApiError("找不到這個檔案，可能已經被刪掉了", "usage");
+        return { ...contextInfo(path, f), content: f.content, encoding: f.encoding } satisfies ContextFile;
+      }
+      if (method === "PUT") return writeMockContext(id, body as Partial<ContextWriteInput>);
+      if (method === "DELETE") return writeMockContext(id, { path: q.get("path") ?? "", ...(q.get("expectVersion") ? { expectVersion: q.get("expectVersion") } : {}) }, true);
     }
     if (method === "POST" && tail === "/open-agent") return { ok: true };
     if (method === "GET" && tail === "/chats") return chats.filter((c) => c.projectId === id && !c.room).map(({ items: _i, ...c }) => c);
