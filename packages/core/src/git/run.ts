@@ -59,13 +59,38 @@ export interface RunGitResult {
   code: number;
 }
 
+/**
+ * Variables that make git ignore `cwd` and use some other repository. Git sets several of them
+ * while running hooks (e.g. `tandem check` from pre-commit), so a child git started from there
+ * would otherwise act on the hook's repo instead of the one we point it at (for example the
+ * separate data repo).
+ */
+const REPO_LOCATING_ENV = [
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_INDEX_FILE",
+  "GIT_COMMON_DIR",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_NAMESPACE",
+  "GIT_PREFIX",
+  "GIT_CEILING_DIRECTORIES",
+  "GIT_DISCOVERY_ACROSS_FILESYSTEM",
+] as const;
+
+/** process.env without the variables above (case-insensitive: Windows env names are). */
+export function inheritedGitEnv(parent: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const drop = new Set<string>(REPO_LOCATING_ENV);
+  return Object.fromEntries(Object.entries(parent).filter(([k]) => !drop.has(k.toUpperCase())));
+}
+
 /** Run git without a shell. Throws TandemError("internal") on non-zero exit unless allowFail. */
 export function runGit(args: string[], opts: RunGitOptions): Promise<RunGitResult> {
   return new Promise((resolve, reject) => {
     const g = resolveGit();
     const child = spawn(g.bin, args, {
       cwd: opts.cwd,
-      env: { ...process.env, ...g.env, ...opts.env, LC_ALL: "C", GIT_TERMINAL_PROMPT: "0" },
+      env: { ...inheritedGitEnv(), ...g.env, ...opts.env, LC_ALL: "C", GIT_TERMINAL_PROMPT: "0" },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });
