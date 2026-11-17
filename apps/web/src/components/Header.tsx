@@ -33,6 +33,8 @@ interface Props {
   onError: (msg: string) => void;
   view: View;
   onView: (v: View) => void;
+  /** Open the decisions / discussions / who-waits-on-whom page. */
+  onLog?: () => void;
   /** Extra tabs (e.g. rooms) appended after TABS. */
   tabs?: { id: View; label: string }[];
 }
@@ -253,6 +255,7 @@ export function Header(p: Props) {
   const more =
     usable && id
       ? [
+          ...(p.onLog ? [{ key: "log", label: "決定和討論", hint: "誰在等誰、團隊的決定、討論", run: p.onLog }] : []),
           ...agents
             .filter((a) => a.installed && a.terminalAvailable !== false)
             .map((a) => ({

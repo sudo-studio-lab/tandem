@@ -170,7 +170,14 @@ export function App() {
       onSettings={() => setDialog("settings")}
       onError={notify}
       view={view}
-      onView={setView}
+      onView={(v) => {
+        setView(v);
+        if (v === "board") setBoardTab("list");
+      }}
+      onLog={() => {
+        setView("board");
+        setBoardTab("log");
+      }}
     />
   );
 
@@ -226,18 +233,15 @@ export function App() {
               {app.boardError}
             </p>
           )}
-          <div className="tb-seg" role="tablist" aria-label="看板內容">
-            <button type="button" role="tab" aria-selected={boardTab === "list"} className={boardTab === "list" ? "is-on" : undefined} onClick={() => setBoardTab("list")}>
-              清單
-            </button>
-            <button type="button" role="tab" aria-selected={boardTab === "log"} className={boardTab === "log" ? "is-on" : undefined} onClick={() => setBoardTab("log")}>
-              紀錄
-            </button>
-          </div>
           {boardTab === "list" ? (
             <TaskBoard board={board} now={now} />
           ) : (
             <div className="tb-log">
+              <p className="tb-back">
+                <button type="button" className="tb-link" onClick={() => setBoardTab("list")}>
+                  ← 回任務
+                </button>
+              </p>
               <Waiting items={board.waiting} now={now} />
               <Decisions board={board} />
               <Discussions items={board.discussions} now={now} />

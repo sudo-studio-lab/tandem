@@ -6,9 +6,11 @@ import { PersonCard } from "./People.tsx";
 import { relTime, waitedFor } from "../time.ts";
 
 /*
- * The board as one narrow column (fits an editor's side panel):
- * people strip → what waits on me → PRs and tasks grouped by state.
- * Clicking a person filters the list to them and opens their full status.
+ * The board as one narrow column (fits an editor's side panel), laid out
+ * like a task board: all / mine on the left, teammates' faces on the right,
+ * then what waits on me (only when something does) and PRs and tasks grouped
+ * by state. Clicking a face filters the list to that person and opens their
+ * full status.
  */
 
 type GroupKey = "ready" | "working" | "done";
@@ -27,7 +29,7 @@ interface Item {
 }
 
 const GROUPS: { key: GroupKey; label: string; open: boolean }[] = [
-  { key: "ready", label: "待合併", open: true },
+  { key: "ready", label: "已開 PR", open: true },
   { key: "working", label: "進行中", open: true },
   { key: "done", label: "最近完成", open: false },
 ];
@@ -38,9 +40,16 @@ const WAIT_KIND: Record<WaitingItem["kind"], string> = {
   blocked_issue: "等你完成",
 };
 
-function Icon({ name, className }: { name: "ready" | "working" | "done" | "pr" | "task"; className?: string }) {
+function Icon({ name, className }: { name: "wait" | "ready" | "working" | "done" | "pr" | "task"; className?: string }) {
   const common = { className: `tb-ic${className ? ` ${className}` : ""}`, viewBox: "0 0 16 16", "aria-hidden": true } as const;
   switch (name) {
+    case "wait":
+      return (
+        <svg {...common}>
+          <circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M8 4.8V8l2.2 1.6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
     case "ready":
       return (
         <svg {...common}>
@@ -159,25 +168,44 @@ function Group({ label, k, open, items, now, empty }: { label: string; k: GroupK
   );
 }
 
-function Person({ m, me, now, selected, onPick }: { m: BoardMember; me: string; now: number; selected: boolean; onPick: () => void }) {
+function Face({ m, me, now, selected, onPick }: { m: BoardMember; me: string; now: number; selected: boolean; onPick: () => void }) {
   const s = m.status;
-  const fresh = s && Date.now() - Date.parse(s.updated) < 24 * 3600_000;
+  const fresh = s && now - Date.parse(s.updated) < 24 * 3600_000;
   const line = s?.blocked ? `卡在：${s.blocked}` : s?.doing || "還沒寫狀態";
+  const label = `${m.login}${m.login === me ? "（你）" : ""}：${line}${s ? `（${relTime(s.updated, now)}更新）` : ""}`;
   return (
-    <button type="button" className={`tb-person${selected ? " is-sel" : ""}`} aria-pressed={selected} onClick={onPick}>
-      <span className="tb-av">
-        <Avatar login={m.login} size={32} />
-        <i className={`tb-dot${s?.blocked ? " is-blocked" : fresh ? " is-fresh" : ""}`} aria-hidden="true" />
-      </span>
-      <span className="tb-person-text">
-        <span className="tb-who">
-          {m.login}
-          {m.login === me && <span className="badge badge-me">你</span>}
-        </span>
-        <span className={`tb-doing${s?.blocked ? " is-blocked" : ""}`}>{line}</span>
-        <span className="tb-when">{s ? `${relTime(s.updated, now)}更新` : ""}</span>
-      </span>
+    <button type="button" className={`tb-face${selected ? " is-sel" : ""}`} aria-pressed={selected} aria-label={label} title={label} onClick={onPick}>
+      <Avatar login={m.login} size={26} />
+      <i className={`tb-dot${s?.blocked ? " is-blocked" : fresh ? " is-fresh" : ""}`} aria-hidden="true" />
     </button>
+  );
+}
+
+function WaitGroup({ items, now }: { items: WaitingItem[]; now: number }) {
+  return (
+    <details className="tb-group tb-group-wait" open>
+      <summary>
+        <span className="tb-chev" aria-hidden="true" />
+        <Icon name="wait" className="tb-wait-ic" />
+        <span className="tb-group-label">等你</span>
+        <span className="tb-count">{items.length}</span>
+      </summary>
+      <ul className="tb-rows">
+        {items.map((w, i) => (
+          <li key={i} className="tb-row">
+            <Icon name="wait" className="tb-wait-ic" />
+            <span className="tb-kind">{WAIT_KIND[w.kind]}</span>
+            <Ext href={w.url} className="tb-title">
+              {w.title}
+            </Ext>
+            <span className="tb-meta">{waitedFor(w.since, now)}</span>
+            <span className="tb-owners" title={`@${w.from}`}>
+              <Avatar login={w.from} size={22} />
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
@@ -193,35 +221,10 @@ export function TaskBoard({ board, now }: { board: ProjectBoard; now: number }) 
 
   return (
     <div className="tb">
-      <div className="tb-people" role="group" aria-label="成員（點一下只看這個人）">
-        {members.map((m) => (
-          <Person key={m.login} m={m} me={board.me} now={now} selected={person === m.login} onPick={() => setPerson(person === m.login ? null : m.login)} />
-        ))}
-      </div>
-
-      {picked && (
-        <div className="tb-picked">
-          <PersonCard m={picked} board={board} now={now} />
-        </div>
-      )}
-
-      {mine.length > 0 && (
-        <section className="tb-wait" aria-label={`有 ${mine.length} 件事在等你`}>
-          {mine.map((w, i) => (
-            <Ext key={i} href={w.url} className="tb-wait-item">
-              <b>{WAIT_KIND[w.kind]}</b>
-              <span className="tb-wait-title">{w.title}</span>
-              <span className="tb-wait-meta">{waitedFor(w.since, now)}</span>
-              <Avatar login={w.from} size={20} />
-            </Ext>
-          ))}
-        </section>
-      )}
-
-      <div className="tb-scope">
+      <div className="tb-bar">
         {person ? (
           <p className="tb-filter-note">
-            只看 @{person} 的 PR 和任務・
+            只看 @{person}・
             <button type="button" className="tb-link" onClick={() => setPerson(null)}>
               看全部
             </button>
@@ -236,7 +239,20 @@ export function TaskBoard({ board, now }: { board: ProjectBoard; now: number }) 
             </button>
           </div>
         )}
+        <div className="tb-faces" role="group" aria-label="成員（點一下只看這個人）">
+          {members.map((m) => (
+            <Face key={m.login} m={m} me={board.me} now={now} selected={person === m.login} onPick={() => setPerson(person === m.login ? null : m.login)} />
+          ))}
+        </div>
       </div>
+
+      {picked && (
+        <div className="tb-picked">
+          <PersonCard m={picked} board={board} now={now} />
+        </div>
+      )}
+
+      {mine.length > 0 && <WaitGroup items={mine} now={now} />}
 
       {GROUPS.map((g) => (
         <Group
@@ -246,7 +262,7 @@ export function TaskBoard({ board, now }: { board: ProjectBoard; now: number }) 
           open={g.open}
           now={now}
           items={items.filter((it) => it.group === g.key)}
-          empty={g.key === "ready" ? "沒有等著合併的 PR" : g.key === "working" ? "沒有進行中的草稿 PR 或任務" : "最近兩週沒有完成的項目"}
+          empty={g.key === "ready" ? "沒有開著的 PR" : g.key === "working" ? "沒有進行中的草稿 PR 或任務" : "最近兩週沒有完成的項目"}
         />
       ))}
     </div>
