@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import type { AgentKind, AgentStatus, AppSession, ProjectBoard, ProjectRef } from "@tandem/contracts";
 import { api, projectPath } from "../api.ts";
 import { relTime } from "../time.ts";
-import { errMsg } from "./ui.tsx";
+import { Avatar, errMsg } from "./ui.tsx";
 
 const AGENT_NAME: Record<AgentKind, string> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity", grok: "Grok", cursor: "Cursor" };
 
@@ -49,6 +49,8 @@ interface Props {
   onLog?: () => void;
   /** Open the shared context page (脈絡). */
   onContext?: () => void;
+  onAgentMessages?: () => void;
+  onSharedChats?: () => void;
   /** Extra tabs (e.g. rooms) appended after TABS. */
   tabs?: { id: View; label: string }[];
 }
@@ -209,33 +211,24 @@ function Switcher({ session, project, onSelect, onRemove, onAddProject, onError 
 /** "⋯" menu: the less frequent actions (terminal, folder, refresh). */
 function MoreMenu({ items }: { items: { key: string; label: string; hint?: string; disabled?: boolean; run: () => void }[] }) {
   const [open, setOpen] = useState(false);
+  const [position,setPosition]=useState({left:12,top:60});
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(ref, open, () => setOpen(false));
+  const toggle=()=>{if(!open){const rect=ref.current?.getBoundingClientRect();setPosition({left:Math.max(12,Math.min((rect?.right??292)-280,window.innerWidth-292)),top:(rect?.bottom??54)+6});}setOpen(v=>!v);};
+  useEffect(()=>{if(!open)return;const resize=()=>{const r=ref.current?.getBoundingClientRect();setPosition({left:Math.max(12,Math.min((r?.right??292)-280,window.innerWidth-292)),top:(r?.bottom??54)+6});};window.addEventListener("resize",resize);return()=>window.removeEventListener("resize",resize);},[open]);
+  const collaboration=new Set(["log","context","agent-messages","shared-chats"]);
+  const tools=items.filter(it=>!collaboration.has(it.key)&&!["folder","refresh"].includes(it.key));
+  const renderItem=(it:typeof items[number])=><button key={it.key} type="button" className="menu-item" disabled={it.disabled} onClick={()=>{setOpen(false);it.run();}}><span className="grow">{it.label}{it.hint&&<span className="block muted small">{it.hint}</span>}</span></button>;
   return (
-    <div className="more-menu" ref={ref}>
-      <button type="button" className="icon-btn" aria-label="更多動作" title="更多動作" aria-expanded={open} aria-haspopup="true" onClick={() => setOpen((v) => !v)}>
+    <div className="more-menu" ref={ref} onKeyDown={e=>{if(e.key==="Escape"){setOpen(false);ref.current?.querySelector("button")?.focus();}}}>
+      <button type="button" className="icon-btn" aria-label="更多動作" title="更多動作" aria-expanded={open} aria-controls="tandem-project-actions" onClick={toggle}>
         ⋯
       </button>
       {open && (
-        <div className="menu menu-right card" role="menu">
-          {items.map((it) => (
-            <button
-              key={it.key}
-              type="button"
-              role="menuitem"
-              className="menu-item"
-              disabled={it.disabled}
-              onClick={() => {
-                setOpen(false);
-                it.run();
-              }}
-            >
-              <span className="grow">
-                {it.label}
-                {it.hint && <span className="block muted small">{it.hint}</span>}
-              </span>
-            </button>
-          ))}
+        <div id="tandem-project-actions" className="menu menu-right card co-more-menu" style={{position:"fixed",left:position.left,right:"auto",top:position.top,width:280,minWidth:0,maxHeight:`calc(100dvh - ${position.top+12}px)`,overflowY:"auto"}} role="region" aria-label="專案功能">
+          <div role="group" aria-label="協作"><p className="co-menu-heading">協作</p>{items.filter(it=>collaboration.has(it.key)).map(renderItem)}</div>
+          {tools.length>0&&<details className="co-menu-tools"><summary>開啟我的 AI 工具</summary>{tools.map(renderItem)}</details>}
+          <div role="group" aria-label="專案操作" className="co-menu-project">{items.filter(it=>["folder","refresh"].includes(it.key)).map(renderItem)}</div>
         </div>
       )}
     </div>
@@ -271,6 +264,8 @@ export function Header(p: Props) {
       ? [
           ...(p.onLog ? [{ key: "log", label: "決定和討論", hint: "誰在等誰、團隊的決定、討論", run: p.onLog }] : []),
           ...(p.onContext ? [{ key: "context", label: "脈絡", hint: "背景、規格和圖，大家和 AI 都讀得到", run: p.onContext }] : []),
+          ...(p.onAgentMessages ? [{ key: "agent-messages", label: "Agent 問答", hint: "閱讀問答、停止或設定開放", run: p.onAgentMessages }] : []),
+          ...(p.onSharedChats ? [{ key: "shared-chats", label: "對話與交接", hint: "選擇分享、閱讀隊友對話與交接任務", run: p.onSharedChats }] : []),
           ...agents
             .filter((a) => a.installed && a.terminalAvailable !== false)
             .map((a) => ({
@@ -312,8 +307,8 @@ export function Header(p: Props) {
         )}
         <SyncPill board={p.board} now={p.now} syncing={p.syncing} refreshing={p.refreshing} onSync={p.onSync} onRefresh={p.onRefresh} usable={usable} />
         {usable && (
-          <button type="button" className="btn btn-small" onClick={p.onInvite}>
-            ＋ 邀請
+          <button type="button" className="btn btn-small co-members-button" onClick={p.onInvite} aria-label="邀請與成員">
+            {(p.board?.members.length??0)>1?<><span className="co-member-faces" aria-hidden="true">{p.board!.members.slice(0,3).map(m=><Avatar key={m.login} login={m.login} size={22}/>)}</span><span>{p.board!.members.length} 位成員</span></>:"邀請隊友"}
           </button>
         )}
         {more.length > 0 && <MoreMenu items={more} />}

@@ -15,6 +15,8 @@ import { InviteDialog, SettingsDialog } from "./components/Dialogs.tsx";
 import { AgentSettingsDialog, ChatView } from "./components/Chat.tsx";
 import { RoomView } from "./components/Room.tsx";
 import { ContextPage } from "./components/Context.tsx";
+import { AgentMessagesPage } from "./components/AgentMessages.tsx";
+import { SharedChatsPage } from "./components/SharedChats.tsx";
 import { Spinner, errMsg } from "./components/ui.tsx";
 
 interface Op {
@@ -34,7 +36,8 @@ export function App() {
   const [op, setOp] = useState<Op | null>(null);
   const [dialog, setDialog] = useState<"invite" | "settings" | "agents" | null>(null);
   const [view, setView] = useState<View>("board");
-  const [boardTab, setBoardTab] = useState<"list" | "log" | "context">("list");
+  const [boardTab, setBoardTab] = useState<"list" | "log" | "context" | "agent-messages" | "shared-chats">("list");
+  const [forkId,setForkId]=useState<string|undefined>();
   const [toast, setToast] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const handledDone = useRef<string | null>(null);
@@ -163,6 +166,7 @@ export function App() {
       onSync={app.sync}
       onSelect={(id) => {
         setShowPicker(false);
+        setForkId(undefined);
         void app.selectProject(id);
       }}
       onRemove={app.removeProject}
@@ -183,6 +187,8 @@ export function App() {
         setView("board");
         setBoardTab("context");
       }}
+      onAgentMessages={()=>{setView("board");setBoardTab("agent-messages");}}
+      onSharedChats={()=>{setView("board");setBoardTab("shared-chats");}}
     />
   );
 
@@ -217,7 +223,7 @@ export function App() {
       ) : view === "room" ? (
         <RoomView key={project.id} projectId={project.id} me={session.login} now={now} onOpenSettings={() => setDialog("agents")} />
       ) : view === "chat" ? (
-        <ChatView key={project.id} projectId={project.id} now={now} onOpenSettings={() => setDialog("agents")} />
+        <><div className="page tb-back"><button type="button" className="tb-link" onClick={()=>{setView("board");setBoardTab("shared-chats");}}>回對話與交接</button></div><ChatView key={project.id} projectId={project.id} now={now} initialChatId={forkId} onOpenSettings={() => setDialog("agents")} /></>
       ) : !board ? (
         <main className="page">
           {app.boardError ? (
@@ -239,9 +245,13 @@ export function App() {
             </p>
           )}
           {boardTab === "list" ? (
-            <TaskBoard board={board} now={now} onTaskCreated={app.reloadBoard} />
+            <TaskBoard key={project.id} board={board} now={now} onTaskCreated={app.reloadBoard} />
           ) : boardTab === "context" ? (
             <ContextPage key={project.id} projectId={project.id} now={now} onBack={() => setBoardTab("list")} />
+          ) : boardTab === "agent-messages" ? (
+            <AgentMessagesPage key={project.id} projectId={project.id} me={session.login} now={now} onBack={()=>setBoardTab("list")} />
+          ) : boardTab === "shared-chats" ? (
+            <SharedChatsPage key={project.id} board={board} now={now} onBack={()=>setBoardTab("list")} onChanged={app.reloadBoard} onFork={id=>{setForkId(id);setView("chat");}}/>
           ) : (
             <div className="tb-log">
               <p className="tb-back">

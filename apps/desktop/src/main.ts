@@ -15,7 +15,7 @@ import {
 } from "electron";
 import type { AppEvent, AppNotification } from "@tandem/contracts";
 import { Backend } from "./backend.ts";
-import { findDeepLink, isHttps, parseJoinLink } from "./deeplink.ts";
+import { findDeepLink, isHttps, parseJoinLink, parseJoinSecret } from "./deeplink.ts";
 import { EventStream } from "./events.ts";
 import { cliPath, gitExe, iconPath } from "./paths.ts";
 import { defaultBinDir, ensureShim } from "./shim.ts";
@@ -36,6 +36,7 @@ let tray: Tray | null = null;
 let quitting = false;
 let attention = 0;
 let pendingJoin: string | null = null;
+let pendingJoinSecret: string | null = null;
 let serverError: string | null = null;
 const events = new EventStream(onAppEvent, (m) => backend?.note(m));
 const notified = new Set<string>();
@@ -64,7 +65,8 @@ function handleLink(link: string): void {
   const repo = parseJoinLink(link);
   if (!repo) return; // ignore anything that is not a valid join link
   pendingJoin = repo;
-  if (origin) loadApp(repo);
+  pendingJoinSecret=parseJoinSecret(link);
+  if (origin) loadApp(repo,pendingJoinSecret??undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -83,8 +85,9 @@ async function boot(): Promise<void> {
       origin = backend!.origin;
       serverError = null;
       events.connect(origin, token);
-      loadApp(pendingJoin ?? undefined);
+      loadApp(pendingJoin ?? undefined,pendingJoinSecret??undefined);
       pendingJoin = null;
+      pendingJoinSecret=null;
     });
     backend.on("down", (reason: string) => {
       serverError = reason;
@@ -237,9 +240,9 @@ function showLoading(): void {
 }
 
 /** Load the web app. The token in the URL is swapped for a cookie by the server. */
-function loadApp(join?: string): void {
+function loadApp(join?: string,share?:string): void {
   if (!win || win.isDestroyed() || !origin) return;
-  const q = join ? `join=${join}&t=${token}` : `t=${token}`;
+  const q = (join ? `join=${encodeURIComponent(join)}&t=${token}` : `t=${token}`)+(share?`#share=${share}`:"");
   void win.loadURL(`${origin}/?${q}`);
   if (join) showWindow();
 }

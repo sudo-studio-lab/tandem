@@ -18,6 +18,7 @@ import {
   updateStatus,
 } from "@tandem/core";
 import { openContext, type Context } from "./context.ts";
+import { verifyShareLink } from "./members.ts";
 
 export type Progress = (step: ProjectStep, message: string) => void;
 const noop: Progress = () => undefined;
@@ -190,6 +191,8 @@ export async function startProject(opts: {
   enableDiscussions: boolean;
   /** Also accept a pending invitation to the project's data repo (see .tandem.json). */
   acceptDataInvite?: boolean;
+  fromLink?: boolean;
+  shareToken?: string;
   progress?: Progress;
 }): Promise<{ projectId: string; dir: string; setup: SetupResult }> {
   const progress = opts.progress ?? noop;
@@ -203,6 +206,7 @@ export async function startProject(opts: {
   if (opts.acceptDataInvite) await acceptDataRepoInvite(dir, opts.owner, opts.name, opts.token, progress);
   // Also sets up the local copy of the data repo when .tandem.json points to one.
   const ctx = await openContext(dir, { token: opts.token });
+  if(opts.fromLink)await verifyShareLink(ctx,opts.shareToken);
   const setup = await setupProject(ctx, { enableDiscussions: opts.enableDiscussions, progress });
   const projectId = await rememberProject(ctx);
   progress("done", "完成");
@@ -236,6 +240,8 @@ export async function joinProject(opts: {
   projectsDir: string;
   dir?: string;
   invitationId?: number;
+  fromLink?: boolean;
+  shareToken?: string;
   progress?: Progress;
 }) {
   const progress = opts.progress ?? noop;

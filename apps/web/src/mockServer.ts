@@ -22,6 +22,8 @@ import type {
   ProjectStep,
   RepoChoice,
   TaskSummary,
+  SharedChat,
+  Handoff,
 } from "@tandem/contracts";
 import { ApiError } from "./api.ts";
 import { mockProjectBoard } from "./mock.ts";
@@ -39,6 +41,13 @@ import { describeSecrets, findSecrets } from "../../../packages/core/src/context
 
 const params = new URLSearchParams(location.search);
 const ME = "jielle2453";
+const messageSettings = {enabled:false,provider:"codex",model:"",transcriptIds:[]};
+const agentQuestions = [{request:{id:"11111111-1111-4111-8111-111111111111",project:"demo",from:"theroyatlas",to:ME,text:"登入流程目前還缺哪一步？",at:new Date().toISOString()},reply:{id:"11111111-1111-4111-8111-111111111111",by:ME,text:"介面與錯誤提示已完成，還需要確認登入過期時的重試流程。",at:new Date().toISOString(),status:"answered"},stopped:false,archived:false}];
+const mockMembers=new Map<string,{login:string;role:string}[]>();
+const mockLinks=new Map<string,string>();
+const membersFor=(id:string)=>{let m=mockMembers.get(id);if(!m){m=[{login:ME,role:"admin"},{login:"theroyatlas",role:"admin"},{login:"mei-lin",role:"write"}];mockMembers.set(id,m);}return m;};
+const sharedMocks=new Map<string,{settings:{enabled:boolean;transcriptIds:string[]};chats:SharedChat[];handoffs:Handoff[]}>();
+const sharedFor=(id:string)=>{let value=sharedMocks.get(id);if(!value){value={settings:{enabled:false,transcriptIds:[]},chats:[{id:"b".repeat(64),project:id,owner:"theroyatlas",source:"codex",title:"登入流程與錯誤處理",sharedAt:new Date().toISOString(),messages:[{role:"user",text:"登入做到哪裡了？"},{role:"assistant",text:"表單和錯誤提示已完成，剩下登入過期時的重試流程。"}]}],handoffs:[]};sharedMocks.set(id,value);}return value;};
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -529,6 +538,20 @@ export async function handle(method: string, path: string, body: unknown): Promi
       return boardFor(id);
     }
     if (method === "POST" && tail === "/refresh") return boardFor(id);
+    if(tail==="/shared-chats"&&method==="GET")return sharedFor(id);
+    if(tail==="/shared-chats/preview"&&method==="POST")return {token:"mock-preview",transcripts:[{id:"a".repeat(64),source:"codex",title:"登入流程的專案討論",updatedAt:new Date().toISOString(),messages:[{role:"user",text:"請整理登入的待辦。"},{role:"assistant",text:"還需要確認登入過期與重新驗證的流程。"}]}]};
+    if(tail==="/shared-chats/confirm"&&method==="POST"){const d=sharedFor(id);d.settings={enabled:true,transcriptIds:["a".repeat(64)]};d.chats=d.chats.filter(c=>c.owner!==ME);d.chats.push({id:"a".repeat(64),project:id,owner:ME,source:"codex",title:"登入流程的專案討論",sharedAt:new Date().toISOString(),messages:[{role:"user",text:"請整理登入的待辦。"},{role:"assistant",text:"還需要確認登入過期與重新驗證的流程。"}]});return d.settings;}
+    if(tail==="/shared-chats/stop"&&method==="POST"){const d=sharedFor(id);d.settings={enabled:false,transcriptIds:[]};d.chats=d.chats.filter(c=>c.owner!==ME);return {enabled:false,write:{result:"pushed"}};}
+    if(tail==="/shared-chats/fork"&&method==="POST"){const source=sharedFor(id).chats.find(c=>c.id===(b as any).id&&c.owner===(b as any).owner);if(!source)throw new ApiError("找不到分享","usage");const at=new Date().toISOString();const c:Chat={id:crypto.randomUUID(),projectId:id,agent:(b as any).provider,model:(b as any).model??"",title:`接續：${source.title}`,createdAt:at,updatedAt:at,running:false,items:[{kind:"notice",id:crypto.randomUUID(),at,text:`這是從 @${source.owner} 的分享複製的本機對話，送出新訊息後才會呼叫 AI。`},...source.messages.map(m=>({kind:m.role,id:crypto.randomUUID(),at,text:m.text}))]};chats.push(c);saveChats();chatSummary(c);return c;}
+    if(tail==="/handoffs"&&method==="POST"){const d=sharedFor(id);d.handoffs.unshift({id:crypto.randomUUID(),project:id,from:ME,to:String((b as any).to),task:Number((b as any).task),note:String((b as any).note),at:new Date().toISOString()});return {handoff:d.handoffs[0],write:{result:"pushed"}};}
+    if(tail==="/members"&&method==="GET")return {me:ME,members:membersFor(id),canManage:true,canLeave:true,separate:true,dataRepo:"demo/team-data",url:mockLinks.get(id)??null};
+    if(tail==="/share-link/reset"&&method==="POST"){const url=`tandem://join?repo=${encodeURIComponent(id)}#share=${crypto.randomUUID().replaceAll("-","")+"examplekey1"}`;mockLinks.set(id,url);return {url};}
+    if(tail.startsWith("/members/")&&method==="DELETE"){mockMembers.set(id,membersFor(id).filter(m=>m.login!==decodeURIComponent(tail.slice(9))));return {complete:true,results:[]};}
+    if(tail==="/leave"&&method==="POST"){const i=projects.findIndex(p=>p.id===id);if(i>=0)projects.splice(i,1);currentProjectId=projects[0]?.id??null;emit({type:"session",data:session()});return {complete:true,results:[]};}
+    if(tail==="/agent-messages"&&method==="GET") return {settings:messageSettings,members:[{login:"theroyatlas",enabled:true},{login:ME,enabled:messageSettings.enabled}],messages:agentQuestions};
+    if(tail==="/agent-messages/settings"&&method==="PUT"){Object.assign(messageSettings,body);return {settings:messageSettings,write:{result:"pushed"}};}
+    if(tail==="/local-transcripts"&&method==="GET") return [{id:"a".repeat(64),source:"codex",title:"登入流程的專案討論",updatedAt:new Date().toISOString(),messages:[{role:"user",text:"請整理登入的待辦。"},{role:"assistant",text:"還需要確認登入過期與重新驗證的流程。"}]}];
+    if(tail.startsWith("/agent-messages/")&&method==="POST"){const parts=tail.split("/");const m=agentQuestions.find(m=>m.request.id===parts[2]);if(m){if(parts[3]==="stop")m.stopped=true;if(parts[3]==="archive")m.archived=true;}return {ok:true};}
     if (method === "POST" && tail === "/tasks") {
       const t = body as { title?: unknown; body?: unknown; assign?: unknown };
       const title = typeof t.title === "string" ? t.title.trim() : "";

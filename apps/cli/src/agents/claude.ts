@@ -94,7 +94,7 @@ class ClaudeSession implements AgentSession {
   private turnActive = false;
 
   constructor(private opts: StartOptions) {
-    this.sessionId = opts.resumeId;
+    this.sessionId = opts.answerOnly ? undefined : opts.resumeId;
     this.configFile = path.join(appStateDir(), "chats", `${opts.chatId}.mcp.json`);
   }
 
@@ -106,7 +106,7 @@ class ClaudeSession implements AgentSession {
     if (this.child && this.child.exitCode === null && !this.stopping) return this.child;
     const { opts } = this;
     // The MCP config holds the approve token, so it goes in a file under the user's app folder, not argv.
-    const env = { ...opts.mcp.env, ...(opts.approveBridge ? { TANDEM_APPROVE_URL: opts.approveBridge.url, TANDEM_APPROVE_TOKEN: opts.approveBridge.token, TANDEM_CHAT_ID: opts.chatId } : {}) };
+    const env = { ...opts.mcp.env, ...(!opts.answerOnly && opts.approveBridge ? { TANDEM_APPROVE_URL: opts.approveBridge.url, TANDEM_APPROVE_TOKEN: opts.approveBridge.token, TANDEM_CHAT_ID: opts.chatId } : {}) };
     await mkdir(path.dirname(this.configFile), { recursive: true });
     await writeFile(this.configFile, JSON.stringify({ mcpServers: { tandem: { command: opts.mcp.command, args: opts.mcp.args, env } } }), "utf8");
 
@@ -117,15 +117,16 @@ class ClaudeSession implements AgentSession {
       "--verbose",
       "--include-partial-messages",
       "--mcp-config", this.configFile,
-      "--allowedTools", AUTO_ALLOWED.join(","),
+      "--allowedTools", (opts.answerOnly ? ["tandem_context_list", "tandem_context_read", "tandem_decisions", "tandem_task_list"].map(t=>`mcp__tandem__${t}`) : AUTO_ALLOWED).join(","),
     ];
-    if (opts.approveBridge) args.push("--permission-prompt-tool", "mcp__tandem__approve");
+    if (opts.answerOnly) args.push("--restricted", "--tools", "", "--strict-mcp-config", "--permission-mode", "dontAsk", "--no-session-persistence", "--setting-sources", "", "--settings", '{"disableAllHooks":true}', "--system-prompt", opts.answerOnly.instructions);
+    else if (opts.approveBridge) args.push("--permission-prompt-tool", "mcp__tandem__approve");
     if (opts.model) args.push("--model", opts.model);
     if (this.sessionId) args.push("--resume", this.sessionId);
 
     this.stopping = false;
     this.stderr = "";
-    const child = spawnAgent("claude", args, { cwd: opts.cwd, env: agentEnv() });
+    const child = spawnAgent("claude", args, { cwd: opts.cwd, env: agentEnv(opts.answerOnly?{CLAUDE_CODE_DISABLE_AUTO_MEMORY:"1",CLAUDE_CODE_DISABLE_CLAUDE_MDS:"1"}:{}) });
     this.child = child;
     child.stderr?.setEncoding("utf8");
     child.stderr?.on("data", (d: string) => (this.stderr = (this.stderr + d).slice(-4000)));

@@ -23,6 +23,12 @@ export function findDeepLink(argv: string[]): string | null {
   return argv.find((a) => a.toLowerCase().startsWith("tandem:")) ?? null;
 }
 
+/** The link secret stays in the fragment; it must never enter an HTTP query or a log. */
+export function parseJoinSecret(raw:string):string|null {
+  if(!parseJoinLink(raw))return null;
+  try{const value=new URLSearchParams(new URL(raw).hash.slice(1)).get("share");return value&&/^[A-Za-z0-9_-]{43}$/.test(value)?value:null;}catch{return null;}
+}
+
 /** Only https URLs may leave the app. */
 export function isHttps(url: string): boolean {
   try {

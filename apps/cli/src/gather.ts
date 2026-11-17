@@ -27,6 +27,7 @@ import {
   notesHead,
 } from "@tandem/core";
 import type { Context } from "./context.ts";
+import { listHandoffs } from "./handoffs.ts";
 
 export interface GitHubData {
   discussions: DiscussionSummary[];
@@ -141,6 +142,8 @@ export async function buildBrief(
     ...(notes ? { notesHead: notes } : {}),
   });
   if (!gh) brief.problems.push("這次沒有讀 GitHub（連線逾時或離線），討論和任務可能不是最新的");
+  const handoffs=(await listHandoffs(ctx)).filter(h=>h.to.toLowerCase()===ctx.me.toLowerCase()&&(!since.time||h.at>since.time));
+  if(handoffs.length){brief.handoffs=handoffs.map(h=>({id:h.id,from:h.from,task:h.task,note:h.note}));brief.quiet=false;}
   return { brief, head, decisions: local.decisions, contextFiles };
 }
 

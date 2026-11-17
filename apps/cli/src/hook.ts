@@ -20,6 +20,7 @@ import { buildBrief, gatherGitHub } from "./gather.ts";
 import { readStdin } from "./io.ts";
 import { checkNewDecisions, rememberDecisions, type DecisionWatch } from "./live-decisions.ts";
 import { newContextNote, rememberContext, type ContextWatch } from "./live-context.ts";
+import { agentMessagesNote } from "./live-agent-messages.ts";
 
 type Agent = "claude" | "codex";
 type HookEvent = "session-start" | "stop" | "user-prompt" | "post-compact";
@@ -40,7 +41,7 @@ async function sessionContext(
  * New decisions and shared-context changes by teammates since the session started; null when
  * none, throttled or on any failure.
  */
-async function liveDecisions(ctx: Awaited<ReturnType<typeof openContext>>, s: DecisionWatch & ContextWatch): Promise<string | null> {
+async function liveDecisions(ctx: Awaited<ReturnType<typeof openContext>>, s: DecisionWatch & ContextWatch & { agentMessageSeen?:string[] }): Promise<string | null> {
   try {
     return await checkNewDecisions({
       session: s,
@@ -51,7 +52,9 @@ async function liveDecisions(ctx: Awaited<ReturnType<typeof openContext>>, s: De
         const files = await listContext(ctx.store);
         const known = new Set(files.map((f) => f.path));
         const deletedSome = Object.keys(s.contextSeen ?? {}).some((p) => !known.has(p));
-        return newContextNote(s, files, ctx.me, deletedSome ? await contextHistory(ctx.store) : undefined);
+        const contextNote=newContextNote(s, files, ctx.me, deletedSome ? await contextHistory(ctx.store) : undefined);
+        const messageNote=ctx.dataRepo.separate?await agentMessagesNote(ctx.store,`${ctx.remote.owner}/${ctx.remote.name}`.toLowerCase(),ctx.me,s):null;
+        return [contextNote,messageNote].filter(Boolean).join("\n\n")||null;
       },
     });
   } catch {

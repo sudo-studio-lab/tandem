@@ -53,8 +53,19 @@ import {
   syncData,
   updateAppState,
   writeContext,
+  agentMembers,
+  listAgentMessages,
+  sendAgentMessage,
+  changeAgentMessage,
+  requirePrivateMessages,
+  sharedChats,
 } from "@tandem/core";
-import { openContext, type Context } from "./context.ts";
+import { AgentMessageWorker, localAgentSettings, saveAgentSettings, projectKey } from "./agent-messages.ts";
+import { projectTranscripts } from "./project-transcripts.ts";
+import { projectMembers, removeProjectMember, resetShareLink } from "./members.ts";
+import { confirmSharing, previewSharing, sharedChatFor, sharingSettings, stopSharing, syncSharedChats } from "./shared-chats.ts";
+import { createHandoff, listHandoffs } from "./handoffs.ts";
+import { openContext, requirePrivateDataRepo, type Context } from "./context.ts";
 import { buildBoard, gatherGitHub, type GitHubData } from "./gather.ts";
 import { inviteLogin } from "./commands.ts";
 import { createTask, parseTaskInput } from "./tasks.ts";
@@ -164,6 +175,12 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
   // --- projects -------------------------------------------------------------
   const runtimes = new Map<string, ProjectRuntime>();
   const opening = new Map<string, Promise<ProjectRuntime>>();
+  const messageWorkers = new Map<string, AgentMessageWorker>();
+  const messageWorker = (rt: ProjectRuntime) => {
+    let w = messageWorkers.get(rt.id);
+    if (!w) { w = new AgentMessageWorker(mcpLaunch); messageWorkers.set(rt.id, w); }
+    return w;
+  };
 
   async function openRuntime(id: string): Promise<ProjectRuntime> {
     const existing = runtimes.get(id);
@@ -474,6 +491,8 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
     "/api/logout",
     handle(async (c) => {
       clearToken();
+      for(const w of messageWorkers.values())w.close();
+      messageWorkers.clear();
       runtimes.clear();
       await loadAuth(); // falls back to gh / env if present
       emit({ type: "session", data: await session() });
@@ -510,8 +529,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
       const inv = (await userClient().listInvitations()).find((i) => i.id === id);
       if (!inv) throw new TandemError("usage", "找不到這個邀請，可能已經接受或過期了");
       const { projectsDir } = await loadAppState();
+      const joinBody=await body<{shareToken:string;fromLink:boolean}>(c);
       const opId = runOperation((progress) =>
-        joinProject({ owner: inv.repo.owner, name: inv.repo.name, token: a.token, projectsDir, invitationId: id, progress }),
+        joinProject({ owner: inv.repo.owner, name: inv.repo.name, token: a.token, projectsDir, invitationId: id, progress,fromLink:joinBody.fromLink===true,shareToken:joinBody.shareToken }),
       );
       return c.json({ opId });
     }),
@@ -631,6 +651,74 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
       return c.json({ number: r.number, url: r.url });
     }),
   );
+  app.get("/api/projects/:id/members",handle(async(c)=>c.json(await projectMembers((await projectRt(c)).ctx))));
+  app.post("/api/projects/:id/share-link/reset",handle(async(c)=>{
+    const b=await body<{confirm:boolean}>(c);if(b.confirm!==true)throw new TandemError("validation","請先確認要作廢舊連結");
+    return c.json(await resetShareLink((await projectRt(c)).ctx));
+  }));
+  app.delete("/api/projects/:id/members/:login",handle(async(c)=>{
+    const b=await body<{confirm:boolean}>(c);if(b.confirm!==true)throw new TandemError("validation","請先確認移除成員與資料 repo 的權限");
+    const rt=await projectRt(c);const login=c.req.param("login")??"";
+    if(login.toLowerCase()===rt.ctx.me.toLowerCase())throw new TandemError("validation","請使用自行離開專案");
+    return c.json(await removeProjectMember(rt.ctx,login));
+  }));
+  app.post("/api/projects/:id/leave",handle(async(c)=>{
+    const b=await body<{confirm:boolean}>(c);if(b.confirm!==true)throw new TandemError("validation","請先確認離開專案");
+    const rt=await projectRt(c);messageWorker(rt).close();
+    const result=await removeProjectMember(rt.ctx,rt.ctx.me,true);
+    if(result.complete){runtimes.delete(rt.id);await updateAppState(s=>{s.projects=s.projects.filter(p=>p.id!==rt.id);if(s.currentProjectId===rt.id)s.currentProjectId=s.projects[0]?.id??null;});emit({type:"session",data:await session()});}
+    return c.json(result);
+  }));
+  app.get("/api/projects/:id/agent-messages", handle(async(c)=>{
+    const {ctx}=await projectRt(c); requirePrivateMessages(ctx.dataRepo.separate);
+    return c.json({settings:await localAgentSettings(ctx),members:await agentMembers(ctx.store,projectKey(ctx)),messages:await listAgentMessages(ctx.store,projectKey(ctx),ctx.me)});
+  }));
+  app.put("/api/projects/:id/agent-messages/settings", handle(async(c)=>{
+    const rt=await projectRt(c); const r=await saveAgentSettings(rt.ctx,await body<unknown>(c));
+    if(!r.settings.enabled) messageWorker(rt).close();
+    else void messageWorker(rt).tick(rt.ctx).catch(()=>undefined);
+    return c.json(r);
+  }));
+  app.post("/api/projects/:id/agent-messages",handle(async(c)=>{
+    const {ctx}=await projectRt(c); const b=await body<{to:string;text:string}>(c);
+    await requirePrivateDataRepo(ctx);
+    return c.json(await sendAgentMessage(ctx.store,{to:typeof b.to==="string"?b.to:"",text:typeof b.text==="string"?b.text:"",project:projectKey(ctx),me:ctx.me,separate:ctx.dataRepo.separate}));
+  }));
+  app.post("/api/projects/:id/agent-messages/:message/:action",handle(async(c)=>{
+    const rt=await projectRt(c);requirePrivateMessages(rt.ctx.dataRepo.separate);
+    const action=c.req.param("action");if(action!=="stop"&&action!=="archive") throw new TandemError("usage","找不到這個操作");
+    const id=c.req.param("message")??"";await changeAgentMessage(rt.ctx.store,projectKey(rt.ctx),rt.ctx.me,id,action);
+    if(action==="stop") messageWorker(rt).stop(id);
+    return c.json({ok:true});
+  }));
+  app.get("/api/projects/:id/local-transcripts",handle(async(c)=>{
+    const {ctx}=await projectRt(c);requirePrivateMessages(ctx.dataRepo.separate);
+    return c.json(await projectTranscripts(ctx.repoRoot,{project:projectKey(ctx)}));
+  }));
+
+  app.get("/api/projects/:id/shared-chats",handle(async(c)=>{
+    const {ctx}=await projectRt(c);requirePrivateMessages(ctx.dataRepo.separate);
+    return c.json({settings:await sharingSettings(ctx),chats:await sharedChats(ctx.store,projectKey(ctx)),handoffs:await listHandoffs(ctx)});
+  }));
+  app.post("/api/projects/:id/shared-chats/preview",handle(async(c)=>{
+    const {ctx}=await projectRt(c);const b=await body<{ids:string[]}>(c);return c.json(await previewSharing(ctx,b.ids??[]));
+  }));
+  app.post("/api/projects/:id/shared-chats/confirm",handle(async(c)=>{
+    const {ctx}=await projectRt(c);const b=await body<{token:string}>(c);return c.json(await confirmSharing(ctx,b.token??""));
+  }));
+  app.post("/api/projects/:id/shared-chats/stop",handle(async(c)=>c.json(await stopSharing((await projectRt(c)).ctx))));
+  app.post("/api/projects/:id/shared-chats/fork",handle(async(c)=>{
+    const rt=await projectRt(c);const b=await body<{owner:string;id:string;provider:string;model:string}>(c);
+    if(b.provider!=="claude"&&b.provider!=="codex")throw new TandemError("validation","請選擇接續對話要用的工具");
+    const source=await sharedChatFor(rt.ctx,b.owner??"",b.id??"");
+    return c.json(await chats.forkShared(rt.id,b.provider,typeof b.model==="string"?b.model:"",source));
+  }));
+  app.post("/api/projects/:id/handoffs",handle(async(c)=>{
+    const rt=await projectRt(c);const b=await body<{task:number;to:string;note:string;confirm:boolean}>(c);
+    if(b.confirm!==true)throw new TandemError("validation","請先確認任務、接手人與交接筆記");
+    const r=await createHandoff(rt.ctx,{task:b.task??0,to:b.to??"",note:b.note??""});await rebuild(rt,true);return c.json(r);
+  }));
+
   // Shared context (tandem/context/ in the data repo). Paths are relative to that folder.
   app.get("/api/projects/:id/context", handle(async (c) => c.json(await listContext((await projectRt(c)).ctx.store))));
   app.get(
@@ -901,9 +989,14 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
 
   void refreshAll();
   const poll = setInterval(() => void refreshAll(), GITHUB_POLL_MS);
+  const messagePoll = setInterval(()=>{for(const rt of runtimes.values()) void messageWorker(rt).tick(rt.ctx).catch(()=>undefined);},15_000);
+  const sharePoll=setInterval(()=>{for(const rt of runtimes.values())void syncSharedChats(rt.ctx).catch(()=>undefined);},30_000);
 
   const close = async () => {
     clearInterval(poll);
+    clearInterval(messagePoll);
+    clearInterval(sharePoll);
+    for(const w of messageWorkers.values()) w.close();
     rooms.closeAll();
     await chats.closeAll();
     await new Promise<void>((resolve) => server!.close(() => resolve()));

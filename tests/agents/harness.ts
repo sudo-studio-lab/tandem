@@ -14,6 +14,7 @@ import type { AgentKind, ApprovalDecision } from "@tandem/contracts";
 import { createDecision, openFsDataStore, updateStatus } from "@tandem/core";
 import { ADAPTERS } from "../../apps/cli/src/agents/index.ts";
 import type { AdapterEvent, AgentSession, ApprovalRequest } from "../../apps/cli/src/agents/types.ts";
+import {ANSWER_INSTRUCTIONS} from "../../apps/cli/src/agent-messages.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.resolve(here, "../../apps/cli/dist/bin.js");
@@ -40,17 +41,19 @@ export class Harness {
   /** Everything the user said, in order. */
   readonly said: string[] = [];
   policy: Policy = denyAll;
+  private answerOnly=false;
 
   private constructor(readonly agent: AgentKind, dir: string) {
     this.dir = dir;
   }
 
-  static async create(agent: AgentKind, model: string): Promise<Harness> {
+  static async create(agent: AgentKind, model: string, opts:{answerOnly?:boolean}={}): Promise<Harness> {
     // Keep the adapters' per-chat files out of the user's real Tandem folder.
     process.env.TANDEM_HOME ??= await mkdtemp(path.join(tmpdir(), "tandem-conf-home-"));
     const dir = await mkdtemp(path.join(tmpdir(), `tandem-conf-${agent}-`));
     execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dir });
     const h = new Harness(agent, dir);
+    h.answerOnly=opts.answerOnly===true;
     await h.start(model);
     return h;
   }
@@ -82,7 +85,8 @@ export class Harness {
       chatId: `conf-${randomBytes(4).toString("hex")}`,
       cwd: this.dir,
       model,
-      mcp: { command: process.execPath, args: [CLI, "mcp"], env: { TANDEM_TEST_ROOT: this.dir, TANDEM_TEST_ME: ME } },
+      mcp: { command: process.execPath, args: [CLI, "mcp"], env: { TANDEM_TEST_ROOT: this.dir, TANDEM_TEST_ME: ME,...(this.answerOnly?{TANDEM_READ_ONLY:"1"}:{}) } },
+      ...(this.answerOnly?{answerOnly:{instructions:ANSWER_INSTRUCTIONS}}:{}),
       approveBridge,
       requestApproval: async (req) => this.approve(req),
       onEvent: (e) => this.onEvent(e),

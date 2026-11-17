@@ -102,6 +102,8 @@ export interface ChatSummary {
 
 export interface Chat extends ChatSummary {
   items: ChatItem[];
+  /** External snapshot for a new provider session, without the source resume id. */
+  forkContext?: string;
 }
 
 /** Payload of the `chat` server-sent event. */

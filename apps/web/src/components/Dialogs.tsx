@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { AppSession, AppSettings, NotificationKind } from "@tandem/contracts";
 import { api, projectPath } from "../api.ts";
-import { Modal, errMsg, useCopy } from "./ui.tsx";
+import { Modal, Avatar, errMsg, useCopy } from "./ui.tsx";
+import "./collaboration.css";
 
 export function InviteDialog({ projectId, onClose }: { projectId: string; onClose: () => void }) {
   const [login, setLogin] = useState("");
@@ -9,6 +10,12 @@ export function InviteDialog({ projectId, onClose }: { projectId: string; onClos
   const [err, setErr] = useState<string | null>(null);
   const [result, setResult] = useState<{ shareText: string; who: string; dataNote?: string } | null>(null);
   const { copied, failed, copy } = useCopy();
+  const [members,setMembers]=useState<{me:string;members:{login:string;role:string}[];canManage:boolean;canLeave:boolean;url:string|null;dataRepo:string|null;separate:boolean}|null>(null);
+  const [notice,setNotice]=useState("");
+  const loadMembers=()=>api<NonNullable<typeof members>>("GET",projectPath(projectId,"/members")).then(setMembers).catch(e=>setErr(errMsg(e)));
+  useEffect(()=>{void loadMembers();},[projectId]);
+  const resetLink=async()=>{if(!confirm("產生新的加入連結並作廢舊連結？既有 GitHub 邀請與成員權限不會因此改變。"))return;setBusy(true);setErr(null);try{const r=await api<{url:string}>("POST",projectPath(projectId,"/share-link/reset"),{confirm:true});setMembers(m=>m?{...m,url:r.url}:m);setNotice("已產生新連結，舊連結不能再加入 Tandem。");}catch(e){setErr(errMsg(e));}finally{setBusy(false);}};
+  const remove=async(who:string,self=false)=>{if(!confirm(`${self?"離開專案":"移除 @"+who}？會移除程式 repo${members?.dataRepo?` 與 ${members.dataRepo}`:""} 的直接存取權。組織或團隊授權仍需在 GitHub 管理。`))return;setBusy(true);setErr(null);try{const r=await api<{complete:boolean}>(self?"POST":"DELETE",projectPath(projectId,self?"/leave":`/members/${encodeURIComponent(who)}`),{confirm:true});if(!r.complete)setErr("部分存取權仍存在。可能來自組織／團隊授權，或其中一個 repo 操作失敗，請到 GitHub 確認後再試。");else if(self){onClose();return;}else setNotice(`已移除 @${who} 的專案存取權。`);await loadMembers();}catch(e){setErr(errMsg(e));}finally{setBusy(false);}};
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -25,6 +32,7 @@ export function InviteDialog({ projectId, onClose }: { projectId: string; onClos
       );
       // Team data in a separate repo: the invite covers both, but say so when that half failed.
       setResult({ shareText: r.shareText, who, dataNote: r.dataRepo?.error });
+      await loadMembers();
     } catch (e2) {
       setErr(errMsg(e2));
     } finally {
@@ -33,8 +41,8 @@ export function InviteDialog({ projectId, onClose }: { projectId: string; onClos
   }
 
   return (
-    <Modal title="邀請隊友" onClose={onClose}>
-      <form onSubmit={submit} className="row">
+    <Modal title="邀請與成員" onClose={onClose}>
+      {members?.canManage&&<form onSubmit={submit} className="row">
         <label htmlFor="invite-login" className="sr-only">
           對方的 GitHub 帳號
         </label>
@@ -51,7 +59,7 @@ export function InviteDialog({ projectId, onClose }: { projectId: string; onClos
         <button type="submit" className="btn btn-primary" disabled={busy || !login.trim()}>
           {busy ? "邀請中…" : "邀請"}
         </button>
-      </form>
+      </form>}
       {err && (
         <p className="banner banner-error" role="alert">
           {err}
@@ -78,6 +86,12 @@ export function InviteDialog({ projectId, onClose }: { projectId: string; onClos
         </div>
       )}
       <p className="muted small gap-top">對方下載 Tandem、用 GitHub 登入後就會看到邀請</p>
+      {members&&<>
+        <h3>專案成員</h3><ul className="co-member-list">{members.members.map(m=><li key={m.login}><Avatar login={m.login} size={28}/><div className="grow"><strong>@{m.login}</strong><span className="row-meta">{m.login===members.me?"你 · ":""}{m.role==="admin"?"管理者":"成員"}</span></div>{members.canManage&&m.login.toLowerCase()!==members.me.toLowerCase()&&<button type="button" className="btn btn-small btn-danger" disabled={busy} onClick={()=>void remove(m.login)}>移除</button>}</li>)}</ul>
+        {members.separate&&<section className="co-link-section"><h3>加入連結</h3><p className="muted small">對方仍需要 GitHub 邀請與資料 repo 的權限。連結只協助加入 Tandem，不會授予 repo 權限。</p>{members.url?<button type="button" className="btn" onClick={()=>copy(members.url!)}>{copied?"已複製":"複製加入連結"}</button>:<p className="muted small">這台電腦沒有保留目前連結。管理者可產生新連結。</p>}{members.canManage&&<button type="button" className="btn btn-quiet" disabled={busy} onClick={()=>void resetLink()}>產生新連結</button>}{failed&&<p role="alert">無法複製，請重新產生後再試。</p>}</section>}
+        {notice&&<p role="status">{notice}</p>}
+        {members.canLeave&&<div className="co-actions"><button type="button" className="btn btn-danger" disabled={busy} onClick={()=>void remove(members.me,true)}>離開這個專案</button></div>}
+      </>}
     </Modal>
   );
 }

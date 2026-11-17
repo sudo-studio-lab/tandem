@@ -81,7 +81,7 @@ describe("tandem mcp", () => {
   it("lists the team tools", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ["tandem_ask", "tandem_brief", "tandem_check", "tandem_context_list", "tandem_context_read", "tandem_context_write", "tandem_decide", "tandem_decisions", "tandem_disagree", "tandem_status", "tandem_task"].sort(),
+      ["tandem_ask", "tandem_brief", "tandem_check", "tandem_context_list", "tandem_context_read", "tandem_context_write", "tandem_decide", "tandem_decisions", "tandem_disagree", "tandem_status", "tandem_task", "tandem_task_list", "tandem_message_agent", "tandem_agent_replies", "tandem_chat_read", "tandem_handoffs"].sort(),
     );
     expect(client.getInstructions()).toContain("我記成這樣，對嗎？");
   });
@@ -158,7 +158,7 @@ describe("tandem mcp", () => {
       throw new Error("這裡不是 Tandem 專案");
     });
     const { tools } = await client.listTools();
-    expect(tools.length).toBe(11);
+    expect(tools.length).toBe(16);
     const r = await call("tandem_check");
     expect(r.isError).toBe(true);
     expect(r.text).toContain("這裡不是 Tandem 專案");

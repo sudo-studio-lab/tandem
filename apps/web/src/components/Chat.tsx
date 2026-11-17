@@ -161,7 +161,7 @@ export function AgentSettingsDialog({ onClose }: { onClose: () => void }) {
 // ---------------------------------------------------------------------------
 // Chat view
 // ---------------------------------------------------------------------------
-export function ChatView({ projectId, now, onOpenSettings }: { projectId: string; now: number; onOpenSettings: () => void }) {
+export function ChatView({ projectId, now, onOpenSettings, initialChatId }: { projectId: string; now: number; onOpenSettings: () => void; initialChatId?:string }) {
   const { agents } = useAgents();
   const [list, setList] = useState<ChatSummary[] | null>(null);
   const [current, setCurrent] = useState<Chat | null>(null);
@@ -183,6 +183,7 @@ export function ChatView({ projectId, now, onOpenSettings }: { projectId: string
     const version = ++opening.current;
     try {
       const chat = await api<Chat>("GET", `/api/chats/${id}`);
+      if(chat.projectId!==projectId)throw new Error("這段對話屬於另一個專案，請重新選擇");
       if (version !== opening.current) return;
       setCurrent(chat);
       try { localStorage.setItem(`tandem:current-chat:${chat.projectId}`, chat.id); } catch { /* optional navigation memory */ }
@@ -190,7 +191,9 @@ export function ChatView({ projectId, now, onOpenSettings }: { projectId: string
     } catch (e) {
       setError(errMsg(e));
     }
-  }, []);
+  }, [projectId]);
+
+  useEffect(()=>{if(initialChatId)void open(initialChatId);},[initialChatId,open]);
 
   useEffect(() => {
     setCurrent(null);

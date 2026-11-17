@@ -62,7 +62,7 @@ function Invitations({ hint, login, now, onStart }: { hint: string | null; login
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={() => onStart(() => api("POST", `/api/invitations/${i.id}/accept`), true)}
+                onClick={() => onStart(() => api("POST", `/api/invitations/${i.id}/accept`,{fromLink:!!hint&&i.repo.fullName.toLowerCase()===hint.toLowerCase(),shareToken:new URLSearchParams(location.hash.slice(1)).get("share")??undefined}), true)}
               >
                 加入
               </button>

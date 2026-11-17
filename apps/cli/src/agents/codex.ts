@@ -116,11 +116,11 @@ function mcpOverrides(mcp: McpLaunch): string[] {
   ];
 }
 
-async function startRpc(cwd: string, extraArgs: string[] = []): Promise<Rpc> {
+async function startRpc(cwd: string, extraArgs: string[] = [], experimental = false): Promise<Rpc> {
   const child = spawnAgent("codex", [...extraArgs, "app-server"], { cwd, env: agentEnv() });
   const rpc = new Rpc(child);
   try {
-    await rpc.request("initialize", { clientInfo: { name: "tandem", title: "Tandem", version: pkg.version } }, 30_000);
+    await rpc.request("initialize", { clientInfo: { name: "tandem", title: "Tandem", version: pkg.version }, ...(experimental ? { capabilities: { experimentalApi: true } } : {}) }, 30_000);
     rpc.notify("initialized");
   } catch (e) { killTree(child); throw e; }
   return rpc;
@@ -226,7 +226,7 @@ class CodexSession implements AgentSession {
   private closing = false;
 
   constructor(private opts: StartOptions) {
-    this.threadId = opts.resumeId;
+    this.threadId = opts.answerOnly ? undefined : opts.resumeId;
   }
 
   private emit(e: AdapterEvent) {
@@ -237,7 +237,23 @@ class CodexSession implements AgentSession {
     if (this.rpc) return this.rpc;
     this.closing = false;
     const p = (async () => {
-      const rpc = await startRpc(this.opts.cwd, mcpOverrides(this.opts.mcp));
+      const restricted = this.opts.answerOnly;
+      const answeringArgs = [
+        ...(restricted ? ["-c", "mcp_servers={}", "-c", "features.shell_tool=false", "-c", "features.apps=false", "-c", "features.plugins=false", "-c", "features.hooks=false", "-c", "features.multi_agent=false", "-c", 'web_search="disabled"', "-c", "disable_user_hooks=true", "-c", "project_doc_max_bytes=0", "-c", "memories.use_memories=false", "-c", "memories.generate_memories=false"] : []),
+        ...mcpOverrides(this.opts.mcp),
+      ];
+      let rpc = await startRpc(this.opts.cwd, answeringArgs, !!restricted);
+      if(restricted){
+        const first=await rpc.request<{config:Json}>("config/read",{includeLayers:false});
+        if(!first.config?.mcp_servers){killTree(rpc.child);throw new Error("無法確認 MCP 隔離設定");}
+        const inherited=Object.keys(first.config.mcp_servers).filter(k=>k!=="tandem"&&first.config.mcp_servers[k]?.enabled!==false);
+        if(inherited.length){
+          killTree(rpc.child);
+          if(inherited.some(k=>!/^[A-Za-z0-9_-]+$/.test(k)))throw new Error("無法安全覆寫這個 MCP 設定名稱，回答模式已停止");
+          const disabled=inherited.flatMap(k=>["-c",`mcp_servers.${k}.enabled=false`]);
+          rpc=await startRpc(this.opts.cwd,[...answeringArgs,...disabled],true);
+        }
+      }
       if (this.closing) { killTree(rpc.child); throw new Error("已停止"); }
       rpc.onNotify = (m, params) => this.onNotify(m, params);
       rpc.onRequest = (m, params) => this.onRequest(m, params);
@@ -248,7 +264,17 @@ class CodexSession implements AgentSession {
         this.completion?.resolve();
         this.emit({ type: "exit" });
       };
-      const params: Json = { cwd: this.opts.cwd, ...(this.opts.model ? { model: this.opts.model } : {}) };
+      if (restricted) {
+        // Fail closed if a CLI version ignores the isolation overrides; never inherit other MCP servers.
+        const effective = await rpc.request<{ config: Json }>("config/read", { includeLayers: false });
+        const cfg = effective.config;
+        if (!cfg || cfg.features?.shell_tool !== false || cfg.features?.apps !== false || cfg.features?.plugins !== false || cfg.features?.hooks !== false || cfg.features?.multi_agent !== false || cfg.web_search !== "disabled" || !cfg.mcp_servers || Object.keys(cfg.mcp_servers).some(k=>k!=="tandem"&&cfg.mcp_servers[k]?.enabled!==false)) {
+          killTree(rpc.child);
+          throw new Error("這個 Codex 版本無法確認回答模式的工具限制，已停止");
+        }
+      }
+      const params: Json = { cwd: this.opts.cwd, ...(this.opts.model ? { model: this.opts.model } : {}),
+        ...(restricted ? { approvalPolicy: "never", sandbox: "read-only", ephemeral: true, environments: [], selectedCapabilityRoots: [], baseInstructions: restricted.instructions, serviceTier: "default" } : {}) };
       const r = this.threadId
         ? await rpc.request<{ thread: { id: string } }>("thread/resume", { threadId: this.threadId, ...params })
         : await rpc.request<{ thread: { id: string } }>("thread/start", params);
@@ -318,6 +344,7 @@ class CodexSession implements AgentSession {
   }
 
   private async onRequest(method: string, p: Json): Promise<unknown> {
+    if (this.opts.answerOnly) return { decision: "decline" };
     if (method === "item/commandExecution/requestApproval") {
       const d = await this.opts.requestApproval({ name: "執行指令", summary: summarize("", { command: p.command }) || p.reason || "", input: { command: p.command, cwd: p.cwd, reason: p.reason } });
       return { decision: DECISION[d] };

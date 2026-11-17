@@ -388,6 +388,22 @@ export function createGitHubClient(opts: GitHubClientOptions) {
     };
   }
 
+  async function listProjectMembers(): Promise<{login:string;role:string}[]> {
+    const users=await listAll(`${repoPath}/collaborators?affiliation=all`,false);
+    return users.map(u=>({login:String(u.login),role:String(u.role_name??(u.permissions?.admin?"admin":"write"))}));
+  }
+  async function removeCollaborator(login:string):Promise<void> {
+    if(!/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/.test(login))throw new TandemError("validation","GitHub 帳號格式不對");
+    await rest({method:"DELETE",path:`${repoPath}/collaborators/${encodeURIComponent(login)}`,what:"移除直接授予的專案存取權"});
+  }
+  async function hasCollaborator(login:string):Promise<boolean>{
+    try{await rest({path:`${repoPath}/collaborators/${encodeURIComponent(login)}`,what:"確認成員存取權"});return true;}
+    catch(e){if(e instanceof TandemError&&(e.details as any)?.status===404)return false;throw e;}
+  }
+  async function assignIssue(number:number,assignees:string[]):Promise<void>{
+    await rest({method:"PATCH",path:`${repoPath}/issues/${number}`,body:{assignees},what:"交接任務指派"});
+  }
+
   /** Repos the user can push to, newest push first. Up to 3 pages of 100. */
   async function listMyRepos(o: { q?: string } = {}): Promise<RepoChoice[]> {
     const out: RepoChoice[] = [];
@@ -791,6 +807,7 @@ export function createGitHubClient(opts: GitHubClientOptions) {
         state: p.merged_at ? "merged" : p.state === "closed" ? "closed" : "open",
         draft: !!p.draft,
         requestedReviewers: (p.requested_reviewers ?? []).map((r: any) => r.login),
+          closes: closingIssueNumbers(p.body ?? "", `${owner}/${repo}`),
         createdAt: p.created_at,
         updatedAt: p.updated_at,
       };
@@ -806,6 +823,10 @@ export function createGitHubClient(opts: GitHubClientOptions) {
     acceptInvitation,
     listInvitations,
     getRepo,
+    listProjectMembers,
+    removeCollaborator,
+    hasCollaborator,
+    assignIssue,
     listCollaborators,
     listMyRepos,
     listOwners,
@@ -852,3 +873,4 @@ export async function createDiscussionOrIssue(
     throw e;
   }
 }
+import { closingIssueNumbers } from "./task-links.ts";

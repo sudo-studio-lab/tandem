@@ -267,6 +267,8 @@ export interface TaskSummary {
 }
 
 export interface PullRequestSummary {
+  /** Issues this PR explicitly closes in this repository. */
+  closes?: number[];
   number: number;
   title: string;
   url: string;
@@ -316,6 +318,7 @@ export interface BriefTeammate {
 }
 
 export interface Brief {
+  handoffs?: { id:string;from:string;task:number;note:string }[];
   me: string;
   repo: { owner: string; name: string };
   since: { commit: string | null; time: string | null };
@@ -386,3 +389,5 @@ export type * from "./app.ts";
 export type * from "./agent.ts";
 export * from "./images.ts";
 export * from "./context.ts";
+export * from "./agent-messages.ts";
+export * from "./shared-chats.ts";

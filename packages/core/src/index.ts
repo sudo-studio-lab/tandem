@@ -11,3 +11,5 @@ export * from "./activity/index.ts";
 export * from "./notify/index.ts";
 export * from "./app-state/index.ts";
 export * from "./context/index.ts";
+export * from "./agent-messages.ts";
+export * from "./shared-chats.ts";
