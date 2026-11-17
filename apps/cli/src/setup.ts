@@ -6,7 +6,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { PATHS, PRODUCT, TandemError, type ProjectStep } from "@tandem/contracts";
+import { PATHS, PRODUCT, TandemError, parseRepoFullName, type ProjectStep } from "@tandem/contracts";
 import {
   createGitHubClient,
   installAgentIntegration,
@@ -14,6 +14,7 @@ import {
   runGit,
   updateAppState,
   projectIdFor,
+  readTandemConfig,
   updateStatus,
 } from "@tandem/core";
 import { openContext, type Context } from "./context.ts";
@@ -187,6 +188,8 @@ export async function startProject(opts: {
   projectsDir: string;
   dir?: string;
   enableDiscussions: boolean;
+  /** Also accept a pending invitation to the project's data repo (see .tandem.json). */
+  acceptDataInvite?: boolean;
   progress?: Progress;
 }): Promise<{ projectId: string; dir: string; setup: SetupResult }> {
   const progress = opts.progress ?? noop;
@@ -197,11 +200,32 @@ export async function startProject(opts: {
     progress("clone", `下載到 ${dir}`);
     await cloneRepo(opts.owner, opts.name, dir, gitAuthEnv(opts.token));
   } else progress("clone", `這台電腦已經有了：${dir}`);
+  if (opts.acceptDataInvite) await acceptDataRepoInvite(dir, opts.owner, opts.name, opts.token, progress);
+  // Also sets up the local copy of the data repo when .tandem.json points to one.
   const ctx = await openContext(dir, { token: opts.token });
   const setup = await setupProject(ctx, { enableDiscussions: opts.enableDiscussions, progress });
   const projectId = await rememberProject(ctx);
   progress("done", "完成");
   return { projectId, dir, setup };
+}
+
+/**
+ * When team data lives in a separate repo, the invite comes as two invitations; accept the
+ * data repo one together with the code repo one. Best effort: a missing invitation is fine
+ * (already a member, or not invited yet), and openContext reports a real access problem.
+ */
+export async function acceptDataRepoInvite(dir: string, owner: string, name: string, token: string, progress: Progress = noop): Promise<void> {
+  let cfg;
+  try {
+    cfg = await readTandemConfig(dir);
+  } catch {
+    return;
+  }
+  const target = cfg.dataRepo ? parseRepoFullName(cfg.dataRepo) : null;
+  if (!target || `${target.owner}/${target.name}`.toLowerCase() === `${owner}/${name}`.toLowerCase()) return;
+  progress("accept", `接受團隊資料 repo ${target.owner}/${target.name} 的邀請`);
+  const gh = createGitHubClient({ token, owner: target.owner, repo: target.name });
+  await gh.acceptInvitationFor().catch(() => undefined);
 }
 
 /** Accept a pending invitation (by repo) and start the project. */
@@ -219,5 +243,5 @@ export async function joinProject(opts: {
   progress("accept", "接受邀請");
   if (opts.invitationId !== undefined) await gh.acceptInvitation(opts.invitationId);
   else await gh.acceptInvitationFor();
-  return startProject({ ...opts, enableDiscussions: false });
+  return startProject({ ...opts, enableDiscussions: false, acceptDataInvite: true });
 }

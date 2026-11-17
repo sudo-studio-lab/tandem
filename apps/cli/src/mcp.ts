@@ -136,7 +136,7 @@ export function createMcpServer(ctx: () => Promise<Context>, approve?: ApproveBr
     },
     guard(async ({ markRead }: { markRead?: boolean }) => {
       const c = await ctx();
-      await syncData(c.repoRoot, { gitEnv: c.gitEnv }).catch(() => undefined);
+      await syncData(c.dataRoot, { gitEnv: c.gitEnv }).catch(() => undefined);
       const gh = await withTimeout(gatherGitHub(c).catch(() => null), 15_000, null);
       const { brief, head } = await buildBrief(c, gh);
       if (markRead) {

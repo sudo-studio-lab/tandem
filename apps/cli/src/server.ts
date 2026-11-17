@@ -246,7 +246,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
     rt.sync = { state: "syncing", lastSyncAt: rt.sync.lastSyncAt };
     emit({ type: "sync", data: { ...rt.sync, projectId: rt.id } });
     try {
-      const r = await syncData(rt.ctx.repoRoot, { gitEnv: rt.ctx.gitEnv });
+      const r = await syncData(rt.ctx.dataRoot, { gitEnv: rt.ctx.gitEnv });
       rt.sync =
         r.result === "conflict"
           ? { state: "conflict", message: r.message, lastSyncAt: rt.sync.lastSyncAt }

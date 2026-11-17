@@ -28,6 +28,8 @@ export function offlineContext(root: string, me: string): Context {
     saveState: async () => {},
     token: "",
     gitEnv: {},
+    dataRoot: root,
+    dataRepo: { owner: "test", name: "test", url: "https://github.com/test/test", separate: false },
     store: openFsDataStore(root),
   };
 }

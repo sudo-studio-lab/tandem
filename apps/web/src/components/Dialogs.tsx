@@ -7,7 +7,7 @@ export function InviteDialog({ projectId, onClose }: { projectId: string; onClos
   const [login, setLogin] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [result, setResult] = useState<{ shareText: string; who: string } | null>(null);
+  const [result, setResult] = useState<{ shareText: string; who: string; dataNote?: string } | null>(null);
   const { copied, failed, copy } = useCopy();
 
   async function submit(e: FormEvent) {
@@ -18,8 +18,13 @@ export function InviteDialog({ projectId, onClose }: { projectId: string; onClos
     setErr(null);
     setResult(null);
     try {
-      const r = await api<{ shareText: string; url: string }>("POST", projectPath(projectId, "/invite"), { login: who });
-      setResult({ shareText: r.shareText, who });
+      const r = await api<{ shareText: string; url: string; dataRepo?: { repo: string; error?: string } }>(
+        "POST",
+        projectPath(projectId, "/invite"),
+        { login: who },
+      );
+      // Team data in a separate repo: the invite covers both, but say so when that half failed.
+      setResult({ shareText: r.shareText, who, dataNote: r.dataRepo?.error });
     } catch (e2) {
       setErr(errMsg(e2));
     } finally {
@@ -55,6 +60,11 @@ export function InviteDialog({ projectId, onClose }: { projectId: string; onClos
       {result && (
         <div className="gap-top">
           <p>已邀請 @{result.who}。把下面這段話傳給對方：</p>
+          {result.dataNote && (
+            <p className="banner banner-error" role="alert">
+              {result.dataNote}
+            </p>
+          )}
           <label htmlFor="share-text" className="sr-only">
             邀請訊息
           </label>

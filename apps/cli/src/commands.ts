@@ -46,7 +46,7 @@ function printProblems(problems: Problem[]): void {
 // ---------------------------------------------------------------------------
 export async function cmdBrief(opts: JsonOpt & { peek?: boolean }): Promise<void> {
   const ctx = await openContext();
-  await syncData(ctx.repoRoot, { gitEnv: ctx.gitEnv }).catch(() => undefined);
+  await syncData(ctx.dataRoot, { gitEnv: ctx.gitEnv }).catch(() => undefined);
   const gh = await withTimeout(gatherGitHub(ctx), 15_000, null);
   const { brief, head } = await buildBrief(ctx, gh);
   if (opts.json) printJson(brief);
@@ -186,7 +186,7 @@ export async function cmdCheck(opts: JsonOpt & { fix?: boolean; quiet?: boolean 
 
 export async function cmdSync(opts: JsonOpt): Promise<void> {
   const ctx = await openContext();
-  const r = await syncData(ctx.repoRoot, { gitEnv: ctx.gitEnv });
+  const r = await syncData(ctx.dataRoot, { gitEnv: ctx.gitEnv });
   if (opts.json) printJson(r);
   else {
     const msg = { ok: "已同步", nothing: "沒有需要同步的", conflict: "有衝突，紀錄先留在本機", offline: "目前離線" }[r.result];
@@ -250,11 +250,29 @@ export function shareTextFor(owner: string, name: string): string {
   ].join("\n");
 }
 
+export interface DataInviteResult {
+  repo: string;
+  status?: "invited" | "already";
+  /** Set when the data repo invite failed (the code repo invite still stands). */
+  error?: string;
+}
+
+/** Invite to the code repo first, then (when team data lives elsewhere) to the data repo too. */
 export async function inviteLogin(ctx: Context, login: string) {
   const status = await ctx.gh.inviteCollaborator(login);
+  let dataRepo: DataInviteResult | undefined;
+  if (ctx.dataRepo.separate && ctx.dataGh) {
+    const repo = `${ctx.dataRepo.owner}/${ctx.dataRepo.name}`;
+    try {
+      dataRepo = { repo, status: await ctx.dataGh.inviteCollaborator(login) };
+    } catch (e) {
+      dataRepo = { repo, error: `沒能邀請到團隊資料 repo ${repo}：${e instanceof Error ? e.message : String(e)}` };
+    }
+  }
   return {
     invited: login,
     status,
+    ...(dataRepo ? { dataRepo } : {}),
     shareText: shareTextFor(ctx.remote.owner, ctx.remote.name),
     url: joinUrlFor(ctx.remote.owner, ctx.remote.name),
   };
@@ -265,7 +283,11 @@ export async function cmdInvite(login: string, opts: JsonOpt): Promise<void> {
   const r = await inviteLogin(ctx, login);
   if (opts.json) printJson(r);
   else {
-    info(r.status === "invited" ? `已邀請 @${login}。把下面這段傳給對方：` : `@${login} 本來就有權限。把下面這段傳給對方：`);
+    const code = `${ctx.remote.owner}/${ctx.remote.name}`;
+    info(r.status === "invited" ? `已邀請 @${login} 加入 ${code}。` : `@${login} 本來就有 ${code} 的權限。`);
+    if (r.dataRepo?.error) info(`⚠ ${r.dataRepo.error}`);
+    else if (r.dataRepo) info(r.dataRepo.status === "invited" ? `也邀請了團隊資料 repo ${r.dataRepo.repo}。` : `@${login} 本來就有 ${r.dataRepo.repo} 的權限。`);
+    info("把下面這段傳給對方：");
     process.stdout.write(`\n${r.shareText}\n`);
   }
 }
@@ -358,6 +380,13 @@ export async function cmdDoctor(opts: JsonOpt): Promise<void> {
   try {
     const ctx = await openContext();
     add("專案", true, `${ctx.remote.owner}/${ctx.remote.name}，你是 @${ctx.me}`);
+    add(
+      "團隊資料",
+      true,
+      ctx.dataRepo.separate
+        ? `放在 ${ctx.dataRepo.owner}/${ctx.dataRepo.name}（本機副本：${ctx.dataRoot}）`
+        : `跟程式碼放在同一個 repo（要分開可以執行 ${PRODUCT.command} data move --to owner/name）`,
+    );
     try {
       const d = await ctx.gh.getDiscussionsInfo();
       add("GitHub Discussions", d.enabled, d.enabled ? (d.qaCategoryId ? "已開啟，有 Q&A 分類" : "已開啟，但找不到可以標記答案的分類") : `沒開，執行 ${PRODUCT.command} init 開啟`);

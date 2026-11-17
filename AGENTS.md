@@ -37,7 +37,8 @@ cd apps/cli && npm link
 
 ## 推送
 
-- 只動到 `tandem/`、`notes/` 的改動：直接 commit 到 `main` 並 push，不開 PR（`tandem` 指令會自動同步）。
+- 團隊資料（決定、狀態、`team.md`）放在 `.tandem.json` 的 `dataRepo` 指定的 repo，由 `tandem` 指令自動寫入和同步，不要手動 commit 到這個 repo 的 `tandem/`；沒有設定 `dataRepo` 時才照舊放在這個 repo 的 `tandem/`。
+- 只動到 `notes/` 的改動：直接 commit 到 `main` 並 push，不開 PR。
 - 其他改動（程式碼、這份規則）：開分支和 PR。
 - 不同意別人的決定：不要直接改它。用 `tandem disagree` 開分歧討論，或新增一筆決定並寫 `supersedes`。
 

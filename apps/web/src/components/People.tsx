@@ -35,7 +35,8 @@ function Activity({ items, now }: { items: ActivityItem[]; now: number }) {
 export function PersonCard({ m, board, now }: { m: BoardMember; board: ProjectBoard; now: number }) {
   const s = m.status;
   const isMe = m.login === board.me;
-  const repoUrl = board.repo.url;
+  // Decision files live in the data repo (same as the code repo unless .tandem.json says otherwise).
+  const repoUrl = board.dataRepo?.url ?? board.repo.url;
   const decisionLink = (ref?: string) => {
     if (!ref || !DECISION_ID_RE.test(ref)) return null;
     const d = board.decisions.find((x) => x.frontmatter.id === ref);

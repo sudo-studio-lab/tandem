@@ -7,8 +7,10 @@ import {
   gitAuthEnv,
   openGitDataStore,
   readLocalState,
+  resolveDataLocation,
   runGit,
   writeLocalState,
+  type DataRepoOptions,
   type DataStore,
   type EtagCache,
   type LocalState,
@@ -34,9 +36,19 @@ export type CliState = LocalState & {
 };
 
 export interface Context {
+  /** The code repo's working tree: code, PRs, issues, tasks, agent setup. */
   repoRoot: string;
   remote: { owner: string; name: string; url: string };
   gh: GitHubClient;
+  /**
+   * Local git repo holding team data (decisions, status, team.md). Same as repoRoot unless
+   * `.tandem.json` sets `dataRepo`; then a local copy under the app state dir.
+   */
+  dataRoot: string;
+  /** The repo team data lives in, and whether it differs from the code repo. */
+  dataRepo: { owner: string; name: string; url: string; separate: boolean };
+  /** GitHub client for the data repo; only set when it is a separate repo. */
+  dataGh?: GitHubClient;
   me: string;
   state: CliState;
   saveState(): Promise<void>;
@@ -49,7 +61,7 @@ export interface Context {
 }
 
 /** Commit author for records: the repo's git identity, else the GitHub noreply address. */
-async function authorFor(repoRoot: string, login: string): Promise<{ name: string; email: string }> {
+export async function authorFor(repoRoot: string, login: string): Promise<{ name: string; email: string }> {
   const get = async (k: string) => (await runGit(["config", "--get", k], { cwd: repoRoot, allowFail: true })).stdout.trim();
   const [name, email] = await Promise.all([get("user.name"), get("user.email")]);
   return { name: name || login, email: email || `${login}@users.noreply.github.com` };
@@ -80,16 +92,31 @@ export async function openContext(cwd: string = process.cwd(), opts: { token?: s
     state.login = me;
     await writeLocalState(repoRoot, state);
   }
-  const gitEnv = gitAuthEnv(token);
-  const store = openGitDataStore(repoRoot, { gitEnv, author: await authorFor(repoRoot, me) });
+  return assembleContext({ repoRoot, remote, gh, me, state, token });
+}
+
+/**
+ * The part of openContext after login: find where team data lives (setting up the local data
+ * repo copy when `.tandem.json` points elsewhere) and open the store on it. Tests call this
+ * directly with `data.remoteUrlFor` pointing at local bare repos.
+ */
+export async function assembleContext(
+  base: Pick<Context, "repoRoot" | "remote" | "gh" | "me" | "state" | "token">,
+  opts: { data?: Omit<DataRepoOptions, "gitEnv">; gitEnv?: Record<string, string> } = {},
+): Promise<Context> {
+  const { repoRoot, remote, me, state, token } = base;
+  const gitEnv = opts.gitEnv ?? gitAuthEnv(token);
+  const data = await resolveDataLocation(repoRoot, remote, { ...opts.data, gitEnv });
+  const store = openGitDataStore(data.root, { gitEnv, author: await authorFor(repoRoot, me) });
+  const dataGh = data.separate
+    ? createGitHubClient({ token, owner: data.repo.owner, repo: data.repo.name, cache: stateEtagCache(state) })
+    : undefined;
   return {
-    repoRoot,
-    remote,
-    gh,
-    me,
-    state,
+    ...base,
+    dataRoot: data.root,
+    dataRepo: { ...data.repo, separate: data.separate },
+    ...(dataGh ? { dataGh } : {}),
     saveState: () => writeLocalState(repoRoot, state),
-    token,
     gitEnv,
     store,
   };

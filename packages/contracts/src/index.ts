@@ -2,6 +2,7 @@
  * Tandem shared contracts: data formats only, no I/O.
  */
 import { z } from "zod";
+import { TandemError, type TandemErrorCode } from "./errors.ts";
 
 // ---------------------------------------------------------------------------
 // Product naming. Every user-visible name derives from here so that renaming
@@ -21,6 +22,8 @@ export const PRODUCT = {
   markerName: "TANDEM",
   /** Prefix for agent skill folders. */
   skillPrefix: "tandem-",
+  /** Committed config file at the code repo root (see TandemConfig). */
+  configFile: ".tandem.json",
 } as const;
 
 export const LABELS = {
@@ -35,6 +38,47 @@ export const PATHS = {
   status: `${PRODUCT.dataDir}/status`,
   team: `${PRODUCT.dataDir}/team.md`,
 } as const;
+
+// ---------------------------------------------------------------------------
+// Project config (.tandem.json at the code repo root)
+// ---------------------------------------------------------------------------
+const OWNER_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+const REPO_NAME_RE = /^[A-Za-z0-9._-]{1,100}$/;
+
+/** Parse "owner/name" (GitHub rules for logins and repo names). Returns null when invalid. */
+export function parseRepoFullName(s: string): { owner: string; name: string } | null {
+  const m = /^([^/\s]+)\/([^/\s]+)$/.exec(s.trim());
+  if (!m) return null;
+  const [, owner, name] = m as unknown as [string, string, string];
+  if (!OWNER_RE.test(owner) || !REPO_NAME_RE.test(name) || name === "." || name === ".." || name.endsWith(".git")) return null;
+  return { owner, name };
+}
+
+export const RepoFullName = z.string().refine((s) => parseRepoFullName(s) !== null, "要寫成 owner/name，例如 my-team/team-data");
+
+/**
+ * `.tandem.json`. Missing file or missing `dataRepo`: team data stays in the code repo.
+ * With `dataRepo`, decisions, status and team.md live in that (private) repo instead.
+ */
+export const TandemConfig = z.looseObject({
+  dataRepo: RepoFullName.optional(),
+});
+export type TandemConfig = z.infer<typeof TandemConfig>;
+
+/** Parse the text of `.tandem.json`. Throws TandemError("validation") on bad JSON or fields. */
+export function parseTandemConfig(text: string): TandemConfig {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text.replace(/^\uFEFF/, ""));
+  } catch {
+    throw new TandemError("validation", `${PRODUCT.configFile} 不是正確的 JSON`);
+  }
+  const r = TandemConfig.safeParse(raw);
+  if (!r.success) {
+    throw new TandemError("validation", `${PRODUCT.configFile} 格式不正確：${r.error.issues.map((i) => `${i.path.join(".") || "(整份)"} ${i.message}`).join("；")}`);
+  }
+  return r.data;
+}
 
 /** Section headings used in decision bodies (kept here for future i18n). */
 export const DECISION_SECTIONS = {
@@ -302,7 +346,10 @@ export interface SyncState {
 }
 
 export interface BoardData {
+  /** The code repo: PRs, issues, tasks, discussions. */
   repo: { owner: string; name: string; url: string };
+  /** Where decisions, status and team.md live. Same as `repo` unless `.tandem.json` sets `dataRepo`. */
+  dataRepo?: { owner: string; name: string; url: string };
   me: string;
   members: BoardMember[];
   waiting: WaitingItem[];
@@ -318,7 +365,7 @@ export interface BoardData {
 // ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
-export { TandemError, type TandemErrorCode } from "./errors.ts";
+export { TandemError, type TandemErrorCode };
 
 /** CLI exit codes. */
 export const EXIT = { ok: 0, error: 1, usage: 2, needsHuman: 3 } as const;

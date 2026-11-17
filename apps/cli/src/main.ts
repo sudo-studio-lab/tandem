@@ -134,6 +134,17 @@ export function buildProgram(): Command {
     .action((t, o) => cmdTask(t, o));
 
   program.command("sync").description("同步紀錄（通常自動進行）").option("--json").action((o) => cmdSync(o));
+  const data = program.command("data").description("團隊資料放在哪個 repo");
+  data
+    .command("move")
+    .description(`把團隊資料（決定、狀態、team.md）搬到另一個 repo，並寫入 ${PRODUCT.configFile}（只做一次）`)
+    .requiredOption("--to <owner/name>", "資料 repo，例如 my-team/team-data")
+    .option("--dry-run", "只列出會複製哪些檔案")
+    .option("--json")
+    .action(async (o) => {
+      const { cmdDataMove } = await import("./data-move.ts");
+      await cmdDataMove(o);
+    });
   program
     .command("check")
     .description("檢查紀錄格式")
