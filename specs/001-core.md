@@ -77,77 +77,63 @@
 ### 紀錄編號：日期加 4 碼亂數
 - **選了**：`D-YYYYMMDD-xxxx`（4 碼小寫英數），檔名是編號加英文 slug。
 - **為什麼**：多人同時新增不用協調。同一天才可能撞號，約 168 萬種組合，一天 30 筆撞號機率約萬分之三；真的撞了 `tandem check --fix` 會改號。
-- **參考**：log4brains 為了避免兩人同時新增時 merge 出問題而放棄流水號；Beads 用雜湊編號並用生日問題算長度。
-- **沒選**：流水號（adr-tools、MADR、PEP、Backlog.md）——兩人同時新增一定撞號；用 PR 編號（Rust RFC）——我們的紀錄不走 PR。
+- **沒選**：流水號——兩人同時新增一定撞號；用 PR 編號——我們的紀錄不走 PR。
 
 ### 決定寫了就不改，「已取代」讀的時候算
 - **選了**：新決定寫 `supersedes`，舊檔完全不動；檔案裡沒有 `status` 欄位。
 - **為什麼**：只新增檔案，兩個人同時推翻同一個決定也不會有文字衝突；歷史一直保留。
-- **參考**：log4brains（決定不可變）、PEP（定案後是歷史文件）。
-- **沒選**：新舊兩邊都改（adr-tools、PEP）、只在舊檔寫 `superseded_by`（Backlog.md）——都要改別人的檔。
+- **沒選**：新舊兩邊都改、只在舊檔寫 `superseded_by`——都要改別人的檔。
 
 ### 定案出處放 frontmatter
 - **選了**：`source` 必填：定案那則發言的網址，在自己 agent 對話裡定的寫 `chat`。
 - **為什麼**：放在 frontmatter 才能自動檢查。
-- **參考**：PEP 的 `Resolution:` 必須連到做出決定的那則發言。
 
 ### 討論在討論串，定案才寫檔
 - **選了**：還沒定案的事放 GitHub Discussions；定案才寫決定檔；被否決的做法寫進決定的「考慮過的其他做法」。
-- **參考**：Rust RFC（討論都在討論串，被拒絕的提案不進 repo）、MADR 的 Considered Options。
-- **沒選**：像 PEP 那樣把被拒絕的提案也留在 repo——對小團隊太重。
+- **沒選**：把被拒絕的提案也留在 repo——對小團隊太重。
 
 ### 不維護索引檔，讀的時候算
 - **選了**：看板和 brief 每次從檔案和 GitHub 現算。
 - **為什麼**：大家都會改的索引檔是最容易衝突的地方。
-- **參考**：PEP 0 在建置時產生、adr-tools 的目錄是臨時印出、Backlog.md 直接讀檔、Changesets「彙總檔只有機器人寫」。
 
 ### 驗證在寫入時和提交前執行
 - **選了**：`tandem decide` 寫入前跑完整驗證；`tandem init` 在 git pre-commit 加一段 `tandem check --quiet`；`--fix` 處理撞號。
 - **為什麼**：紀錄直接進預設分支，雲端 CI 只能事後發現，本機檢查才是真正的關卡。
-- **參考**：PEP 用 pre-commit 跑 `check-peps.py`；Backlog.md 的 `doctor` 找重複編號。
 
 ### 狀態一人一檔
 - **選了**：`tandem/status/<帳號>.md`，只有本人寫；「在等誰」不寫在狀態裡，從討論、PR、issue 算。
 - **為什麼**：沒人改別人的檔，就不會衝突；等待關係只有一個來源，不會兩邊不一致。
-- **參考**：Changesets 每人一個檔。
-- **沒選**：Beads 的 Dolt 資料庫——為大規模設計，2–5 人用不到。
+- **沒選**：另設協作資料庫——為大規模設計，2–5 人用不到。
 
 ### 說明放在指令裡，repo 只放一小段
 - **選了**：AGENTS.md 只放約 10 行的管理區塊；詳細做法由 `tandem brief`（開工報告）和技能檔提供。
 - **為什麼**：流程改了只要更新工具，不用改每個人的 repo。
-- **參考**：Beads 的 `bd prime`、Backlog.md 的 `backlog instructions`。
 
 ### 管理區塊放 AGENTS.md 最上方，CLAUDE.md 用 `@AGENTS.md`
 - **選了**：`<!-- BEGIN TANDEM v:1 hash:… -->` … `<!-- END TANDEM -->`；沒有 CLAUDE.md 就建一個只有 `@AGENTS.md` 的，有但沒引用就在最上方加一段（也包在標記裡）。
 - **為什麼**：Codex 合併 AGENTS.md 有大小上限（預設 32 KiB），放最上方不會被截掉；Claude Code 有 CLAUDE.md 時不會自己讀 AGENTS.md，官方建議用 `@AGENTS.md` 引用；HTML 註解不佔模型脈絡；標記帶版本和雜湊，能判斷缺少、過期或最新，也能只換掉自己那段。
-- **參考**：Codex 和 Claude Code 官方文件、Beads 的標記做法。
 
 ### 兩家都用 hook 開工和收工
 - **選了**：兩家的 SessionStart 跑 `tandem hook session-start`；Stop 只在有做事卻沒更新狀態時提醒；Codex 另外用 PostCompact 加 UserPromptSubmit 在壓縮後重放開工報告。
 - **為什麼**：兩家的 hook 幾乎一樣（SessionStart 能放文字進脈絡、Stop 能要求繼續）。Codex 的 SessionStart 放入內容上限約 2,500 tokens，所以開工報告寫得很短；Codex 的 Stop 只收 JSON，所以 hook 一律輸出 JSON。
-- **參考**：Beads 在兩家都這樣用。
-- **沒選**：只靠 AGENTS.md 的文字（Backlog.md）——是要求不是保證，只當備援。
+- **沒選**：只靠 AGENTS.md 的文字——是要求不是保證，只當備援。
 
 ### 同一份技能檔寫到兩家的資料夾
 - **選了**：標準 `SKILL.md` 格式，寫到 `.claude/skills/` 和 `.agents/skills/`，目前有 `tandem-decision`、`tandem-status`、`tandem-ask` 三個。
 - **為什麼**：Agent Skills 是開放格式，Claude Code 讀前者、Codex 讀後者。
-- **參考**：Agent Skills 規格、spec-kit 同時支援兩家的做法。
 
 ### 程式架構和套件
 - **選了**：TypeScript、Node.js 22 以上；npm workspaces（不用另外裝 pnpm）；zod 定義格式；`yaml` 解析 frontmatter；commander 做指令；Hono 做本機伺服器、Server-Sent Events 推更新；Vite 加 React 做看板；vitest 測試，GitHub 呼叫用假的 fetch。
-- **為什麼**：兩家 agent 和參考的專案都在 npm 生態系，Windows、macOS 都能跑；一份格式定義同時用在驗證、指令輸出和看板。
-- **參考**：T3 Code（git 和檔案屬於伺服器、客戶端只做介面、指令套件把網頁一起打包）、Backlog.md（一個核心同時給指令、網頁、MCP 用）。
+- **為什麼**：既有工具鏈使用 npm 生態系，Windows、macOS 都能跑；一份格式定義同時用在驗證、指令輸出和看板。
 - **沒選**：每個介面各寫一份邏輯——行為會越來越不一致。
 
 ### 本機看板只聽 127.0.0.1，加一次性通行碼
 - **選了**：伺服器只綁 `127.0.0.1`（預設埠 4318，被占用就往後找）；打開瀏覽器的網址帶一次性通行碼，之後換成 cookie。
 - **為什麼**：任何網頁都能連 localhost，只綁本機還不夠。
-- **參考**：Backlog.md 只聽 127.0.0.1；T3 Code 的環境認證（做簡化版）。
 
 ### GitHub 登入
 - **選了**：權杖讀取順序：環境變數（`TANDEM_TOKEN`、`GH_TOKEN`、`GITHUB_TOKEN`）→ 作業系統的認證管理員 → `gh auth token`。001 實際只靠 `gh`；002 加上 Tandem 自己的 OAuth App 裝置碼登入（顯示一組代碼、在瀏覽器確認），權限 `repo`、`read:org`，權杖存進認證管理員（`@napi-rs/keyring`）。
 - **為什麼**：當時兩人都已登入 `gh`，不用任何設定；但沒裝 `gh` 的人用不了，所以 002 補上裝置碼流程。裝置碼流程不需要 client secret，適合發出去的工具。git 推拉時權杖只放在子行程的環境變數，不寫進 `.git/config` 或指令列。
-- **參考**：gh CLI 的登入流程、GitHub OAuth 文件；T3 Code 用 `@napi-rs/keyring`。
 - **沒選**：GitHub App——權限能切細，但每個 repo 擁有者都要先安裝，接受邀請也需要很重的權限，破壞「輸入帳號、傳連結」的流程；keytar——已停止維護。
 
 ### 邀請和加入
@@ -160,22 +146,19 @@
 - **選了（001）**：所有 git 操作排成一條隊伍；`tandem/` 有變動就等幾秒再提交、`pull --rebase --autostash`、推送；衝突時停止、在看板顯示，絕不自動解決或強制推送。
 - **選了（002 改，現況）**：紀錄直接用 git 底層指令寫到遠端預設分支（見〈主要流程〉的 sync）。
 - **為什麼改**：001 的做法會順便推送使用者分支上的程式碼 commit；在功能分支上記的決定，要等合併後別人才看得到。改成直接寫預設分支後，兩個問題都沒了，而且紀錄仍然能在 GitHub 網頁上直接看到。
-- **參考**：Obsidian Git（排隊執行、先拉再推、衝突時停下讓人處理）。
 - **還成立的部分**：一筆一檔、一人一檔，讓衝突幾乎不會發生；同名檔案真的撞上時，那筆寫入被放到 `.git/tandem/conflicts/`，不會蓋掉別人的。
 
 ### 輪詢 GitHub，不用 webhook
 - **選了**：本機伺服器每 3 分鐘同步一次並重讀 GitHub；REST 請求帶 ETag（沒變動回 304，不算額度），快取存在本機狀態；寫入請求之間至少隔 1 秒；遇到額度用完會等待重試。
 - **為什麼**：沒有伺服器就收不到 webhook；每人每小時 5,000 次額度，5 人團隊遠用不完。
-- **參考**：GitHub REST API 最佳做法和額度說明。
 - **跟原計畫不同**：原本規劃看板開著時每 60 秒 fetch、Discussions 每 2–5 分鐘、看板隱藏時暫停，現在統一 3 分鐘。
 
 ### Discussions 用內建 Q&A 分類，開之前先問
 - **選了**：問題和分歧放在內建的 Q&A 分類（可以標記答案），用 `tandem:question`、`tandem:disagreement` 標籤區分；沒開 Discussions 時，`tandem init` 先問，同意才用 API 開（需要管理權限）；不開就改用 Issues。
 - **為什麼**：GitHub 沒有建立討論分類的 API，用內建分類才不用人手動設定；開 Discussions 是 repo 設定，必須先問。免費方案的私人 repo 也能開（已實測）。
-- **參考**：GitHub Discussions GraphQL 文件。
 
 ### 桌面版（002 才做）
-當時先記下的方向：Electron 執行同一份伺服器程式（T3 Code 的做法）、per-user 安裝檔、從 GitHub Releases 自動更新、`tandem://` 連結、Windows 程式碼簽章的費用和地區限制。細節見 002。
+當時先記下的方向：Electron 執行同一份伺服器程式、per-user 安裝檔、從 GitHub Releases 自動更新、`tandem://` 連結、Windows 程式碼簽章的費用和地區限制。細節見 002。
 
 ## 跟原本計畫不一樣的地方
 

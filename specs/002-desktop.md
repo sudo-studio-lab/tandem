@@ -129,7 +129,7 @@ app 每次啟動都在 `%LOCALAPPDATA%\Tandem\bin\` 重寫兩個檔：`tandem.cm
 
 ### 內建 git
 
-用 dugite（GitHub Desktop 用的 git 包裝）帶一份 Git for Windows，打包在安裝資料夾的 `resources/git`。程式執行 git 時先看環境變數 `TANDEM_GIT`，有就用內建的並設好它需要的環境，沒有才用系統的 git。Claude Code 和 Codex 自己跑 git 時仍用系統的 git，跟 Tandem 無關。
+用 dugite（git 包裝）帶一份 Git for Windows，打包在安裝資料夾的 `resources/git`。程式執行 git 時先看環境變數 `TANDEM_GIT`，有就用內建的並設好它需要的環境，沒有才用系統的 git。Claude Code 和 Codex 自己跑 git 時仍用系統的 git，跟 Tandem 無關。
 
 ### 自動更新
 
@@ -147,28 +147,24 @@ app 每次啟動都在 `%LOCALAPPDATA%\Tandem\bin\` 重寫兩個檔：`tandem.cm
 
 - **選了什麼**：用 git 底層指令（read-tree、hash-object、update-index、write-tree、commit-tree）在遠端預設分支上直接組 commit 推上去，加本機待送佇列和跨程式的檔案鎖。
 - **為什麼**：紀錄要「直接進 main、隊友馬上看得到」，同時絕不能碰使用者的程式碼、commit 和未存的修改。這個做法不需要第二個工作目錄，使用者在 main 上時下次 pull 就會快轉拿到，在功能分支上合併 main 也不會衝突。
-- **參考了誰**：Beads 早期用隱藏的 git worktree 同步到獨立分支，後來因為卡住的 worktree 會擋到使用者切換分支而放棄，改放在獨立的 ref；git-bug、git-appraise 用底層指令寫入、不經過工作目錄；GitHub 網頁編輯檔案也是直接在遠端產生 commit。
-- **沒選的做法**：沿用 001 在使用者分支上 commit 再 rebase 推送（會帶出程式碼 commit、改寫歷史）；另開一個 worktree（Beads 踩過的坑）；寫到獨立的 ref（在 GitHub 網頁上看不到、點不到紀錄，違背 001 的設計）。
+- **沒選的做法**：沿用 001 在使用者分支上 commit 再 rebase 推送（會帶出程式碼 commit、改寫歷史）；另開一個 worktree；寫到獨立的 ref（在 GitHub 網頁上看不到、點不到紀錄，違背 001 的設計）。
 
 ### 成員動態從 GitHub 推算，不存檔
 
 - **選了什麼**：每次重整時從 GitHub 抓各分支的 commit、PR、討論和 issue 留言，在記憶體整理成每人最近 7 天的動態，不寫進 repo。
 - **為什麼**：001 的看板要靠人或 agent 寫才有內容，剛開始是空的。commit 和 PR 本來就在發生，不需要任何人多做事就能讓看板有東西。
-- **參考了誰**：GitHub repo 的 Insights、Linear 的活動紀錄，都是從既有事件推算。
 - **沒選的做法**：把動態存成檔案進 repo（多一堆紀錄、還要同步）。原本也考慮用本機 `git log` 依 email 比對作者當備援，但實作時改成只用 GitHub 回傳的帳號：email 對不到帳號的 commit 直接略過，因為用 email 猜容易把動態算到錯的人頭上。
 
 ### 內建 git：dugite
 
 - **選了什麼**：用 dugite 隨 app 帶一份 Git for Windows，靠 `TANDEM_GIT` 環境變數指定。
-- **為什麼**：使用者不用另外裝 git。dugite 是 GitHub Desktop 在用、MIT 授權、持續維護的套件。代價是安裝檔變大（git 壓縮後約 47 MB）。
-- **參考了誰**：GitHub Desktop。
+- **為什麼**：使用者不用另外裝 git。dugite 是 MIT 授權的 git 包裝套件。代價是安裝檔變大（git 壓縮後約 47 MB）。
 - **沒選的做法**：要求使用者自己裝 git（多一個步驟，違背「下載就能用」）；用純 JavaScript 實作的 git（行為和真 git 不完全一樣，推送和認證要另外處理）。
 
 ### 沒有 npm 也能讓 `tandem` 在 PATH 上
 
 - **選了什麼**：在 `%LOCALAPPDATA%\Tandem\bin` 放 `.cmd` 和 sh 兩種小腳本，用 app 自己的執行檔以 Node 模式跑 CLI，再把資料夾加進使用者 PATH。
 - **為什麼**：Claude Code 在 Windows 預設用 Git Bash 跑 hook，沒有 Git Bash 時用 PowerShell，所以兩種殼都要能找到 `tandem`（npm 也因為同樣原因會同時產生 sh 和 `.cmd`）。改 PATH 時保留原本的值型態、讀不到就放棄，避免把使用者的 PATH 弄壞。
-- **參考了誰**：T3 Code 的桌面版用同樣做法上線（`DesktopCliShim.ts`）；npm 的雙檔案做法。
 - **沒選的做法**：要求使用者用 npm 全域安裝 CLI（需要 Node）；另附一個獨立的 console 啟動程式（原本列為備案，目前沒有用到）。
 - 補充：app 自己啟動 agent 對話時，MCP 伺服器直接用 app 的執行檔啟動，不依賴 PATH，所以 PATH 還沒生效時也能用。
 
@@ -176,7 +172,6 @@ app 每次啟動都在 `%LOCALAPPDATA%\Tandem\bin\` 重寫兩個檔：`tandem.cm
 
 - **選了什麼**：註冊在 sudo-studio-lab 組織下的 OAuth App，開啟裝置碼流程，權限 `repo`、`read:org`；權杖存 Windows 認證管理員；權杖不設過期。
 - **為什麼**：裝置碼流程不需要本機回呼網址，也不用在 app 裡處理密碼。組織自己的 OAuth App 不受組織的「第三方 OAuth 存取限制」影響；其他組織的使用者第一次用時，需要他們的組織擁有者核准一次。權杖不過期就不用處理每 8 小時換一次權杖。
-- **參考了誰**：gh 用內嵌公開 Client ID 的裝置碼流程；GitHub Desktop 用自己的 OAuth App。
 - **沒選的做法**：GitHub App。它的權杖只能用在已經安裝這個 App 的 repo，被邀請的人在接受邀請前不可能已經裝好，「邀請就能開始」會被打斷；而且接受邀請需要很大的管理權限。也不再像 001 那樣只靠借用 gh 的登入（使用者要先裝 gh），不過 gh 的權杖仍保留為最後的備援。
 
 ### 先不做程式簽章
@@ -190,7 +185,6 @@ app 每次啟動都在 `%LOCALAPPDATA%\Tandem\bin\` 重寫兩個檔：`tandem.cm
 
 - **選了什麼**：主流程不靠連結。被邀請的人登入後，app 主動列出待接受的邀請；分享文字放的是 https 下載頁，`tandem://` 連結只是已安裝時的捷徑。
 - **為什麼**：聊天軟體多半不會把 `tandem://` 這種自訂連結變成可以點的，GitHub 的 Markdown 也會把它拿掉；https 網址到哪裡都點得開。
-- **參考了誰**：Zoom、Discord 的邀請連結都是先打開 https 網頁，再叫起 app。
 - **限制**：接受邀請前讀不到私人 repo 的內容，分不出它是不是 Tandem 專案，所以用連結裡的 repo 名稱把它排到最上面；使用者也可能已經從 email 接受了邀請，這時就直接當成已經有權限的 repo 來開始。
 
 ### 安裝檔和下載頁放在另一個公開 repo
@@ -203,13 +197,12 @@ app 每次啟動都在 `%LOCALAPPDATA%\Tandem\bin\` 重寫兩個檔：`tandem.cm
 
 - **選了什麼**：主程式用自己的執行檔以 Node 模式啟動 CLI 的伺服器，通行碼經 stdin 傳、就緒時從 stdout 回報埠號，掛掉就重啟；單一實例鎖。
 - **為什麼**：瀏覽器版和桌面版共用同一份伺服器和看板程式，不用寫兩套；不需要使用者裝 Node，因為 Electron 本身就能當 Node 用。
-- **參考了誰**：T3 Code 的 `DesktopBackendManager.ts`。
 - **跨程式的同時寫入**：常駐的伺服器和 agent hook 跑的 `tandem` 是不同的程式，001 的 git 排隊只在同一個程式裡有效。所以寫入時另外用檔案鎖把「抓遠端、組 commit、推送」串起來，鎖太久沒更新（60 秒）就當作殘留可以拿走；佇列檔用先寫暫存檔再改名的方式寫。
 - **沒選的做法**：把伺服器邏輯搬進 Electron 主程式（瀏覽器版就得另寫一套）；要求使用者另外裝 Node 跑伺服器。
 
 ### 工作列、通知、開機啟動、自動更新、打開 agent
 
-- **通知**：設定 AppUserModelId（Windows 用來辨認是哪個 app 發的通知），和安裝程式建的捷徑一致。因為 Windows 的「勿擾」會安靜丟掉通知，所以等你的數量也顯示在工作列和看板上，不只靠通知。參考 Electron 官方通知文件。
+- **通知**：設定 AppUserModelId（Windows 用來辨認是哪個 app 發的通知），和安裝程式建的捷徑一致。因為 Windows 的「勿擾」會安靜丟掉通知，所以等你的數量也顯示在工作列和看板上，不只靠通知。
 - **工作列圖示**：關視窗只隱藏，讓通知和同步繼續。
 - **開機啟動**：用 Electron 的登入項目設定，預設關閉，由使用者自己選。
 - **自動更新**：NSIS 安裝檔加 electron-updater。只有工作列圖示、沒有視窗的 app 偵測不到 Windows 關機，所以不能在關機時更新，改成「下次啟動時安裝」。
