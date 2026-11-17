@@ -1635,3 +1635,237 @@ dialog.modal::backdrop {
     max-width: 160px;
   }
 }
+
+/* ===========================================================================
+   Task board (one column; fits an editor side panel)
+   =========================================================================== */
+.page.board {
+  max-width: 760px;
+}
+.tb-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.tb-faces {
+  display: flex;
+  margin-left: auto;
+  padding-left: 6px;
+}
+.tb-face {
+  position: relative;
+  border: 0;
+  padding: 0;
+  background: none;
+  border-radius: 50%;
+  cursor: pointer;
+  margin-left: -6px;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.tb-face:hover,
+.tb-face:focus-visible {
+  z-index: 1;
+}
+.tb-face.is-sel {
+  z-index: 2;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+.tb-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  border: 2px solid var(--bg);
+}
+.tb-dot.is-fresh {
+  background: var(--ok-fg);
+}
+.tb-dot.is-blocked {
+  background: var(--bad-fg);
+}
+.tb-picked {
+  margin-bottom: 8px;
+}
+.tb-wait-ic {
+  color: var(--warn-fg);
+}
+.tb-kind {
+  color: var(--warn-fg);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tb-meta {
+  color: var(--muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+.tb-group-wait > summary {
+  background: var(--warn-bg);
+}
+.tb-pills {
+  display: flex;
+  gap: 4px;
+}
+.tb-pills button {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--muted);
+  padding: 4px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.tb-pills button.is-on {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+}
+.tb-filter-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.tb-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+}
+.tb-group {
+  margin-top: 6px;
+}
+.tb-group > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.tb-group > summary::-webkit-details-marker {
+  display: none;
+}
+.tb-chev {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--muted);
+  transform: rotate(-90deg);
+  transition: transform 0.15s;
+}
+.tb-group[open] .tb-chev {
+  transform: none;
+}
+.tb-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+.tb-rows {
+  list-style: none;
+  margin: 0;
+  padding: 2px 0;
+}
+.tb-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 7px 26px;
+  font-size: 0.9rem;
+  border-radius: var(--radius-sm);
+}
+.tb-row:hover {
+  background: var(--surface-2);
+}
+.tb-num {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+.tb-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tb-title:hover {
+  text-decoration: underline;
+}
+.tb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px 1px 6px;
+  font-size: 0.76rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.tb-chip-ready .tb-ic {
+  color: var(--accent);
+}
+.tb-chip-done .tb-ic {
+  color: var(--ok-fg);
+}
+.tb-owners {
+  display: inline-flex;
+  flex: none;
+}
+.tb-owners .avatar + .avatar {
+  margin-left: -6px;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.tb-ic {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.tb-ready {
+  color: var(--accent);
+}
+.tb-working {
+  color: var(--muted);
+}
+.tb-done {
+  color: var(--ok-fg);
+}
+.tb-empty {
+  margin: 6px 0 4px 26px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.tb-log {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+@media (max-width: 480px) {
+  .tb-row {
+    padding-left: 10px;
+  }
+  .tb-num {
+    display: none;
+  }
+}
+.tb-back {
+  margin: 0;
+  font-size: 0.88rem;
+}
