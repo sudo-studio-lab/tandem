@@ -3,12 +3,12 @@
 > **這是紀錄，不是定案。** 寫的是到 0.2.1 為止實際做了什麼、為什麼這樣做。之後要改，直接改程式，再回來更新這份。
 >
 > - Claude 的部分在 Windows 實機跑過（Claude Code 2.1.314）。
-> - **Codex 的部分是照官方文件寫的，還沒在真的電腦上跑過**，由 Roy 實測。標「未實測」的地方都可能要改。
+> - **Codex 的部分是照官方文件寫的，還沒在真的電腦上跑過**，待實機驗證。標「未實測」的地方都可能要改。
 > - **房間只用假資料測過**（假的 GitHub、假的 agent），還沒有兩個人真的一起用過。
 
 ## 要解決的問題
 
-002 做完時，「用 Claude Code 開始」只是幫你打開一個終端機。Jielle 想要的是像 T3 Code 那樣：在 Tandem 視窗裡就有一個對話框，用自己登入的 Claude 或 Codex（訂閱或 API key 都可以，可以同時登好幾家），每段對話選要用哪一家、哪個模型。
+002 做完時，「用 Claude Code 開始」只是幫你打開一個終端機。這階段的目標是：在 Tandem 視窗裡就有一個對話框，用自己登入的 Claude 或 Codex（訂閱或 API key 都可以，可以同時登好幾家），每段對話選要用哪一家、哪個模型。
 
 另外有三樣東西是在 app 裡用 AI 一定要有的，001、002 都還沒做：
 
@@ -173,10 +173,10 @@ AI 能做的事跟一般對話一樣，包括改檔案、跑指令、用 Tandem 
 
 | 做法 | 為什麼沒選 |
 |---|---|
-| 主持人開一個對外分享連結，大家連進主持人的電腦（像 Omnigent） | 即時，但要把電腦開給外面，設定和安全都麻煩；我們沒有自己的伺服器 |
-| 別人的訊息要主持人按一下才送給 AI（像 T3 Code 的訪客連結） | 比較保守，但主持人要一直顧著 |
+| 主持人開一個對外分享連結，大家連進主持人的電腦 | 即時，但要把電腦開給外面，設定和安全都麻煩；我們沒有自己的伺服器 |
+| 別人的訊息要主持人按一下才送給 AI | 比較保守，但主持人要一直顧著 |
 | 別人只能看、只能提建議（像 claude-share 這類工具） | 達不到「大家一起講」 |
-| 大家直接輸入同一個用 API key 的 agent（像 Readback） | 要另外付 API 費用，也不是用主持人自己的訂閱 |
+| 大家直接輸入同一個用 API key 的 agent | 要另外付 API 費用，也不是用主持人自己的訂閱 |
 
 選 GitHub Discussion 的原因：不用設定網路，每句話自帶作者和網址；動作由主持人核准，符合「在誰的電腦上跑，就要那個人看過」。
 
@@ -187,14 +187,12 @@ AI 能做的事跟一般對話一樣，包括改檔案、跑指令、用 Tandem 
 **執行原版 Claude Code，不用 Agent SDK**
 - 選了：執行使用者自己裝的、沒改過的 `claude`；登入一律走 Claude Code 自己的流程。
 - 為什麼：Anthropic 的規定允許產品裡執行沒改過的 Claude Code、每個人用自己的訂閱或 API key 登入；但不允許第三方 app 提供 Claude.ai 登入、替使用者轉送訂閱的額度、或收集保存 Claude.ai 憑證。Agent SDK 的文件也寫明，沒事先核准的話不能讓 SDK 做的產品用 claude.ai 登入。執行 Claude Code 需要同意 Anthropic 的商業條款（在 Claude Console 建組織時同意；這是照文件字面的理解，不是法律意見），可以等到給我們兩個以外的人用之前再做。名字上不把「Claude Code」當自己功能的名字，選單寫「Claude」。
-- 參考了誰：Claude Code 的法律與合規頁、Agent SDK 文件；T3 Code（它用 Agent SDK 啟動 Claude，登入叫使用者到 CLI 自己做，是否事先取得同意查不到）。
 - 沒選的做法：Agent SDK 配訂閱登入。
 
 **多輪對話用 stream-json**
 - 選了：`claude -p --input-format stream-json --output-format stream-json --verbose --include-partial-messages`，程序在訊息之間不關。
 - 為什麼：一個程序就能連續送好幾則，不用每則重開。
 - 實機結果：輸入一行 `{"type":"user","message":{"role":"user","content":"文字"}}` 就夠，content 可以是字串。stdin 不關程序就一直活著；每則各有一個 `result`，對話編號不變。輸出的第一行可能是 hook 開始的通知，不一定是初始化訊息。
-- 參考了誰：Claude Code 的 headless 和 CLI 文件。
 
 **接續對話用 `--resume`**
 - 選了：記下 agent 回報的對話編號，下次用 `--resume` 接上。對話內容由 Claude Code 自己保存，Tandem 只記編號。
@@ -232,7 +230,6 @@ AI 能做的事跟一般對話一樣，包括改檔案、跑指令、用 Tandem 
 
 **用 `codex app-server`**
 - 選了：stdio 上的 JSON-RPC，每行一個 JSON，省略 `"jsonrpc"`；先 `initialize` 再 `initialized`。一個程序對應一段對話。
-- 參考了誰：OpenAI 的 app-server 文件。
 - 沒選的做法：原本打算用 `generate-ts` 產生一份型別放進 repo，最後沒做，只在程式裡寫用到的欄位。
 
 **對話**
@@ -264,9 +261,9 @@ AI 能做的事跟一般對話一樣，包括改檔案、跑指令、用 Tandem 
 - 選了：`@modelcontextprotocol/sdk`（1.32 版），`McpServer` 加 stdio 傳輸，參數格式用專案本來就在用的 zod 4。工具結果是文字，出錯時標成錯誤。
 - 為什麼：官方套件，兩家 agent 都支援 stdio 的 MCP 伺服器。放在 `apps/cli` 呼叫 `packages/core`，跟命令列共用同一份邏輯，不會兩邊行為不一樣。
 
-### 讓別人進對話：其他工具怎麼做
+### 房間的流程選擇
 
-做房間前看過的做法（整理在「房間 → 考慮過的做法」）：Readback 用 API key，兩人直接輸入同一個 agent，每則訊息有回條、原話釘在板上；Omnigent 用主持人的訂閱、在主持人電腦上跑，大家一起操作也能按核准；T3 Code 的訪客連結能送訊息，但要主持人按一下才送出；claude-share 這類只能看、提建議。Tandem 選了「主持人的訂閱 + 大家直接輸入 + 動作由主持人核准」，連線改用 GitHub Discussion。
+房間使用主持人的工具與帳號，成員可直接輸入，動作由主持人核准；訊息以 GitHub Discussion 傳遞。
 
 ## 跟原本計畫不一樣的地方
 

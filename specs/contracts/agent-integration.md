@@ -8,9 +8,9 @@
 
 ## 原則
 
-1. **詳細做法由命令列在執行時給。** 寫進使用者 repo 的只有一小段指引，細節由 `tandem brief` 和 hook 的輸出提供。原因：之後改流程，不用去改每個人的 repo。（參考 Beads 的 `bd prime`、Backlog.md 的 `backlog instructions`。）
+1. **詳細做法由命令列在執行時給。** 寫進使用者 repo 的只有一小段指引，細節由 `tandem brief` 和 hook 的輸出提供。原因：之後改流程，不用去改每個人的 repo。
 2. **能用 hook 就用 hook，文字指引當備援。** 原因：hook 要等使用者信任專案才會跑；沒信任時，至少 AGENTS.md 的文字會提醒 agent 自己執行。
-3. **兩家用同一份內容。** 同一段指引、同一份技能、同一個 hook 指令，只是放的位置不同。原因：確保兩家行為一樣（參考 spec-kit 把同一份技能寫到兩家各自的資料夾）。
+3. **兩家用同一份內容。** 同一段指引、同一份技能、同一個 hook 指令，只是放的位置不同。原因：確保兩家行為一樣。
 4. **有 MCP 工具就用工具，沒有才打指令。** 兩者效果一樣。
 5. **只動專案資料夾，不改使用者電腦上的全域設定。** 使用者自己寫的設定一律保留。
 
@@ -63,7 +63,7 @@ Claude Code 只有在沒有任何 CLAUDE.md 時才會自己讀 AGENTS.md；只�
 | 收工 | `Stop` | `Stop` | `tandem hook stop --agent <claude\|codex>` | 這次有做事、但自己的狀態還沒更新時，擋一次並提醒更新狀態 |
 
 - 每個 hook 的設定 `timeout` 是 30 秒；Codex 另外寫 `commandWindows`（內容一樣），給 Windows 用。
-- **Codex 要分兩步**：壓縮後 Codex 會忽略 hook 的純文字輸出，所以先在 `PostCompact` 做記號，下一句話時再放回去（參考 Beads 的做法）。
+- **Codex 要分兩步**：壓縮後 Codex 會忽略 hook 的純文字輸出，所以先在 `PostCompact` 做記號，下一句話時再放回去。
 - **Stop 只在真的需要時擋。** Stop 每一輪都會觸發，所以只有這些條件都成立才擋：不是已經在 Stop 迴圈裡（`stop_hook_active` 為 false）、這次對話有開工紀錄、還沒提醒過、工作區跟開工時比有變動（或多了 commit；`tandem/` 資料夾不算）、自己的狀態在開工之後沒更新過。擋的時候回 `{"decision":"block","reason":"…"}`，每段對話只提醒一次。原因：開工前就有的未提交修改不能算「這次有做事」，不然只是問個問題也會被要求改狀態。
 - **不用 `SessionEnd`**。原因：Claude Code 不能用它擋，而且只給約 1.5 秒。
 - **一律輸出 JSON、絕不讓 agent 失敗。** 開工和下一句話回 `{"hookSpecificOutput":{"hookEventName":…,"additionalContext":…}}`，沒東西就回 `{}`。出錯時把訊息寫到 stderr，照樣輸出放行的 JSON。原因：Codex 不接受純文字；hook 壞了不能卡住使用者。
@@ -145,6 +145,6 @@ Tandem 讓團隊每個人的 agent 共享決定和進度。
 ## 還沒確認的
 
 - Codex 在 `codex exec`（不互動的模式）和 `app-server` 下會不會跑專案的 hook。
-- Codex 要哪個最低版本才支援 hook 把內容放進脈絡（Beads 說 0.129.0 以上）。
+- Codex 要哪個最低版本才支援 hook 把內容放進脈絡，仍需以實際安裝版本驗證。
 - Codex 是否支援 MCP 的 resources 和 prompts（目前只用 tools，不受影響）。
 - `install.ts` 有移除整合的功能，但還沒有指令可以叫用。
