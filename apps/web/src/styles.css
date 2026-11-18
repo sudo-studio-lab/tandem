@@ -313,16 +313,14 @@ label {
 }
 .pill-warn,
 .badge-warn,
-.tag-warn,
-.tag-hunch {
+.tag-warn {
   background: var(--warn-bg);
   color: var(--warn-fg);
   border-color: transparent;
 }
 .pill-bad,
 .badge-bad,
-.tag-bad,
-.tag-hard {
+.tag-bad {
   background: var(--bad-bg);
   color: var(--bad-fg);
   border-color: transparent;
@@ -330,15 +328,10 @@ label {
 .pill-info,
 .badge-info,
 .badge-me,
-.tag-info,
-.tag-preference {
+.tag-info {
   background: var(--info-bg);
   color: var(--info-fg);
   border-color: transparent;
-}
-.tag-one-off {
-  background: var(--surface-2);
-  color: var(--muted);
 }
 .dot-badge {
   background: var(--bad-fg);
@@ -695,28 +688,6 @@ label {
   color: var(--muted);
   margin: 0 0 10px 2px;
 }
-.panel-icon {
-  font-size: 0.95rem;
-  letter-spacing: 0;
-}
-.count-chip {
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0;
-  padding: 0 7px;
-  border-radius: 999px;
-  background: var(--border);
-  color: var(--text);
-  line-height: 1.6;
-}
-.count-warn {
-  background: var(--warn-bg);
-  color: var(--warn-fg);
-}
-.count-bad {
-  background: var(--bad-bg);
-  color: var(--bad-fg);
-}
 .empty {
   padding: 14px 16px;
   border: 1px dashed var(--border-strong);
@@ -958,56 +929,6 @@ label {
   font-size: 0.8rem;
   color: var(--muted);
   margin-top: 3px;
-}
-.wait-who {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  flex: none;
-}
-.wait-arrow {
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
-/* Decisions */
-.decision {
-  flex: 1;
-  min-width: 0;
-}
-.decision > summary {
-  cursor: pointer;
-  list-style: none;
-}
-.decision > summary::-webkit-details-marker {
-  display: none;
-}
-.d-line {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-.d-title {
-  font-weight: 600;
-  line-height: 1.4;
-}
-.decision > summary:hover .d-title {
-  color: var(--accent);
-}
-.d-body {
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  font-size: 0.9rem;
-}
-.d-body h4 {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  margin: 10px 0 2px;
 }
 blockquote {
   margin: 0 0 6px;
@@ -2055,6 +1976,62 @@ dialog.modal::backdrop {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* On 決定和討論 nothing is "yours" to act on, so kinds stay muted; color is kept for problems. */
+.tb-log .tb-kind {
+  color: var(--muted);
+}
+/* 決定和討論: a decision is one row; opening it shows the original words, the decision and why. */
+.lg-dec > details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.lg-dec > details > summary::-webkit-details-marker {
+  display: none;
+}
+.lg-dec > details[open] > summary {
+  --row-bg: var(--surface-2);
+}
+.lg-dec.is-replaced .tb-title {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--border);
+}
+.lg-body {
+  padding: 6px 10px 12px 20px;
+  font-size: 13px;
+  line-height: 1.55;
+  border-bottom: 1px solid var(--border);
+}
+.lg-body p {
+  margin: 0 0 6px;
+}
+.lg-quote {
+  margin: 0 0 8px;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--border);
+}
+.lg-quote p {
+  margin: 0;
+}
+.lg-quote footer,
+.lg-foot,
+.lg-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+.lg-foot a {
+  color: var(--muted);
+}
+.lg-foot a:hover {
+  color: var(--accent);
+}
+.lg-label {
+  margin-top: 8px !important;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--muted);
 }
 .pg-bar-end {
   margin-left: auto;

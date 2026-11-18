@@ -1,23 +1,22 @@
 import type { DiscussionSummary } from "@tandem/contracts";
 import { Ext } from "./Ext.tsx";
-import { Panel } from "./ui.tsx";
+import { Group } from "./Group.tsx";
 import { relTime } from "../time.ts";
 
 const KIND = { question: "問題", disagreement: "意見不同", other: "討論" } as const;
-const TONE = { question: "tag-info", disagreement: "tag-warn", other: "" } as const;
 
 function Row({ d, now }: { d: DiscussionSummary; now: number }) {
+  const waiting = d.waitingOn.map((l) => `@${l}`).join("、");
   return (
-    <li>
-      <span className="grow">
-        <Ext href={d.url} className="row-title">
-          {d.title}
-        </Ext>
-        <span className="row-meta">
-          <span className={`tag ${TONE[d.kind]}`}>{KIND[d.kind]}</span>
-          {d.waitingOn.length > 0 && <> 等 {d.waitingOn.map((l) => `@${l}`).join("、")} ·</>}
-          {d.answered && <> 已有回答 ·</>} {relTime(d.updatedAt, now)}
-        </span>
+    <li className="tb-row" title={d.title}>
+      <Ext href={d.url} className="tb-title">
+        {d.title}
+      </Ext>
+      <span className="tb-meta">
+        <span className={d.kind === "disagreement" ? "tb-stuck" : "tb-kind"}>{KIND[d.kind]}</span>
+        {waiting && <span className="tb-from">等 {waiting}</span>}
+        {d.answered && <span>已有回答</span>}
+        <span>{relTime(d.updatedAt, now)}</span>
       </span>
     </li>
   );
@@ -28,26 +27,19 @@ export function Discussions({ items, now }: { items: DiscussionSummary[]; now: n
   const open = items.filter((d) => !d.closed).sort(byUpdated);
   const closed = items.filter((d) => d.closed).sort(byUpdated);
   return (
-    <Panel title="討論和問題" icon="💬" count={open.length}>
-      {open.length === 0 ? (
-        <p className="muted empty">目前沒有開著的討論</p>
-      ) : (
-        <ul className="rows card">
-          {open.map((d) => (
+    <>
+      <Group label="討論和問題" count={open.length}>
+        {open.map((d) => (
+          <Row key={d.id} d={d} now={now} />
+        ))}
+      </Group>
+      {closed.length > 0 && (
+        <Group label="已結束的討論" count={closed.length} open={false} dim>
+          {closed.map((d) => (
             <Row key={d.id} d={d} now={now} />
           ))}
-        </ul>
+        </Group>
       )}
-      {closed.length > 0 && (
-        <details className="more">
-          <summary>已結束（{closed.length}）</summary>
-          <ul className="rows card dim">
-            {closed.map((d) => (
-              <Row key={d.id} d={d} now={now} />
-            ))}
-          </ul>
-        </details>
-      )}
-    </Panel>
+    </>
   );
 }

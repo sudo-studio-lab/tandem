@@ -6,6 +6,7 @@ import { relTime } from "../time.ts";
 import { TranscriptChoices } from "./AgentMessages.tsx";
 import { PageBar } from "./PageBar.tsx";
 import "./collaboration.css";
+import "./co-panel.css";
 
 interface Data{settings:SharedChatSettings;chats:SharedChat[];handoffs:Handoff[]}
 export function SharedChatsPage({board,now,onBack,onFork,onChanged}:{board:ProjectBoard;now:number;onBack:()=>void;onFork:(id:string)=>void;onChanged:()=>void|Promise<void>}){

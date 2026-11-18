@@ -235,7 +235,7 @@ export function App() {
           }}
         />
       ) : view === "chat" ? (
-        <><div className="page tb-back"><button type="button" className="tb-link" onClick={()=>{setView("board");setBoardTab("shared-chats");}}>回對話與交接</button></div><ChatView key={project.id} projectId={project.id} now={now} initialChatId={forkId} onOpenSettings={() => setDialog("agents")} /></>
+        <><div className="page"><PageBar back="對話與交接" onBack={()=>{setView("board");setBoardTab("shared-chats");}} /></div><ChatView key={project.id} projectId={project.id} now={now} initialChatId={forkId} onOpenSettings={() => setDialog("agents")} /></>
       ) : !board ? (
         <main className="page">
           {app.boardError ? (
@@ -271,9 +271,11 @@ export function App() {
           ) : (
             <div className="tb-log">
               <PageBar title="決定和討論" onBack={() => setBoardTab("list")} />
-              <Waiting items={board.waiting} now={now} />
-              <Decisions board={board} />
-              <Discussions items={board.discussions} now={now} />
+              <div className="tb">
+                <Waiting items={board.waiting} now={now} />
+                <Decisions board={board} />
+                <Discussions items={board.discussions} now={now} />
+              </div>
             </div>
           )}
           <Problems items={board.problems} />

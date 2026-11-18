@@ -1,6 +1,6 @@
 import type { WaitingItem } from "@tandem/contracts";
 import { Ext } from "./Ext.tsx";
-import { Avatar, Panel } from "./ui.tsx";
+import { Group } from "./Group.tsx";
 import { waitedFor } from "../time.ts";
 
 const KIND: Record<WaitingItem["kind"], string> = {
@@ -9,35 +9,31 @@ const KIND: Record<WaitingItem["kind"], string> = {
   blocked_issue: "任務",
 };
 
-/** The one place on the board that lists who is waiting on whom. */
+/** Who is waiting on whom, across the team. Oldest wait first. */
 export function Waiting({ items, now }: { items: WaitingItem[]; now: number }) {
   const sorted = [...items].sort((a, b) => Date.parse(a.since) - Date.parse(b.since));
   return (
-    <Panel title="誰在等誰" icon="⏳" count={items.length} tone="warn">
-      {sorted.length === 0 ? (
-        <p className="muted empty">目前沒有人在等人 👍</p>
-      ) : (
-        <ul className="rows card">
-          {sorted.map((w, i) => (
-            <li key={i} className="wait-row">
-              <span className="wait-who" aria-label={`@${w.from} 在等 @${w.to}`}>
-                <Avatar login={w.from} size={24} />
-                <span className="wait-arrow" aria-hidden="true">
-                  →
+    <Group label="誰在等誰" count={sorted.length}>
+      {sorted.map((w, i) => {
+        const who = `@${w.from} 等 @${w.to}`;
+        return (
+          <li key={i} className="tb-row" title={`${w.title}\n${KIND[w.kind]}・${who}・${waitedFor(w.since, now)}`}>
+            <Ext href={w.url} className="tb-title">
+              {w.title}
+              <span className="sr-only">（{KIND[w.kind]}，{who}）</span>
+            </Ext>
+            <span className="tb-meta">
+              <span className="tb-kind">{KIND[w.kind]}</span>
+              <span>
+                <span className="tb-from">
+                  @{w.from} → @{w.to}・
                 </span>
-                <Avatar login={w.to} size={24} />
+                {waitedFor(w.since, now).replace(/^等了 /, "")}
               </span>
-              <span className="grow">
-                <Ext href={w.url}>{w.title}</Ext>
-                <span className="row-meta">
-                  <span className="tag">{KIND[w.kind]}</span> @{w.from} 等 @{w.to}
-                </span>
-              </span>
-              <span className="muted small nowrap">{waitedFor(w.since, now)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Panel>
+            </span>
+          </li>
+        );
+      })}
+    </Group>
   );
 }
