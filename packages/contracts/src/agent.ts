@@ -53,7 +53,7 @@ export type ApprovalDecision = "allow" | "allowSession" | "deny";
 
 export type ChatItem =
   /** `by`/`url` are set in rooms: who said it, and the GitHub comment it came from. */
-  | { kind: "user"; id: string; at: string; text: string; images?: ChatImage[]; by?: string; url?: string }
+  | { kind: "user"; id: string; at: string; text: string; images?: ChatImage[]; by?: string; url?: string; ask?: boolean }
   | { kind: "assistant"; id: string; at: string; text: string; images?: ChatImage[]; streaming?: boolean }
   | {
       kind: "tool";
@@ -144,6 +144,8 @@ export interface RoomMessage {
   at: string;
   /** Written by the room's AI (posted by the host's app, starts with 🤖). */
   ai: boolean;
+  /** The writer asked the AI to answer (「問 AI」). Only these wake the AI. */
+  ask?: boolean;
 }
 
 export interface Room extends RoomRef {

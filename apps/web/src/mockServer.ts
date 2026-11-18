@@ -146,7 +146,7 @@ function mockChatReply(chat: Chat, text: string) {
 const rooms: Room[] = [
   {
     number: 21,
-    url: "https://github.com/sudo-studio-lab/tandem/discussions/21",
+    url: "https://github.com/demo-team/demo-data/discussions/21",
     title: "登入流程要怎麼做",
     host: "theroyatlas",
     closed: false,
@@ -154,21 +154,34 @@ const rooms: Room[] = [
     notes: ["## 重點", "- 第一版先做 GitHub 登入", "- Google 登入等有使用者再說", "", "## 待辦", "- @theroyatlas 畫登入流程圖"].join("\n"),
     messages: [
       { id: "r1", by: "theroyatlas", text: "登入要不要一開始就支援 Google？", url: "#r1", at: ago(20 * 60_000), ai: false },
-      { id: "r2", by: ME, text: "我覺得先只做 GitHub 就好，我們的使用者都有 GitHub", url: "#r2", at: ago(18 * 60_000), ai: false },
-      { id: "r3", by: "theroyatlas", text: "（範例回覆）同意先只做 GitHub 登入。D-20261115-za46 已經記了「假設使用者都會用 GitHub」，跟這個方向一致。要我把「第一版只做 GitHub 登入」記成決定嗎？", url: "#r3", at: ago(17 * 60_000), ai: true },
+      { id: "r2", by: ME, text: "我覺得先只做 GitHub 就好，我們的使用者都有 GitHub", url: "#r2", at: ago(19 * 60_000), ai: false },
+      { id: "r3", by: "theroyatlas", text: "之前有沒有決定過這件事？", url: "#r3", at: ago(18 * 60_000), ai: false, ask: true },
+      { id: "r4", by: "theroyatlas", text: "（範例回覆）有。D-20261115-za46 記了「假設使用者都會用 GitHub」，跟先只做 GitHub 登入的方向一致。要我把「第一版只做 GitHub 登入」記成決定嗎？", url: "#r4", at: ago(17 * 60_000), ai: true },
     ],
   },
+  {
+    number: 18,
+    url: "https://github.com/demo-team/demo-data/discussions/18",
+    title: "資料庫選哪一種",
+    host: ME,
+    closed: true,
+    updatedAt: ago(3 * 24 * 3600_000),
+    notes: ["## 決定", "- 第一版用 SQLite（@jielle2453：「先用 SQLite，之後再換」）"].join("\n"),
+    messages: [],
+  },
 ];
-function mockRoomSay(room: Room, text: string) {
+function mockRoomSay(room: Room, text: string, ask: boolean) {
   const at = () => new Date().toISOString();
-  room.messages.push({ id: `r${room.messages.length + 1}`, by: ME, text, url: "#", at: at(), ai: false });
+  room.messages.push({ id: `r${room.messages.length + 1}`, by: ME, text, url: "#", at: at(), ai: false, ...(ask ? { ask } : {}) });
   const chat = room.chatId ? chats.find((c) => c.id === room.chatId) : undefined;
   if (chat) {
-    const item: ChatItem = { kind: "user", id: `u${chat.items.length}`, at: at(), text, by: ME, url: "#" };
+    const item: ChatItem = { kind: "user", id: `u${chat.items.length}`, at: at(), text, by: ME, url: "#", ...(ask ? { ask } : {}) };
     chat.items.push(item);
     emit({ type: "chat", data: { chatId: chat.id, type: "item", item } });
-    chat.running = true;
   }
+  // The AI only answers when asked.
+  if (!ask) return;
+  if (chat) chat.running = true;
   setTimeout(() => {
     const reply = `（範例回覆）收到 @${ME} 的「${text}」。大家還有其他想法嗎？`;
     room.messages.push({ id: `r${room.messages.length + 1}`, by: room.host, text: reply, url: "#", at: at(), ai: true });
@@ -628,7 +641,7 @@ export async function handle(method: string, path: string, body: unknown): Promi
       const sub = m[2] ?? "";
       if (method === "GET" && !sub) return { ...room, running: room.chatId ? chats.find((c) => c.id === room.chatId)?.running : undefined };
       if (method === "POST" && sub === "/messages") {
-        mockRoomSay(room, String((body as { text?: string })?.text ?? ""));
+        mockRoomSay(room, String((body as { text?: string })?.text ?? ""), (body as { ask?: boolean })?.ask === true);
         return { ok: true };
       }
       if (method === "POST" && sub === "/notes") {

@@ -1,136 +1,281 @@
-/* Rooms. Builds on the chat layout classes in styles.css. */
-.room {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 16px;
-  height: 100%;
-  min-height: 0;
+/* Rooms: one column in the board's panel style (DESIGN.md「房間」). */
+.rm {
+  font-size: 13px;
+  line-height: 1.5;
 }
-.chat-room {
-  min-width: 0;
+.page.board.rm {
+  padding-bottom: 0;
 }
-.room-head {
+.rm-bar {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-.room-title {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-.room-meta {
-  display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  min-height: calc(var(--ctl-h) + 12px);
 }
-.room-host {
-  color: var(--muted);
+/* Inside a room the back link and host actions stay reachable while the talk scrolls. */
+.rm-room > .rm-bar {
+  position: sticky;
+  top: var(--topbar-h);
+  z-index: 3;
+  margin: 0 -10px;
+  padding: 0 10px;
+  background: var(--bg);
 }
-.room-host.is-me {
-  color: var(--accent);
-  font-weight: 600;
-}
-.room-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-.btn-danger {
-  color: var(--bad-fg);
-}
-.room-list-label {
-  margin: 12px 4px 4px;
+.rm-busy {
   font-size: 12px;
-  font-weight: 600;
+  color: var(--accent);
+}
+.rm-bar-end {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 4px;
+}
+.rm-back {
+  font: inherit;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--ctl-h);
+  padding: 0 6px 0 2px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
   color: var(--muted);
+  cursor: pointer;
 }
-.chat-list-item.is-closed .chat-list-title {
-  color: var(--muted);
-}
-
-.room-msg {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  margin: 10px 0;
-}
-.room-msg-body {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  max-width: 85%;
-}
-.room-msg-who {
-  font-size: 13px;
-  font-weight: 600;
-}
-.room-msg .msg {
-  margin: 0;
-  max-width: none;
-  align-self: flex-start;
-  white-space: pre-wrap;
-}
-.room-msg.is-me {
-  flex-direction: row-reverse;
-}
-.room-msg.is-me .room-msg-body {
-  align-items: flex-end;
-}
-.room-msg.is-me .msg {
-  align-self: flex-end;
-}
-.room-msg:not(.is-me) .msg-user {
+.rm-back:hover {
   background: var(--surface-2);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 16px 16px 16px 4px;
 }
-.avatar-ai {
-  flex: none;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
+.rm-back-ic {
+  transform: rotate(90deg);
+}
+.rm-heading {
+  font-size: 13px;
+  font-weight: 600;
+}
+.ctl:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.ctl-bad {
+  color: var(--bad-fg);
+}
+.rm-open {
+  font: inherit;
+  border: 0;
+  padding: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.rm-new .rm-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.rm-new .rm-field .input {
+  flex: 1;
+  min-width: 0;
+}
+.rm-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* A room fills the panel height so the composer sits at the bottom even when the talk is short. */
+.rm-room {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - var(--topbar-h) - 3px);
+}
+.rm-log {
+  flex: 1;
+}
+.rm-head {
+  padding: 2px 0 8px;
+}
+.rm-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.rm-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.rm-sub a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rm-sub a:hover {
+  color: var(--accent);
+}
+
+/* Notes: a folded group label above the talk, same as the board's groups. */
+.rm-notes {
+  margin: 0 -10px;
+  border-bottom: 1px solid var(--border);
+}
+.rm .rm-notes > .tb-sum {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  cursor: pointer;
+}
+.rm .rm-notes > .tb-sum:hover {
+  color: var(--text);
+}
+.rm-notes > .tb-sum::-webkit-details-marker {
+  display: none;
+}
+.rm-notes > .tb-sum .tb-chev {
+  transform: rotate(-90deg);
+  transition: transform 0.15s;
+}
+.rm-notes[open] > .tb-sum .tb-chev {
+  transform: none;
+}
+.rm-notes > .tb-sum .tb-count {
+  margin-left: auto;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.rm-notes-body {
+  padding: 0 10px 10px;
+}
+
+/* The talk: a log, not bubbles. Name line, then the words. */
+.rm-log {
+  padding: 8px 0 12px;
+}
+.rm-msg {
+  padding: 6px 0;
+}
+.rm-who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.rm-name {
+  font-weight: 600;
+  color: var(--text);
+}
+.rm-time {
+  color: var(--muted);
+}
+.rm-ask {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.rm-text {
+  margin: 2px 0 0 22px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.rm-msg.is-ai .rm-text {
+  white-space: normal;
+}
+.rm-msg.is-ai .rm-name {
+  color: var(--accent);
+}
+.rm-ai-mark {
   display: inline-grid;
   place-items: center;
-  font-size: 11px;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
   font-weight: 700;
-  color: #fff;
-  background: #7c3aed;
+  flex: none;
+}
+.rm-text .notes p,
+.rm-text .notes .notes-li {
+  font-size: 13px;
+}
+.rm-item {
+  margin: 6px 0 6px 22px;
+}
+.rm-running,
+.rm-waiting {
+  margin: 6px 0 0 22px;
+  font-size: 12px;
+  color: var(--accent);
+}
+.rm-waiting {
+  color: var(--muted);
+}
+.rm-send-error {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--bad-fg);
+}
+.rm-closed {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 8px 0;
 }
 
-.room-notes {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  padding: 14px 16px;
-  overflow-y: auto;
-  min-height: 0;
+/* Composer stays at the bottom of the panel while the talk scrolls. */
+.rm-compose {
+  position: sticky;
+  bottom: 0;
+  margin: 0 -10px;
+  padding: 8px 10px 10px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
 }
-.room-notes h3 {
-  margin: 0 0 8px;
-  font-size: 15px;
+.rm-compose textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 52px;
+  max-height: 40dvh;
+  font-size: 13px;
 }
-.room-closed {
-  padding: 12px 16px;
-  margin: 0;
+.rm-compose-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 6px;
 }
-.room-setup {
-  max-width: 560px;
+.rm-hint {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: right;
+}
+.rm-compose .btn {
+  min-height: var(--ctl-h);
+}
+@media (pointer: coarse) {
+  .rm-hint-keys {
+    display: none;
+  }
+  .rm-compose-row .btn {
+    flex: 1;
+    min-height: 44px;
+  }
+  .rm .rm-notes > .tb-sum,
+  .rm-back {
+    min-height: 44px;
+  }
 }
 
-@media (max-width: 900px) {
-  .room {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) auto;
-  }
-  .room-notes {
-    max-height: 220px;
-  }
-}

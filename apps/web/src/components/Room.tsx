@@ -1,19 +1,44 @@
 /**
- * Rooms: the team talks with one AI that runs on the host's computer. Messages travel
- * through a GitHub Discussion; the host additionally sees the AI's live work (tools, approvals).
+ * Rooms: the team talks in one place and asks an AI that runs on the host's computer when they
+ * need it (「問 AI」). Messages travel through a GitHub Discussion in the private team data repo;
+ * the host additionally sees the AI's live work (tools, approvals).
+ *
+ * One column so it fits an editor side panel: the room list, or one room with a back link.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { AgentKind, Chat, ChatUpdate, Room, RoomMessage, RoomRef } from "@tandem/contracts";
 import { api, onAppEvent, projectPath } from "../api.ts";
-import { relTime } from "../time.ts";
+import { relTime, waitedFor } from "../time.ts";
 import { Avatar, MarkdownLite, Spinner, errMsg } from "./ui.tsx";
 import { Item, applyUpdate, useAgents, usableAgents } from "./Chat.tsx";
+import { Glyph } from "./icons.tsx";
 import "./room.css";
 import { useDraft } from "../drafts.ts";
 
 const POLL_MS = 4000;
 
-export function RoomView({ projectId, me, now, onOpenSettings }: { projectId: string; me: string; now: number; onOpenSettings: () => void }) {
+function Back({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" className="rm-back" onClick={onClick}>
+      <Glyph name="chevron" size={12} className="rm-back-ic" />
+      {label}
+    </button>
+  );
+}
+
+function ErrorLine({ text, onDismiss }: { text: string; onDismiss: () => void }) {
+  return (
+    <p className="board-error" role="alert">
+      <span className="status-dot" aria-hidden="true" />
+      <span className="board-error-text">{text}</span>
+      <button type="button" className="tb-link" onClick={onDismiss}>
+        知道了
+      </button>
+    </p>
+  );
+}
+
+export function RoomView({ projectId, me, now, onOpenSettings, onBack }: { projectId: string; me: string; now: number; onOpenSettings: () => void; onBack: () => void }) {
   const [list, setList] = useState<RoomRef[] | null>(null);
   const [current, setCurrent] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
@@ -32,79 +57,115 @@ export function RoomView({ projectId, me, now, onOpenSettings }: { projectId: st
     setCurrent(null);
     setList(null);
     void loadList();
-    const t = setInterval(() => void loadList(), POLL_MS * 4);
+    const t = setInterval(() => document.visibilityState !== "hidden" && void loadList(), POLL_MS * 4);
     return () => clearInterval(t);
   }, [loadList]);
 
   const open = list?.filter((r) => !r.closed) ?? [];
   const closed = list?.filter((r) => r.closed) ?? [];
-  const showNew = creating || (current === null && list !== null && open.length === 0 && closed.length === 0);
+
+  if (current !== null) {
+    return (
+      <main className="page board rm">
+        {error && <ErrorLine text={error} onDismiss={() => setError(null)} />}
+        <RoomPane
+          key={current}
+          projectId={projectId}
+          number={current}
+          me={me}
+          now={now}
+          onError={setError}
+          onChanged={loadList}
+          onBack={() => {
+            setCurrent(null);
+            void loadList();
+          }}
+        />
+      </main>
+    );
+  }
 
   return (
-    <main className="chat-page room-page">
-      <aside className="chat-list" aria-label="房間清單">
-        <button type="button" className="btn btn-primary chat-new" onClick={() => setCreating(true)}>
-          ＋ 開房間
+    <main className="page board rm">
+      <div className="rm-bar">
+        <Back label="看板" onClick={onBack} />
+        <h2 className="rm-heading">房間</h2>
+        <button type="button" className="ctl rm-bar-end" aria-expanded={creating} onClick={() => setCreating((c) => !c)}>
+          <Glyph name="plus" />
+          <span>開房間</span>
         </button>
-        {list === null ? (
-          <Spinner label="載入中…" />
-        ) : (
-          <>
-            {open.length > 0 && <p className="room-list-label">進行中</p>}
-            <RoomList rooms={open} current={current} now={now} me={me} onOpen={(n) => (setCurrent(n), setCreating(false))} />
-            {closed.length > 0 && <p className="room-list-label">最近結束</p>}
-            <RoomList rooms={closed} current={current} now={now} me={me} onOpen={(n) => (setCurrent(n), setCreating(false))} />
-          </>
-        )}
-      </aside>
-      <section className="chat-main">
-        {error && (
-          <p className="banner banner-error" role="alert">
-            {error}{" "}
-            <button type="button" className="btn btn-small" onClick={() => setError(null)}>
-              知道了
+      </div>
+      {error && <ErrorLine text={error} onDismiss={() => setError(null)} />}
+      {creating && (
+        <NewRoom
+          onOpenSettings={onOpenSettings}
+          onCancel={() => setCreating(false)}
+          onCreate={async (title, agent, model) => {
+            const r = await api<Room>("POST", projectPath(projectId, "/rooms"), { title, agent, model });
+            setCreating(false);
+            setCurrent(r.number);
+            void loadList();
+          }}
+        />
+      )}
+      {list === null ? (
+        <Spinner label="載入房間…" />
+      ) : open.length + closed.length === 0 ? (
+        !creating && (
+          <p className="tb-empty-note">
+            還沒有房間。在房間裡可以一起討論，需要時按「問 AI」。
+            <button type="button" className="tb-link" onClick={() => setCreating(true)}>
+              開一個房間
             </button>
           </p>
-        )}
-        {showNew ? (
-          <NewRoom
-            onOpenSettings={onOpenSettings}
-            onCancel={current !== null || open.length + closed.length > 0 ? () => setCreating(false) : undefined}
-            onCreate={async (title, agent, model) => {
-              const r = await api<Room>("POST", projectPath(projectId, "/rooms"), { title, agent, model });
-              setCreating(false);
-              setCurrent(r.number);
-              void loadList();
-            }}
-          />
-        ) : current !== null ? (
-          <RoomPane key={current} projectId={projectId} number={current} me={me} now={now} onError={setError} onChanged={loadList} />
-        ) : (
-          <p className="muted chat-empty">從左邊選一個房間，或開一個新的。</p>
-        )}
-      </section>
+        )
+      ) : (
+        <div className="tb">
+          <RoomGroup label="進行中" rooms={open} now={now} me={me} onOpen={setCurrent} />
+          {closed.length > 0 && <RoomGroup label="最近結束" rooms={closed} now={now} me={me} onOpen={setCurrent} folded />}
+        </div>
+      )}
     </main>
   );
 }
 
-function RoomList({ rooms, current, now, me, onOpen }: { rooms: RoomRef[]; current: number | null; now: number; me: string; onOpen: (n: number) => void }) {
+function RoomGroup({ label, rooms, now, me, onOpen, folded }: { label: string; rooms: RoomRef[]; now: number; me: string; onOpen: (n: number) => void; folded?: boolean }) {
+  if (rooms.length === 0) {
+    return (
+      <div className="tb-group tb-group-empty">
+        <div className="tb-sum">
+          <span className="tb-chev-space" aria-hidden="true" />
+          <span className="tb-group-label">{label}</span>
+          <span className="tb-count">0</span>
+        </div>
+      </div>
+    );
+  }
   return (
-    <ul>
-      {rooms.map((r) => (
-        <li key={r.number}>
-          <button type="button" className={`chat-list-item${r.number === current ? " is-current" : ""}${r.closed ? " is-closed" : ""}`} onClick={() => onOpen(r.number)}>
-            <span className="chat-list-title">{r.title}</span>
-            <span className="muted small">
-              {r.host === me ? "你主持" : `@${r.host} 主持`} · {relTime(r.updatedAt, now)}
+    <details className={`tb-group${folded ? " tb-done-group" : ""}`} open={!folded}>
+      <summary className="tb-sum">
+        <Glyph name="chevron" size={12} className="tb-chev" />
+        <span className="tb-group-label">{label}</span>
+        <span className="tb-count">{rooms.length}</span>
+      </summary>
+      <ul className="tb-rows">
+        {rooms.map((r) => (
+          <li key={r.number} className="tb-row">
+            <button type="button" className="tb-title rm-open" title={r.title} onClick={() => onOpen(r.number)}>
+              {r.title}
+            </button>
+            <span className="tb-meta">
+              <span>{r.host.toLowerCase() === me.toLowerCase() ? "你主持" : `@${r.host} 主持`}</span>
+              <span>{relTime(r.updatedAt, now)}</span>
             </span>
-          </button>
-        </li>
-      ))}
-    </ul>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
-function NewRoom(props: { onOpenSettings: () => void; onCancel?: () => void; onCreate: (title: string, agent: AgentKind, model: string) => Promise<void> }) {
+function NewRoom(props: { onOpenSettings: () => void; onCancel: () => void; onCreate: (title: string, agent: AgentKind, model: string) => Promise<void> }) {
   const { agents } = useAgents();
   const usable = agents ? usableAgents(agents) : [];
   const options = useMemo(
@@ -133,26 +194,27 @@ function NewRoom(props: { onOpenSettings: () => void; onCancel?: () => void; onC
     }
   };
   return (
-    <div className="card pad chat-setup room-setup">
-      <h2>開一個房間</h2>
-      <p className="muted">
-        隊友都能進來一起跟 AI 討論。AI 跑在<strong>你的電腦</strong>、用你的帳號；它要改檔案或跑指令時會先問你。房間的對話存在 GitHub
-        Discussions，結束時 AI 會整理成筆記。
-      </p>
-      <label className="chat-field">
-        <span>要討論什麼</span>
-        <input className="input" value={title} maxLength={80} placeholder="例如：登入流程要怎麼做" onChange={(e) => setTitle(e.target.value)} autoFocus />
+    <form
+      className="tb-new rm-new"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void create();
+      }}
+    >
+      <label htmlFor="rm-new-title" className="sr-only">
+        要討論什麼
       </label>
+      <input id="rm-new-title" className="input" value={title} maxLength={80} placeholder="要討論什麼？例如：登入流程要怎麼做" onChange={(e) => setTitle(e.target.value)} autoFocus />
       {usable.length === 0 ? (
-        <p className="banner banner-warn">
-          你還沒登入任何 AI，沒辦法主持房間（但可以加入別人的房間）。{" "}
-          <button type="button" className="btn-link" onClick={props.onOpenSettings}>
+        <p className="rm-note">
+          你還沒登入任何 AI，沒辦法主持房間，但可以加入別人的房間。{" "}
+          <button type="button" className="tb-link" onClick={props.onOpenSettings}>
             登入 AI
           </button>
         </p>
       ) : (
-        <label className="chat-field">
-          <span>用哪一個 AI</span>
+        <label className="rm-field">
+          <span>問 AI 時用</span>
           <select className="input" value={choice} onChange={(e) => setChoice(e.target.value)}>
             {options.map((x) => (
               <option key={x.key} value={x.key}>
@@ -162,31 +224,35 @@ function NewRoom(props: { onOpenSettings: () => void; onCancel?: () => void; onC
           </select>
         </label>
       )}
-      {error && <p className="banner banner-error">{error}</p>}
-      <div className="row-end">
-        {props.onCancel && (
-          <button type="button" className="btn" onClick={props.onCancel}>
-            取消
-          </button>
-        )}
-        <button type="button" className="btn btn-primary" disabled={!o || !title.trim() || busy} onClick={() => void create()}>
+      <p className="rm-note">AI 跑在你的電腦、用你的帳號，只有有人按「問 AI」時才回答；要改檔案或跑指令會先問你。房間存在私人的團隊資料 repo。</p>
+      {error && (
+        <p className="field-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="tb-new-actions">
+        <button type="button" className="btn btn-small btn-quiet" onClick={props.onCancel}>
+          取消
+        </button>
+        <button type="submit" className="btn btn-small btn-primary" disabled={!o || !title.trim() || busy}>
           {busy ? "建立中…" : "開房間"}
         </button>
       </div>
-    </div>
+    </form>
   );
 }
 
-function RoomPane({ projectId, number, me, now, onError, onChanged }: { projectId: string; number: number; me: string; now: number; onError: (m: string) => void; onChanged: () => void }) {
+function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { projectId: string; number: number; me: string; now: number; onError: (m: string) => void; onChanged: () => void; onBack: () => void }) {
   const [room, setRoom] = useState<Room | null>(null);
   const [chat, setChat] = useState<Chat | null>(null);
   const { draft, setDraft } = useDraft(`room:${projectId}:${number}:${me}`);
   const text = draft.text;
   const setText = (text: string) => setDraft((current) => ({ ...current, text }));
-  const [sending, setSending] = useState(false);
+  const [sending, setSending] = useState<"say" | "ask" | null>(null);
   const [noting, setNoting] = useState(false);
-  const scroller = useRef<HTMLDivElement>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
   const stick = useRef(true);
+  const log = useRef<HTMLDivElement>(null);
   const chatId = room?.chatId;
   const isHost = !!chatId;
 
@@ -200,8 +266,14 @@ function RoomPane({ projectId, number, me, now, onError, onChanged }: { projectI
 
   useEffect(() => {
     void load();
-    const t = setInterval(() => void load(), POLL_MS);
-    return () => clearInterval(t);
+    // A hidden tab doesn't need fresh messages; catch up as soon as it is visible again.
+    const t = setInterval(() => document.visibilityState !== "hidden" && void load(), POLL_MS);
+    const onShow = () => document.visibilityState === "visible" && void load();
+    document.addEventListener("visibilitychange", onShow);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onShow);
+    };
   }, [load]);
 
   // Host: the live chat behind the room (tools, approvals, streaming).
@@ -220,31 +292,48 @@ function RoomPane({ projectId, number, me, now, onError, onChanged }: { projectI
     };
   }, [chatId, onError]);
 
-  const count = isHost ? chat?.items.length : room?.messages.length;
+  // The page scrolls; stay at the newest message unless the reader scrolled up.
+  useEffect(() => {
+    const onScroll = () => {
+      const el = document.scrollingElement ?? document.documentElement;
+      stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  // Follow the talk as it grows (new messages and an answer streaming in) unless the reader scrolled up.
   useLayoutEffect(() => {
-    const el = scroller.current;
-    if (el && stick.current) el.scrollTop = el.scrollHeight;
-  }, [count]);
+    const el = log.current;
+    if (!el) return;
+    const follow = () => {
+      if (stick.current) window.scrollTo({ top: document.documentElement.scrollHeight });
+    };
+    follow();
+    const ro = new ResizeObserver(follow);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [room !== null]);
 
   if (!room) return <Spinner label="載入房間…" />;
 
-  const send = async () => {
+  const send = async (ask: boolean) => {
     const body = text.trim();
     if (!body || sending) return;
-    setSending(true);
+    setSending(ask ? "ask" : "say");
+    setSendError(null);
     try {
-      await api("POST", projectPath(projectId, `/rooms/${number}/messages`), { text: body });
+      await api("POST", projectPath(projectId, `/rooms/${number}/messages`), { text: body, ask });
       setText("");
       stick.current = true;
       void load();
     } catch (e) {
-      onError(errMsg(e));
+      setSendError(`沒送出：${errMsg(e)}。文字還在，可以再試一次。`);
     } finally {
-      setSending(false);
+      setSending(null);
     }
   };
   const notes = async (end: boolean) => {
-    if (end && !confirm("結束房間？AI 會整理筆記存到 GitHub，之後大家就不能再發言。")) return;
+    if (end && !confirm("結束房間？AI 會整理筆記存起來，之後大家就不能再發言。")) return;
     setNoting(true);
     try {
       await api("POST", projectPath(projectId, `/rooms/${number}/notes`), { end });
@@ -256,137 +345,173 @@ function RoomPane({ projectId, number, me, now, onError, onChanged }: { projectI
       setNoting(false);
     }
   };
-  const running = isHost ? !!chat?.running : false;
+  const running = isHost ? !!chat?.running : !!room.running;
+  const hasNotes = !!room.notes && room.notes !== "（還沒有筆記）";
+  const loadingChat = isHost && !chat;
+  const empty = isHost ? !!chat && chat.items.length === 0 : room.messages.length === 0;
+  // A question nobody has answered yet: the newest 「問 AI」 with no AI reply after it.
+  const said = isHost && chat
+    ? chat.items.flatMap((it) => (it.kind === "user" ? [{ ai: false, ask: !!it.ask, at: it.at }] : it.kind === "assistant" ? [{ ai: true, ask: false, at: it.at }] : []))
+    : room.messages.map((m) => ({ ai: m.ai, ask: !!m.ask, at: m.at }));
+  let lastAsk = -1;
+  said.forEach((m, i) => {
+    if (m.ask) lastAsk = i;
+  });
+  const waiting = lastAsk >= 0 && !said.slice(lastAsk + 1).some((m) => m.ai) ? said[lastAsk]! : null;
 
   return (
-    <div className="room">
-      <div className="chat chat-room">
-        <div className="chat-head room-head">
-          <div className="room-title">
-            <strong>{room.title}</strong>
-            <span className="room-meta">
-              <span className={`room-host${isHost ? " is-me" : ""}`}>{isHost ? "你主持 · AI 跑在你的電腦" : `@${room.host} 主持 · AI 跑在主持人的電腦`}</span>
-              {room.closed && <span className="pill">已結束</span>}
-              <a className="muted small" href={room.url} target="_blank" rel="noreferrer">
-                在 GitHub 打開 ↗
-              </a>
-            </span>
-          </div>
-          {isHost && !room.closed && (
-            <div className="room-actions">
-              <button type="button" className="btn btn-small" disabled={noting || running} onClick={() => void notes(false)}>
-                整理筆記
-              </button>
-              <button type="button" className="btn btn-small btn-danger" disabled={noting || running} onClick={() => void notes(true)}>
-                結束房間
-              </button>
-            </div>
-          )}
-        </div>
-        <div
-          className="chat-scroll"
-          ref={scroller}
-          onScroll={(e) => {
-            const el = e.currentTarget;
-            stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-          }}
-        >
-          {isHost && chat ? (
-            chat.items.length === 0 ? (
-              <EmptyRoom />
-            ) : (
-              chat.items.map((it) =>
-                it.kind === "user" ? (
-                  <Said key={it.id} by={it.by ?? me} me={me} text={it.text} at={it.at} now={now} />
-                ) : it.kind === "assistant" ? (
-                  <AiSaid key={it.id} text={it.text} at={it.at} now={now} streaming={it.streaming} />
-                ) : (
-                  <Item key={it.id} item={it} chatId={chat.id} onError={onError} />
-                ),
-              )
-            )
-          ) : room.messages.length === 0 ? (
-            <EmptyRoom />
-          ) : (
-            room.messages.map((m) => <Message key={m.id} m={m} me={me} now={now} />)
-          )}
-          {running && <p className="msg-notice muted small">AI 回覆中…</p>}
-        </div>
-        {room.closed ? (
-          <p className="muted small room-closed">房間已經結束。筆記在右邊，也存在 GitHub。</p>
-        ) : (
-          <div className="chat-compose">
-            <textarea
-              className="input"
-              rows={2}
-              value={text}
-              disabled={sending}
-              placeholder={isHost ? "跟大家和 AI 說…（Enter 送出，Shift+Enter 換行）" : `跟大家和 AI 說…AI 跑在 @${room.host} 的電腦，回覆會晚幾秒`}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  void send();
-                }
-              }}
-            />
-            <button type="button" className="btn btn-primary" disabled={!text.trim() || sending} onClick={() => void send()}>
-              送出
+    <div className="rm-room">
+      <div className="rm-bar">
+        <Back label="房間" onClick={onBack} />
+        {noting && <span className="rm-busy">AI 整理筆記中…</span>}
+        {isHost && !room.closed && (
+          <span className="rm-bar-end">
+            <button type="button" className="ctl" disabled={noting || running} onClick={() => void notes(false)}>
+              整理筆記
             </button>
-          </div>
+            <button type="button" className="ctl ctl-bad" disabled={noting || running} onClick={() => void notes(true)}>
+              結束
+            </button>
+          </span>
         )}
       </div>
-      <aside className="room-notes" aria-label="筆記">
-        <h3>筆記</h3>
-        {room.notes && room.notes !== "（還沒有筆記）" ? (
-          <MarkdownLite text={room.notes} />
+      <header className="rm-head">
+        <h2 className="rm-title">{room.title}</h2>
+        <p className="rm-sub">
+          <span>{isHost ? "你主持・AI 跑在你的電腦" : `@${room.host} 主持・AI 跑在主持人的電腦`}</span>
+          {room.closed && <span>・已結束</span>}
+          <span>・</span>
+          <a href={room.url} target="_blank" rel="noreferrer">
+            在 GitHub 打開
+          </a>
+        </p>
+      </header>
+
+      <details className="rm-notes" open={room.closed && hasNotes}>
+        <summary className="tb-sum">
+          <Glyph name="chevron" size={12} className="tb-chev" />
+          <span className="tb-group-label">筆記</span>
+          <span className="tb-count">{hasNotes ? "" : "還沒有"}</span>
+        </summary>
+        <div className="rm-notes-body">
+          {hasNotes ? (
+            <MarkdownLite text={room.notes} />
+          ) : (
+            <p className="muted">{isHost ? "討論一段後按「整理筆記」，AI 會整理重點、決定和待辦。" : `@${room.host} 按「整理筆記」後會出現在這裡。`}</p>
+          )}
+        </div>
+      </details>
+
+      <div className="rm-log" ref={log} aria-live="polite">
+        {loadingChat ? (
+          <Spinner label="載入對話…" />
+        ) : empty ? (
+          <p className="tb-empty-note">還沒有人說話。先說說要討論什麼；需要 AI 時按「問 AI」。</p>
+        ) : isHost && chat ? (
+          chat.items.map((it) =>
+            it.kind === "user" ? (
+              <Said key={it.id} by={it.by ?? me} me={me} text={it.text} at={it.at} now={now} ask={!!it.ask} />
+            ) : it.kind === "assistant" ? (
+              <AiSaid key={it.id} text={it.text} at={it.at} now={now} streaming={it.streaming} />
+            ) : (
+              <div key={it.id} className="rm-item">
+                <Item item={it} chatId={chat.id} onError={onError} />
+              </div>
+            ),
+          )
         ) : (
-          <p className="muted small">{isHost ? "討論一段後按「整理筆記」，AI 會整理重點、決定和待辦。" : `@${room.host} 按「整理筆記」後會出現在這裡。`}</p>
+          room.messages.map((m) => <Message key={m.id} m={m} me={me} now={now} />)
         )}
-        {noting && <Spinner label="整理中…" />}
-      </aside>
+        {running ? (
+          <p className="rm-running">AI 回覆中…</p>
+        ) : (
+          waiting &&
+          !room.closed && (
+            <p className="rm-waiting">
+              {isHost ? "AI 等一下就會回答" : `等 @${room.host} 的 AI 回覆・${waitedFor(waiting.at, now)}（主持人的 Tandem 要開著）`}
+            </p>
+          )
+        )}
+      </div>
+
+      {room.closed ? (
+        <p className="rm-closed">房間已經結束，筆記在上面。</p>
+      ) : (
+        <div className="rm-compose">
+          {sendError && (
+            <p className="rm-send-error" role="alert">
+              {sendError}
+            </p>
+          )}
+          <label htmlFor="rm-text" className="sr-only">
+            訊息
+          </label>
+          <textarea
+            id="rm-text"
+            className="input"
+            rows={2}
+            value={text}
+            disabled={!!sending}
+            placeholder="跟大家說…"
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) {
+                e.preventDefault();
+                void send(e.ctrlKey || e.metaKey);
+              }
+            }}
+          />
+          <div className="rm-compose-row">
+            <button type="button" className="btn btn-small" title="只給大家看（Enter）" aria-keyshortcuts="Enter" disabled={!text.trim() || !!sending} onClick={() => void send(false)}>
+              {sending === "say" ? "送出中…" : "送出"}
+            </button>
+            <button type="button" className="btn btn-small btn-primary" title="請 AI 看過討論後回答（Ctrl+Enter）" aria-keyshortcuts="Control+Enter" disabled={!text.trim() || !!sending} onClick={() => void send(true)}>
+              {sending === "ask" ? "送出中…" : "問 AI"}
+            </button>
+          </div>
+          <p className="rm-hint">
+            <span className="rm-hint-keys">Enter 送出・Ctrl+Enter 問 AI・Shift+Enter 換行・</span>
+            只有「問 AI」會叫 AI 回答{isHost ? "" : `，AI 在 @${room.host} 的電腦，會晚幾秒`}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
 
-function EmptyRoom() {
-  return <p className="muted chat-empty">還沒有人說話。先說說要討論什麼吧。</p>;
-}
-
-function Said({ by, me, text, at, now }: { by: string; me: string; text: string; at: string; now: number }) {
+function Said({ by, me, text, at, now, ask }: { by: string; me: string; text: string; at: string; now: number; ask: boolean }) {
   const mine = by.toLowerCase() === me.toLowerCase();
   return (
-    <div className={`room-msg${mine ? " is-me" : ""}`}>
-      <Avatar login={by} size={30} />
-      <div className="room-msg-body">
-        <span className="room-msg-who">
-          {mine ? "你" : `@${by}`} <span className="muted small">{relTime(at, now)}</span>
-        </span>
-        <div className="msg msg-user">{text}</div>
+    <div className="rm-msg">
+      <div className="rm-who">
+        <Avatar login={by} size={16} />
+        <span className="rm-name">{mine ? "你" : `@${by}`}</span>
+        <span className="rm-time">{relTime(at, now)}</span>
+        {ask && <span className="rm-ask">問 AI</span>}
       </div>
+      <div className="rm-text">{text}</div>
     </div>
   );
 }
 
 function Message({ m, me, now }: { m: RoomMessage; me: string; now: number }) {
-  if (!m.ai) return <Said by={m.by} me={me} text={m.text} at={m.at} now={now} />;
+  if (!m.ai) return <Said by={m.by} me={me} text={m.text} at={m.at} now={now} ask={!!m.ask} />;
   return <AiSaid text={m.text} at={m.at} now={now} />;
 }
 
 function AiSaid({ text, at, now, streaming }: { text: string; at: string; now: number; streaming?: boolean }) {
   return (
-    <div className="room-msg is-ai">
-      <span className="avatar-ai" aria-hidden="true">
-        AI
-      </span>
-      <div className="room-msg-body">
-        <span className="room-msg-who">
-          AI <span className="muted small">{relTime(at, now)}</span>
+    <div className="rm-msg is-ai">
+      <div className="rm-who">
+        <span className="rm-ai-mark" aria-hidden="true">
+          AI
         </span>
-        <div className="msg msg-assistant">
-          {text}
-          {streaming && <span className="caret" aria-hidden="true" />}
-        </div>
+        <span className="rm-name">AI</span>
+        <span className="rm-time">{relTime(at, now)}</span>
+      </div>
+      <div className="rm-text">
+        <MarkdownLite text={text} />
+        {streaming && <span className="caret" aria-hidden="true" />}
       </div>
     </div>
   );

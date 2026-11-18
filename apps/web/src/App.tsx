@@ -189,6 +189,7 @@ export function App() {
       }}
       onAgentMessages={()=>{setView("board");setBoardTab("agent-messages");}}
       onSharedChats={()=>{setView("board");setBoardTab("shared-chats");}}
+      onRooms={() => setView("room")}
     />
   );
 
@@ -221,7 +222,17 @@ export function App() {
           </div>
         </main>
       ) : view === "room" ? (
-        <RoomView key={project.id} projectId={project.id} me={session.login} now={now} onOpenSettings={() => setDialog("agents")} />
+        <RoomView
+          key={project.id}
+          projectId={project.id}
+          me={session.login}
+          now={now}
+          onOpenSettings={() => setDialog("agents")}
+          onBack={() => {
+            setView("board");
+            setBoardTab("list");
+          }}
+        />
       ) : view === "chat" ? (
         <><div className="page tb-back"><button type="button" className="tb-link" onClick={()=>{setView("board");setBoardTab("shared-chats");}}>回對話與交接</button></div><ChatView key={project.id} projectId={project.id} now={now} initialChatId={forkId} onOpenSettings={() => setDialog("agents")} /></>
       ) : !board ? (
