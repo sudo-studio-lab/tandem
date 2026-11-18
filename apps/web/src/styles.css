@@ -1649,6 +1649,8 @@ dialog.modal::backdrop {
   font-variant-numeric: tabular-nums;
 }
 .tb .tb-title {
+  /* Holds the screen-reader text that follows a long title, so it cannot widen the page. */
+  position: relative;
   flex: 1;
   min-width: 0;
   align-self: stretch;
