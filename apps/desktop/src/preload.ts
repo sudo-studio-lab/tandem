@@ -6,5 +6,8 @@ contextBridge.exposeInMainWorld("tandemDesktop", {
   setOpenAtLogin: (v: boolean): Promise<boolean> => ipcRenderer.invoke("tandem:setOpenAtLogin", !!v),
   getOpenAtLogin: (): Promise<boolean> => ipcRenderer.invoke("tandem:getOpenAtLogin"),
   setBadge: (n: number): void => ipcRenderer.send("tandem:setBadge", n),
+  getSidebarUrl: (): Promise<string> => ipcRenderer.invoke("tandem:getSidebarUrl"),
+  copySidebarUrl: (): Promise<boolean> => ipcRenderer.invoke("tandem:copySidebarUrl"),
+  replaceSidebarUrl: (): Promise<string> => ipcRenderer.invoke("tandem:replaceSidebarUrl"),
   version: versionArg ? versionArg.slice("--tandem-version=".length) : "",
 });

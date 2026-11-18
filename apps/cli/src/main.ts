@@ -41,12 +41,15 @@ export function buildProgram(): Command {
     .description("給桌面 app 用：啟動本機伺服器")
     .option("--port <port>", "連接埠，0 代表自動挑", (v) => Number(v))
     .option("--token-stdin", "從標準輸入讀一行通行碼")
+    .option("--sidebar-key-stdin", "再從標準輸入讀一行側欄金鑰")
     .option("--desktop", "桌面 app 模式")
     .action(async (o) => {
-      let sessionToken: string | undefined;
-      if (o.tokenStdin) sessionToken = await readLine();
+      // Secrets come on stdin, one per line, in this order: session token, then side-panel key.
+      const lines = await readLines(Number(!!o.tokenStdin) + Number(!!o.sidebarKeyStdin));
+      const sessionToken = o.tokenStdin ? lines.shift() : undefined;
+      const sidebarKey = o.sidebarKeyStdin ? lines.shift() : undefined;
       const { startServer } = await import("./server.ts");
-      await startServer({ port: o.port ?? 0, sessionToken, desktop: !!o.desktop, readyLine: true, openBrowser: false });
+      await startServer({ port: o.port ?? 0, sessionToken, sidebarKey, desktop: !!o.desktop, readyLine: true, openBrowser: false });
     });
 
   program
@@ -169,21 +172,27 @@ export function buildProgram(): Command {
   return program;
 }
 
-/** Read one line from stdin without keeping stdin open afterwards. */
-function readLine(): Promise<string> {
+/** Read `n` lines from stdin without keeping stdin open afterwards (they may arrive in one chunk). */
+export function readLines(n: number, input: NodeJS.ReadableStream = process.stdin): Promise<string[]> {
+  if (n <= 0) return Promise.resolve([]);
   return new Promise((resolve, reject) => {
     let buf = "";
-    const onData = (d: Buffer) => {
-      buf += d.toString("utf8");
-      const i = buf.indexOf("\n");
-      if (i >= 0) {
-        process.stdin.off("data", onData);
-        process.stdin.pause();
-        resolve(buf.slice(0, i).trim());
-      }
+    const done = (lines: string[]) => {
+      input.off("data", onData);
+      input.pause();
+      resolve(lines.map((l) => l.trim()));
     };
-    process.stdin.on("data", onData);
-    process.stdin.once("end", () => (buf.trim() ? resolve(buf.trim()) : reject(new Error("沒有收到通行碼"))));
+    const onData = (d: Buffer | string) => {
+      buf += d.toString();
+      const lines = buf.split("\n");
+      if (lines.length > n) done(lines.slice(0, n));
+    };
+    input.on("data", onData);
+    input.once("end", () => {
+      const lines = buf.split("\n").filter((l) => l.trim());
+      if (lines.length >= n) done(lines.slice(0, n));
+      else reject(new Error("沒有收到通行碼"));
+    });
   });
 }
 
