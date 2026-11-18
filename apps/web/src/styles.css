@@ -1158,6 +1158,43 @@ dialog.modal::backdrop {
   margin-top: 3px;
   flex: none;
 }
+/* Settings → 放在編輯器側欄: the masked address and its copy button on one line. */
+.sb-link {
+  margin-top: 16px;
+}
+.sb-link > p {
+  margin: 0 0 8px;
+}
+.sb-url {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sb-url code {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-replace {
+  margin-top: 6px;
+  padding-left: 0;
+  padding-right: 0;
+}
+.sb-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 8px 0 0;
+  font-size: 13px;
+}
 .share textarea {
   display: block;
   width: 100%;
@@ -2373,42 +2410,4 @@ dialog.modal::backdrop {
 .ctx-pick:focus-within {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
-}
-
-/* Settings → 放在編輯器側欄: the masked address and its copy button on one line. */
-.sb-link {
-  margin-top: 16px;
-}
-.sb-link > p {
-  margin: 0 0 8px;
-}
-.sb-url {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.sb-url code {
-  flex: 1;
-  min-width: 0;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.sb-replace {
-  margin-top: 6px;
-  padding-left: 0;
-  padding-right: 0;
-}
-.sb-confirm {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 8px;
-  margin: 8px 0 0;
-  font-size: 13px;
 }
