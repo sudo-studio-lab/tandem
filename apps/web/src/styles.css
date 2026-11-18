@@ -2,6 +2,7 @@
    Tokens
    =========================================================================== */
 :root {
+  --ic-out: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3.5H3.5v9h9V10M9 3.5h3.5V7M12.5 3.5 7 9'/%3E%3C/svg%3E");
   --bg: #f7f7f8;
   --surface: #ffffff;
   --surface-2: #efeff1;
@@ -313,16 +314,14 @@ label {
 }
 .pill-warn,
 .badge-warn,
-.tag-warn,
-.tag-hunch {
+.tag-warn {
   background: var(--warn-bg);
   color: var(--warn-fg);
   border-color: transparent;
 }
 .pill-bad,
 .badge-bad,
-.tag-bad,
-.tag-hard {
+.tag-bad {
   background: var(--bad-bg);
   color: var(--bad-fg);
   border-color: transparent;
@@ -330,15 +329,10 @@ label {
 .pill-info,
 .badge-info,
 .badge-me,
-.tag-info,
-.tag-preference {
+.tag-info {
   background: var(--info-bg);
   color: var(--info-fg);
   border-color: transparent;
-}
-.tag-one-off {
-  background: var(--surface-2);
-  color: var(--muted);
 }
 .dot-badge {
   background: var(--bad-fg);
@@ -682,20 +676,6 @@ label {
 /* ===========================================================================
    Board
    =========================================================================== */
-.board-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-  gap: 24px;
-  align-items: start;
-  margin-top: 8px;
-}
-.board-main,
-.board-side {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  min-width: 0;
-}
 .panel-block {
   min-width: 0;
 }
@@ -708,28 +688,6 @@ label {
   letter-spacing: 0.06em;
   color: var(--muted);
   margin: 0 0 10px 2px;
-}
-.panel-icon {
-  font-size: 0.95rem;
-  letter-spacing: 0;
-}
-.count-chip {
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0;
-  padding: 0 7px;
-  border-radius: 999px;
-  background: var(--border);
-  color: var(--text);
-  line-height: 1.6;
-}
-.count-warn {
-  background: var(--warn-bg);
-  color: var(--warn-fg);
-}
-.count-bad {
-  background: var(--bad-bg);
-  color: var(--bad-fg);
 }
 .empty {
   padding: 14px 16px;
@@ -972,56 +930,6 @@ label {
   font-size: 0.8rem;
   color: var(--muted);
   margin-top: 3px;
-}
-.wait-who {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  flex: none;
-}
-.wait-arrow {
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
-/* Decisions */
-.decision {
-  flex: 1;
-  min-width: 0;
-}
-.decision > summary {
-  cursor: pointer;
-  list-style: none;
-}
-.decision > summary::-webkit-details-marker {
-  display: none;
-}
-.d-line {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-.d-title {
-  font-weight: 600;
-  line-height: 1.4;
-}
-.decision > summary:hover .d-title {
-  color: var(--accent);
-}
-.d-body {
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  font-size: 0.9rem;
-}
-.d-body h4 {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  margin: 10px 0 2px;
 }
 blockquote {
   margin: 0 0 6px;
@@ -1662,11 +1570,6 @@ dialog.modal::backdrop {
 /* ===========================================================================
    Responsive
    =========================================================================== */
-@media (max-width: 900px) {
-  .board-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 @media (max-width: 760px) {
   .chat-page {
     grid-template-columns: 1fr;
@@ -1723,12 +1626,6 @@ dialog.modal::backdrop {
   gap: 6px 8px;
   padding: 6px 10px;
 }
-.tb-bar-end {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-}
 /* Shared control system: every control in a toolbar is var(--ctl-h) tall,
    6px corners, no border at rest; the selected state is a filled surface. */
 .ctl {
@@ -1774,9 +1671,6 @@ dialog.modal::backdrop {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-}
-.seg-icons button {
-  padding: 0 6px;
 }
 .seg button:hover {
   color: var(--text);
@@ -1837,17 +1731,17 @@ dialog.modal::backdrop {
     width: 32px !important;
     height: 32px !important;
   }
-  .tb .tb-row {
+  .tb .tb-rows .tb-row {
     min-height: 44px;
   }
-  .tb .tb-title {
+  .tb .tb-rows .tb-title {
     line-height: 44px;
   }
   .tb-dot {
     right: calc((var(--ctl-h) - 32px) / 2 - 1px);
     bottom: calc((var(--ctl-h) - 32px) / 2 - 1px);
   }
-  .tb .tb-sum,
+  .tb .tb-group > .tb-sum,
   .problems > summary {
     min-height: 44px;
     padding-top: 8px;
@@ -1857,29 +1751,13 @@ dialog.modal::backdrop {
     min-height: 44px;
   }
   .tb-new .btn,
-  .tb-new .co-assign {
+  .pg-back {
     min-height: 44px;
   }
 }
 @media (max-width: 480px) {
   .tb-from {
     display: none;
-  }
-}
-/* Below 760px the board view is one column anyway, so the switch has nothing to switch. */
-@media (max-width: 760px) {
-  .tb-bar .seg-icons {
-    display: none;
-  }
-}
-@media (max-width: 420px) {
-  .tb-bar .ctl .ctl-label {
-    display: none;
-  }
-  .tb-bar .ctl {
-    padding: 0;
-    width: var(--ctl-h);
-    justify-content: center;
   }
 }
 .tb-picked {
@@ -1967,14 +1845,39 @@ dialog.modal::backdrop {
   min-height: 28px;
   padding: 0 10px;
 }
-.tb .tb-row:hover {
-  --row-bg: var(--surface-2);
-}
-.tb .tb-group-wait .tb-row {
+.tb .tb-group-wait .tb-row,
+.tb .tb-row.is-mine {
   --row-bg: var(--accent-soft);
 }
-.tb .tb-group-wait .tb-row:hover {
-  --row-bg: color-mix(in srgb, var(--accent-soft), var(--accent) 10%);
+@media (hover: hover) {
+  .tb .tb-row:hover {
+    --row-bg: var(--surface-2);
+  }
+  .tb .tb-group-wait .tb-row:hover,
+  .tb .tb-row.is-mine:hover {
+    --row-bg: color-mix(in srgb, var(--accent-soft), var(--accent) 10%);
+  }
+  .tb a.tb-title:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  /* A title that is a link opens GitHub in a new tab: a small out-arrow follows it on hover.
+     It sits in the title's own line, so it takes no room from the meta on the right. */
+  .tb a.tb-title::after {
+    content: "";
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    margin-left: 4px;
+    vertical-align: -1px;
+    background: var(--muted);
+    -webkit-mask: var(--ic-out) center / contain no-repeat;
+    mask: var(--ic-out) center / contain no-repeat;
+    opacity: 0;
+  }
+  .tb .tb-row:hover > a.tb-title::after {
+    opacity: 1;
+  }
 }
 .tb-num {
   flex: none;
@@ -1994,10 +1897,6 @@ dialog.modal::backdrop {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.tb .tb-title:hover {
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 .tb-done-group .tb-title {
   color: var(--muted);
@@ -2054,11 +1953,134 @@ dialog.modal::backdrop {
 .tb-log {
   display: flex;
   flex-direction: column;
-  gap: 20px;
 }
 .tb-back {
   margin: 0;
   font-size: 0.88rem;
+}
+/* Page bar: every page reached from the board starts with "‹ 看板" and its title on one row
+   (PageBar.tsx). Same height as a toolbar row; the title is panel size, not a big heading. */
+.pg-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: calc(var(--ctl-h) + 12px);
+}
+.pg-back {
+  font: inherit;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--ctl-h);
+  padding: 0 6px 0 2px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  flex: none;
+}
+.pg-back:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.pg-back-ic {
+  transform: rotate(90deg);
+}
+.pg-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* On 決定和討論 nothing is "yours" to act on, so kinds stay muted; color is kept for problems. */
+.tb-log .tb-kind {
+  color: var(--muted);
+}
+/* 決定和討論: a decision is one row; opening it shows the original words, the decision and why. */
+.lg-dec > details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.lg-dec > details > summary::-webkit-details-marker {
+  display: none;
+}
+.lg-dec > details[open] > summary {
+  --row-bg: var(--surface-2);
+}
+.lg-chev {
+  flex: none;
+  margin-right: -2px;
+  color: var(--muted);
+  transform: rotate(-90deg);
+  transition: transform 0.15s;
+}
+.lg-dec > details[open] .lg-chev {
+  transform: none;
+}
+.lg-hard {
+  color: var(--text);
+  font-weight: 600;
+}
+.lg-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.lg-arrow {
+  color: var(--muted);
+}
+.lg-dec.is-replaced .tb-title {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--border);
+}
+.lg-body {
+  padding: 6px 10px 14px 30px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.lg-body p {
+  margin: 0 0 6px;
+}
+.lg-quote {
+  margin: 0 0 8px;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--border);
+  border-radius: 0;
+  background: none;
+}
+.lg-quote p {
+  margin: 0;
+}
+.lg-quote footer,
+.lg-foot,
+.lg-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+.lg-foot a {
+  color: var(--muted);
+}
+.lg-foot a:hover {
+  color: var(--accent);
+}
+.lg-label {
+  margin-top: 8px !important;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.pg-bar-end {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 4px;
 }
 .tb-new {
   display: flex;
@@ -2077,17 +2099,6 @@ dialog.modal::backdrop {
 .tb-new textarea.input {
   resize: vertical;
   min-height: 60px;
-}
-.tb-new-assign {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-.tb-new-label {
-  font-size: 12px;
-  color: var(--muted);
-  margin-right: 2px;
 }
 .tb-new .field-error {
   margin: 0;
@@ -2192,25 +2203,6 @@ dialog.modal::backdrop {
 }
 .board-error .status-dot {
   background: var(--bad-fg);
-}
-
-/* Board view (wide screens): three columns of the same one-line rows. */
-.tb-layout-board {
-  max-width: 1160px;
-}
-.page.board:has(.tb-layout-board) {
-  max-width: 1160px;
-}
-.tb-layout-board .tb-groups {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0 16px;
-  align-items: start;
-}
-@media (max-width: 760px) {
-  .tb-layout-board .tb-groups {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* Light Markdown (room notes, shared context) */

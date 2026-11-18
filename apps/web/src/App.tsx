@@ -18,6 +18,7 @@ import { ContextPage } from "./components/Context.tsx";
 import { AgentMessagesPage } from "./components/AgentMessages.tsx";
 import { SharedChatsPage } from "./components/SharedChats.tsx";
 import { Spinner, errMsg } from "./components/ui.tsx";
+import { HOME, PageBar } from "./components/PageBar.tsx";
 
 interface Op {
   /** null while the start request is in flight. */
@@ -189,6 +190,7 @@ export function App() {
       }}
       onAgentMessages={()=>{setView("board");setBoardTab("agent-messages");}}
       onSharedChats={()=>{setView("board");setBoardTab("shared-chats");}}
+      onRooms={() => setView("room")}
     />
   );
 
@@ -221,20 +223,30 @@ export function App() {
           </div>
         </main>
       ) : view === "room" ? (
-        <RoomView key={project.id} projectId={project.id} me={session.login} now={now} onOpenSettings={() => setDialog("agents")} />
+        <RoomView
+          key={project.id}
+          projectId={project.id}
+          me={session.login}
+          now={now}
+          onOpenSettings={() => setDialog("agents")}
+          onBack={() => {
+            setView("board");
+            setBoardTab("list");
+          }}
+        />
       ) : view === "chat" ? (
-        <><div className="page tb-back"><button type="button" className="tb-link" onClick={()=>{setView("board");setBoardTab("shared-chats");}}>回對話與交接</button></div><ChatView key={project.id} projectId={project.id} now={now} initialChatId={forkId} onOpenSettings={() => setDialog("agents")} /></>
+        <><div className="page"><PageBar back="對話與交接" title="接續對話" onBack={()=>{setView("board");setBoardTab("shared-chats");}} /></div><ChatView key={project.id} projectId={project.id} now={now} initialChatId={forkId} onOpenSettings={() => setDialog("agents")} /></>
       ) : !board ? (
         <main className="page">
           {app.boardError ? (
             <p className="banner banner-error" role="alert">
-              無法載入看板：{app.boardError}{" "}
+              無法載入{HOME}：{app.boardError}{" "}
               <button type="button" className="btn btn-small" onClick={() => void app.refresh()}>
                 再試一次
               </button>
             </p>
           ) : (
-            <Spinner label="載入看板中…" />
+            <Spinner label={`載入${HOME}中…`} />
           )}
         </main>
       ) : (
@@ -242,14 +254,14 @@ export function App() {
           {app.boardError && (
             <p className="board-error" role="alert">
               <span className="status-dot" aria-hidden="true" />
-              <span className="board-error-text">看板沒有更新：{app.boardError}</span>
+              <span className="board-error-text">{HOME}沒有更新：{app.boardError}</span>
               <button type="button" className="tb-link" onClick={() => void app.reloadBoard()}>
                 再試一次
               </button>
             </p>
           )}
           {boardTab === "list" ? (
-            <TaskBoard key={project.id} board={board} now={now} onTaskCreated={app.reloadBoard} />
+            <TaskBoard key={project.id} board={board} now={now} />
           ) : boardTab === "context" ? (
             <ContextPage key={project.id} projectId={project.id} now={now} onBack={() => setBoardTab("list")} />
           ) : boardTab === "agent-messages" ? (
@@ -258,17 +270,15 @@ export function App() {
             <SharedChatsPage key={project.id} board={board} now={now} onBack={()=>setBoardTab("list")} onChanged={app.reloadBoard} onFork={id=>{setForkId(id);setView("chat");}}/>
           ) : (
             <div className="tb-log">
-              <p className="tb-back">
-                <button type="button" className="tb-link" onClick={() => setBoardTab("list")}>
-                  ← 回任務
-                </button>
-              </p>
-              <Waiting items={board.waiting} now={now} />
-              <Decisions board={board} />
-              <Discussions items={board.discussions} now={now} />
+              <PageBar title="決定和討論" onBack={() => setBoardTab("list")} />
+              <div className="tb">
+                <Waiting items={board.waiting} me={board.me} now={now} />
+                <Decisions board={board} />
+                <Discussions items={board.discussions} shown={new Set(board.waiting.filter((w) => w.kind === "discussion").map((w) => w.url))} now={now} />
+              </div>
             </div>
           )}
-          <Problems items={board.problems} />
+          {(boardTab === "list" || boardTab === "log") && <Problems items={board.problems} />}
         </main>
       )}
       {dialog === "invite" && project && <InviteDialog projectId={project.id} onClose={() => setDialog(null)} />}

@@ -15,7 +15,8 @@ import {
 } from "../../../../packages/contracts/src/context.ts";
 import { ApiError, api, projectPath } from "../api.ts";
 import { relTime } from "../time.ts";
-import { MarkdownLite, Panel, Spinner, errMsg } from "./ui.tsx";
+import { MarkdownLite, Spinner, errMsg } from "./ui.tsx";
+import { PageBar } from "./PageBar.tsx";
 
 const ACCEPT = [...Object.keys(CONTEXT_TEXT_TYPES), ...Object.keys(CONTEXT_IMAGE_TYPES)].join(",");
 const MAX_MB = CONTEXT_MAX_BYTES / 1024 / 1024;
@@ -261,11 +262,7 @@ function FileView({
   const text = file?.kind === "text";
   return (
     <>
-      <p className="tb-back">
-        <button type="button" className="tb-link" onClick={onBack}>
-          ← 所有檔案
-        </button>
-      </p>
+      <PageBar back="脈絡" onBack={onBack} />
       {!file ? (
         loadError ? (
           <p className="banner banner-error" role="alert">
@@ -363,14 +360,6 @@ export function ContextPage({ projectId, now, onBack }: { projectId: string; now
     void load();
   }, [load]);
 
-  const back = (
-    <p className="tb-back">
-      <button type="button" className="tb-link" onClick={onBack}>
-        ← 回任務
-      </button>
-    </p>
-  );
-
   if (open) {
     return (
       <div className="tb-log ctx">
@@ -382,8 +371,8 @@ export function ContextPage({ projectId, now, onBack }: { projectId: string; now
   const hasNotes = !!files?.some((f) => f.path === CONTEXT_NOTES);
   return (
     <div className="tb-log ctx">
-      {back}
-      <Panel title="脈絡" icon="📎" count={files?.length}>
+      <PageBar title="脈絡" titleId="ctx-title" onBack={onBack} />
+      <section className="panel-block" aria-labelledby="ctx-title">
         <div className="ctx-intro">
           <p className="muted small grow">背景、規格和圖，隊友和大家的 AI 都讀得到。不要放金鑰或密碼。</p>
           {creating === null && (
@@ -448,7 +437,7 @@ export function ContextPage({ projectId, now, onBack }: { projectId: string; now
             )}
           </>
         )}
-      </Panel>
+      </section>
     </div>
   );
 }

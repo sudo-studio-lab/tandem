@@ -1,0 +1,198 @@
+/*
+ * Agent 問答 and 對話與交接 at the board's panel scale: 13px text, small muted section labels,
+ * folding sections with the same chevron, one control height. Scoped under .page so it wins
+ * over the older page styles in collaboration.css without editing them.
+ */
+.page .co-page {
+  max-width: 760px;
+  font-size: 13px;
+  line-height: 1.5;
+  padding-bottom: 24px;
+}
+.page .co-page p {
+  margin: 0 0 8px;
+}
+.page .co-page .co-lead {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.page .co-page h3 {
+  margin: 14px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.page .co-page .row-meta,
+.page .co-page .co-readonly {
+  font-size: 12px;
+}
+
+/* Folding details inside a section (transcripts, previews): a quiet row with a small chevron. */
+.page .co-page details:not(.tb-group) > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--ctl-h);
+  padding: 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.page .co-page details:not(.tb-group) > summary::-webkit-details-marker {
+  display: none;
+}
+.page .co-page details:not(.tb-group) > summary::before {
+  content: "";
+  flex: none;
+  width: 5px;
+  height: 5px;
+  margin: 0 6px 0 3px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+.page .co-page details:not(.tb-group)[open] > summary::before {
+  transform: rotate(45deg);
+}
+.page .co-page details:not(.tb-group) > summary .pill {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Controls: one height, small text. */
+.page .co-page .btn {
+  min-height: var(--ctl-h);
+  padding: 0 10px;
+  font-size: 12px;
+}
+.page .co-page .input {
+  min-height: var(--ctl-h);
+  padding: 2px 8px;
+  font-size: 13px;
+}
+.page .co-page textarea.input {
+  padding: 6px 8px;
+}
+.page .co-page .co-fields {
+  gap: 10px;
+  margin-block: 8px;
+}
+.page .co-page .co-fields label {
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.page .co-page .co-actions {
+  gap: 6px;
+  margin-top: 8px;
+}
+.page .co-page .co-check {
+  min-height: var(--ctl-h);
+  gap: 8px;
+  font-size: 13px;
+}
+/* A label that stands alone above a field reads like the labels inside .co-fields. */
+.page .co-page form > label {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.page .co-page .co-check input {
+  width: 14px;
+  height: 14px;
+}
+
+/* Sections: the board's group label row, then the body indented to the panel gutter. */
+.page .co-page .co-sec-body {
+  padding: 2px 10px 12px;
+}
+.page .co-page .co-meta {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.page .co-page .co-message header {
+  justify-content: flex-start;
+  gap: 4px 8px;
+}
+.page .co-page .co-message footer:empty {
+  display: none;
+}
+
+/* Lists and messages. */
+.page .co-page .co-empty {
+  padding-block: 4px;
+  font-size: 12px;
+}
+.page .co-page .co-chat-list {
+  margin: 0 0 8px;
+}
+.page .co-page .co-chat-pick {
+  padding: 4px 0;
+  font-size: 13px;
+}
+.page .co-page .co-chat-pick strong {
+  font-weight: 500;
+}
+.page .co-page .co-chat-pick .row-meta {
+  margin-top: 0;
+}
+.page .co-page .co-message {
+  padding-block: 10px;
+}
+.page .co-page .co-message footer {
+  margin-top: 8px;
+}
+/* Replies and transcripts read as quotes, not cards: a thin rule on the left, no fill. */
+.page .co-page .co-answer,
+.page .co-page .co-preview {
+  margin-top: 8px;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--border);
+  border-radius: 0;
+  background: none;
+}
+.page .co-page .co-preview {
+  font-size: 12px;
+}
+.page .co-page .co-preview > div + div {
+  margin-top: 10px;
+}
+.page .co-page .co-reading h3 {
+  margin: 10px 0 2px;
+  font-size: 13px;
+  letter-spacing: 0;
+  color: var(--text);
+}
+.page .co-page .co-reading,
+.page .co-page .co-share-confirm {
+  margin-block: 10px 14px;
+}
+.page .co-page .co-handoff {
+  margin-top: 0;
+}
+.page .co-page .banner {
+  font-size: 12px;
+}
+
+/* Touch screens get 44px targets; narrow mouse windows keep the panel height. */
+@media (max-width: 560px) and (pointer: fine) {
+  .page .co-page .btn,
+  .page .co-page summary,
+  .page .co-page .input {
+    min-height: var(--ctl-h);
+  }
+}
+@media (pointer: coarse) {
+  .page .co-page .btn,
+  .page .co-page details:not(.tb-group) > summary,
+  .page .co-page .input {
+    min-height: 44px;
+  }
+}

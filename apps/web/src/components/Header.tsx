@@ -4,6 +4,7 @@ import { api, projectPath } from "../api.ts";
 import { relTime } from "../time.ts";
 import { Avatar, errMsg } from "./ui.tsx";
 import { Glyph } from "./icons.tsx";
+import { HOME } from "./PageBar.tsx";
 
 const AGENT_NAME: Record<AgentKind, string> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity", grok: "Grok", cursor: "Cursor" };
 
@@ -11,20 +12,14 @@ const AGENT_NAME: Record<AgentKind, string> = { claude: "Claude Code", codex: "C
 export type View = "board" | "chat" | "room";
 
 /**
- * Chat and rooms are hidden for now: you talk to AI in your own editor, and
- * shared rooms are postponed (D-20261117-qb70). The code stays; set this to
- * true to bring the tabs back.
+ * Chat stays hidden: you talk to AI in your own editor (D-20261117-qb70). The code stays;
+ * set this to true to bring the tab back. Rooms open from the ⋯ menu (D-20261118-8urw).
  */
-const SHOW_CHAT_AND_ROOM = false;
+const SHOW_CHAT = false;
 
 export const TABS: { id: View; label: string }[] = [
-  { id: "board", label: "看板" },
-  ...(SHOW_CHAT_AND_ROOM
-    ? [
-        { id: "chat" as const, label: "跟 AI 對話" },
-        { id: "room" as const, label: "房間" },
-      ]
-    : []),
+  { id: "board", label: HOME },
+  ...(SHOW_CHAT ? [{ id: "chat" as const, label: "跟 AI 對話" }] : []),
 ];
 
 interface Props {
@@ -52,6 +47,7 @@ interface Props {
   onContext?: () => void;
   onAgentMessages?: () => void;
   onSharedChats?: () => void;
+  onRooms?: () => void;
   /** Extra tabs (e.g. rooms) appended after TABS. */
   tabs?: { id: View; label: string }[];
 }
@@ -221,7 +217,7 @@ function MoreMenu({ items }: { items: { key: string; label: string; hint?: strin
   useDismiss(ref, open, () => setOpen(false));
   const toggle=()=>{if(!open){const rect=ref.current?.getBoundingClientRect();setPosition({left:Math.max(12,Math.min((rect?.right??292)-280,window.innerWidth-292)),top:(rect?.bottom??54)+6});}setOpen(v=>!v);};
   useEffect(()=>{if(!open)return;const resize=()=>{const r=ref.current?.getBoundingClientRect();setPosition({left:Math.max(12,Math.min((r?.right??292)-280,window.innerWidth-292)),top:(r?.bottom??54)+6});};window.addEventListener("resize",resize);return()=>window.removeEventListener("resize",resize);},[open]);
-  const collaboration=new Set(["log","context","agent-messages","shared-chats"]);
+  const collaboration=new Set(["log","context","agent-messages","shared-chats","rooms"]);
   const tools=items.filter(it=>!collaboration.has(it.key)&&!["members","folder","refresh"].includes(it.key));
   const renderItem=(it:typeof items[number])=><button key={it.key} type="button" className="menu-item" disabled={it.disabled} onClick={()=>{setOpen(false);it.run();}}><span className="grow">{it.label}{it.hint&&<span className="block muted small">{it.hint}</span>}</span></button>;
   return (
@@ -271,6 +267,7 @@ export function Header(p: Props) {
           ...(p.onContext ? [{ key: "context", label: "脈絡", hint: "背景、規格和圖，大家和 AI 都讀得到", run: p.onContext }] : []),
           ...(p.onAgentMessages ? [{ key: "agent-messages", label: "Agent 問答", hint: "閱讀問答、停止或設定開放", run: p.onAgentMessages }] : []),
           ...(p.onSharedChats ? [{ key: "shared-chats", label: "對話與交接", hint: "選擇分享、閱讀隊友對話與交接任務", run: p.onSharedChats }] : []),
+          ...(p.onRooms ? [{ key: "rooms", label: "房間", hint: "一起討論，需要時按「問 AI」", run: p.onRooms }] : []),
           ...agents
             .filter((a) => a.installed && a.terminalAvailable !== false)
             .map((a) => ({
@@ -281,7 +278,7 @@ export function Header(p: Props) {
             })),
           { key: "members", label: "成員與邀請", run: p.onInvite },
           { key: "folder", label: "打開專案資料夾", disabled: opening === "folder", run: () => void run("folder", projectPath(id, "/open-folder")) },
-          { key: "refresh", label: "重新整理看板", disabled: p.refreshing, run: p.onRefresh },
+          { key: "refresh", label: `重新整理${HOME}`, disabled: p.refreshing, run: p.onRefresh },
         ]
       : [];
 

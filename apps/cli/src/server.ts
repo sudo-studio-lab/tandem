@@ -68,7 +68,6 @@ import { createHandoff, listHandoffs } from "./handoffs.ts";
 import { openContext, requirePrivateDataRepo, type Context } from "./context.ts";
 import { buildBoard, gatherGitHub, type GitHubData } from "./gather.ts";
 import { inviteLogin } from "./commands.ts";
-import { createTask, parseTaskInput } from "./tasks.ts";
 import { info } from "./io.ts";
 import { rememberProject, startProject, joinProject } from "./setup.ts";
 import { ADAPTERS, agentStatuses } from "./agents/index.ts";
@@ -366,11 +365,14 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
     approveBridge: () => ({ url: `http://127.0.0.1:${port}/internal/approve`, token: approveToken }),
     onTurnDone: (chat, texts) => rooms.onTurnDone(chat, texts),
   });
+  const roomsResumed = new Set<string>();
   const rooms: RoomManager = new RoomManager({
     chats,
     project: async (id) => {
       const rt = await openRuntime(id);
-      return { gh: rt.ctx.gh, me: rt.ctx.me, cwd: rt.ctx.repoRoot };
+      // Rooms live in the private team data repo, never in a (possibly public) code repo.
+      await requirePrivateDataRepo(rt.ctx);
+      return { gh: rt.ctx.dataGh!, me: rt.ctx.me, cwd: rt.ctx.repoRoot, members: async () => (await rt.ctx.gh.listProjectMembers()).map((m) => m.login) };
     },
     agentLabel: (kind) => (kind === "codex" ? "Codex" : "Claude"),
   });
@@ -616,6 +618,12 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
     "/api/projects/:id/board",
     handle(async (c) => {
       const rt = await projectRt(c);
+      // Opening a project also picks rooms this computer hosts back up, so a restart doesn't
+      // leave teammates' 「問 AI」 unanswered. Needs the private data repo; skip quietly without it.
+      if (!roomsResumed.has(pid(c))) {
+        roomsResumed.add(pid(c));
+        void rooms.resume(pid(c)).catch(() => roomsResumed.delete(pid(c)));
+      }
       return c.json(rt.board ?? (await rebuild(rt, true)));
     }),
   );
@@ -638,17 +646,6 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
       }
       const rt = await projectRt(c);
       return c.json(await inviteLogin(rt.ctx, b.login.replace(/^@/, "")));
-    }),
-  );
-  app.post(
-    "/api/projects/:id/tasks",
-    handle(async (c) => {
-      const input = parseTaskInput(await body<unknown>(c));
-      const rt = await projectRt(c);
-      const r = await createTask(rt.ctx, input);
-      // Refresh so the new task is on the board (and pushed to open windows) before we answer.
-      await rebuild(rt, true).catch(() => undefined);
-      return c.json({ number: r.number, url: r.url });
     }),
   );
   app.get("/api/projects/:id/members",handle(async(c)=>c.json(await projectMembers((await projectRt(c)).ctx))));
@@ -878,8 +875,8 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
   app.post(
     "/api/projects/:id/rooms/:n/messages",
     handle(async (c) => {
-      const b = await body<{ text: string }>(c);
-      await rooms.post(pid(c), roomNo(c), String(b.text ?? ""));
+      const b = await body<{ text: string; ask?: boolean }>(c);
+      await rooms.post(pid(c), roomNo(c), String(b.text ?? ""), b.ask === true);
       return c.json({ ok: true });
     }),
   );

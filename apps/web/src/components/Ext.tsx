@@ -8,15 +8,3 @@ export function Ext({ href, children, className }: { href: string; children: Rea
   );
 }
 
-export function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
-  const id = `sec-${title}`;
-  return (
-    <section className="section" aria-labelledby={id}>
-      <h2 id={id}>
-        {title}
-        {count !== undefined && <span className="count">{count}</span>}
-      </h2>
-      {children}
-    </section>
-  );
-}

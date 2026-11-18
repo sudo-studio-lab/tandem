@@ -1,12 +1,10 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useState } from "react";
 import type { BoardMember, ProjectBoard, WaitingItem } from "@tandem/contracts";
-import { api, projectPath } from "../api.ts";
 import { Ext } from "./Ext.tsx";
-import { Avatar, errMsg } from "./ui.tsx";
+import { Avatar } from "./ui.tsx";
 import { Glyph } from "./icons.tsx";
 import { PersonCard } from "./People.tsx";
 import { relTime, waitedFor } from "../time.ts";
-import "./collaboration.css";
 
 /*
  * The board as one narrow column (fits an editor's side panel), laid out
@@ -251,113 +249,9 @@ ${WAIT_KIND[w.kind]}・@${w.from}・${waitedFor(w.since, now)}`}>
   );
 }
 
-/** Inline form under the bar: a person (not an agent) opens a task. Enter in the title submits, Esc cancels. */
-function NewTask({ board, members, onDone, onCancel }: { board: ProjectBoard; members: BoardMember[]; onDone: () => void; onCancel: () => void }) {
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [assign, setAssign] = useState<string[]>([board.me]);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const toggle = (login: string) => setAssign((a) => (a.includes(login) ? a.filter((x) => x !== login) : [...a, login]));
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    if (busy || !title.trim()) return;
-    setBusy(true);
-    setErr(null);
-    try {
-      await api<{ number: number; url: string }>("POST", projectPath(board.projectId, "/tasks"), {
-        title: title.trim(),
-        body: body.trim() || undefined,
-        assign,
-      });
-      onDone();
-    } catch (e2) {
-      setErr(errMsg(e2));
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form
-      className="tb-new"
-      aria-label="新任務"
-      onSubmit={submit}
-      onKeyDown={(e) => {
-        if (e.key === "Escape" && !busy) {
-          e.preventDefault();
-          onCancel();
-        }
-      }}
-    >
-      <label htmlFor="tb-new-title" className="sr-only">
-        標題
-      </label>
-      <input
-        id="tb-new-title"
-        className="input"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="標題"
-        maxLength={256}
-        autoComplete="off"
-        autoFocus
-        required
-        disabled={busy}
-      />
-      <label htmlFor="tb-new-body" className="sr-only">
-        說明
-      </label>
-      <textarea id="tb-new-body" className="input" rows={3} value={body} onChange={(e) => setBody(e.target.value)} placeholder="說明（選填）" disabled={busy} />
-      <div className="tb-new-assign" role="group" aria-labelledby="tb-new-assign-label">
-        <span id="tb-new-assign-label" className="tb-new-label">
-          指派給
-        </span>
-        {members.map((m) => {
-          const on = assign.includes(m.login);
-          const name = `@${m.login}${m.login === board.me ? "（你）" : ""}`;
-          return (
-            <button
-              key={m.login}
-              type="button"
-              className={`btn btn-small co-assign${on ? " is-sel" : ""}`}
-              aria-pressed={on}
-              aria-label={name}
-              title={name}
-              disabled={busy}
-              onClick={() => toggle(m.login)}
-            >
-              <Avatar login={m.login} size={22} /><span>@{m.login}</span>
-            </button>
-          );
-        })}
-      </div>
-      {err && (
-        <p className="field-error" role="alert">
-          {err}
-        </p>
-      )}
-      <div className="tb-new-actions">
-        <button type="button" className="btn btn-small btn-quiet" onClick={onCancel} disabled={busy}>
-          取消
-        </button>
-        <button type="submit" className="btn btn-small btn-primary" disabled={busy || !title.trim()}>
-          {busy ? "建立中…" : "建立"}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-export function TaskBoard({ board, now, onTaskCreated }: { board: ProjectBoard; now: number; onTaskCreated?: () => void | Promise<void> }) {
+export function TaskBoard({ board, now }: { board: ProjectBoard; now: number }) {
   const [scope, setScope] = useState<"all" | "mine">("all");
   const [person, setPerson] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-  const addButton=useRef<HTMLButtonElement>(null);
-  const closeNew=()=>{setAdding(false);requestAnimationFrame(()=>addButton.current?.focus());};
-  const [layout,setLayout]=useState<"list"|"board">(()=>{try{return localStorage.getItem(`tandem-layout:${board.projectId}`)==="board"?"board":"list";}catch{return "list";}});
-  const changeLayout=(next:"list"|"board")=>{setLayout(next);try{localStorage.setItem(`tandem-layout:${board.projectId}`,next);}catch{/* session-only when storage is unavailable */}};
   const members = [...board.members].sort((a, b) => Number(b.login === board.me) - Number(a.login === board.me));
   const mine = board.waiting
     .filter((w) => w.to === board.me && (!person || person === board.me || w.from === person))
@@ -368,7 +262,7 @@ export function TaskBoard({ board, now, onTaskCreated }: { board: ProjectBoard; 
   const picked = person ? members.find((m) => m.login === person) : undefined;
 
   return (
-    <div className={`tb tb-layout-${layout}`}>
+    <div className="tb">
       <div className="tb-bar">
         {person ? (
           <p className="tb-filter-note">
@@ -394,33 +288,7 @@ export function TaskBoard({ board, now, onTaskCreated }: { board: ProjectBoard; 
             ))}
           </div>
         )}
-        <div className="tb-bar-end">
-          <div className="seg seg-icons" role="group" aria-label="任務檢視">
-            <button type="button" aria-pressed={layout === "list"} aria-label="清單" title="清單" onClick={() => changeLayout("list")}>
-              <Glyph name="list" />
-            </button>
-            <button type="button" aria-pressed={layout === "board"} aria-label="看板" title="看板" onClick={() => changeLayout("board")}>
-              <Glyph name="columns" />
-            </button>
-          </div>
-          <button ref={addButton} type="button" className="ctl" aria-expanded={adding} aria-label="新增任務" title="新增任務" onClick={() => setAdding((a) => !a)}>
-            <Glyph name="plus" />
-            <span className="ctl-label">新增任務</span>
-          </button>
-        </div>
       </div>
-
-      {adding && (
-        <NewTask
-          board={board}
-          members={members}
-          onCancel={closeNew}
-          onDone={() => {
-            closeNew();
-            void onTaskCreated?.();
-          }}
-        />
-      )}
 
       {mine.length > 0 && <WaitGroup items={mine} now={now} />}
 
@@ -430,25 +298,13 @@ export function TaskBoard({ board, now, onTaskCreated }: { board: ProjectBoard; 
         </div>
       )}
 
-      {items.length === 0 && mine.length === 0 && !adding && (
-        <p className="tb-empty-note">
-          {who ? `@${who} 目前沒有負責的任務。` : "還沒有任務。"}
-          <button type="button" className="tb-link" onClick={() => setAdding(true)}>
-            新增任務
-          </button>
-        </p>
+      {items.length === 0 && mine.length === 0 && (
+        <p className="tb-empty-note">{who ? `@${who} 目前沒有負責的任務。` : "還沒有任務。跟你的 AI 說要開什麼任務，或直接在 GitHub 開 issue。"}</p>
       )}
 
-      <div className="tb-groups">{GROUPS.map((g) => (
-        <Group
-          key={g.key}
-          k={g.key}
-          label={g.label}
-          open={g.open}
-          now={now}
-          items={items.filter((it) => it.group === g.key)}
-        />
-      ))}</div>
+      {GROUPS.map((g) => (
+        <Group key={g.key} k={g.key} label={g.label} open={g.open} now={now} items={items.filter((it) => it.group === g.key)} />
+      ))}
     </div>
   );
 }

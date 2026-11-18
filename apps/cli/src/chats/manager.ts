@@ -270,9 +270,15 @@ export class ChatManager {
   }
 
   /** The room chat that answers discussion `number`, if this computer hosts it. */
-  async findRoom(projectId: string, number: number): Promise<Chat | undefined> {
+  /** The chats behind rooms this computer hosts in a project. */
+  async roomChats(projectId: string): Promise<Chat[]> {
     await this.load();
-    return [...this.chats.values()].find((c) => c.projectId === projectId && c.room?.number === number);
+    return [...this.chats.values()].filter((c) => c.projectId === projectId && !!c.room);
+  }
+
+  async findRoom(projectId: string, number: number, url?: string): Promise<Chat | undefined> {
+    await this.load();
+    return [...this.chats.values()].find((c) => c.projectId === projectId && c.room?.number === number && (!url || c.room.url === url));
   }
 
   /** Show an item without sending anything to the agent (room messages, notices). */

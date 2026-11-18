@@ -57,39 +57,6 @@ export function Spinner({ label }: { label: string }) {
 
 export const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-/** A titled block on the board: icon + title + count, then its content. */
-export function Panel({
-  title,
-  icon,
-  count,
-  tone,
-  className,
-  children,
-}: {
-  title: string;
-  icon?: string;
-  count?: number;
-  tone?: "warn" | "bad";
-  className?: string;
-  children: ReactNode;
-}) {
-  const id = `panel-${title}`;
-  return (
-    <section className={`panel-block${className ? ` ${className}` : ""}`} aria-labelledby={id}>
-      <h2 id={id} className="panel-title">
-        {icon && (
-          <span className="panel-icon" aria-hidden="true">
-            {icon}
-          </span>
-        )}
-        {title}
-        {count !== undefined && count > 0 && <span className={`count-chip${tone ? ` count-${tone}` : ""}`}>{count}</span>}
-      </h2>
-      {children}
-    </section>
-  );
-}
-
 /** Just enough Markdown for notes: headings, bullets, paragraphs and ``` code blocks. Never renders HTML. */
 export function MarkdownLite({ text, className }: { text: string; className?: string }) {
   const out: ReactNode[] = [];
