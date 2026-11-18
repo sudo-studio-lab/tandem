@@ -13,7 +13,7 @@ function Row({ d, now }: { d: DiscussionSummary; now: number }) {
         {d.title}
       </Ext>
       <span className="tb-meta">
-        <span className={d.kind === "disagreement" ? "tb-stuck" : "tb-kind"}>{KIND[d.kind]}</span>
+        <span className={d.kind === "disagreement" ? "lg-hard" : "tb-kind"}>{KIND[d.kind]}</span>
         {waiting && <span className="tb-from">等 {waiting}</span>}
         {d.answered && <span>已有回答</span>}
         <span>{relTime(d.updatedAt, now)}</span>
@@ -22,13 +22,14 @@ function Row({ d, now }: { d: DiscussionSummary; now: number }) {
   );
 }
 
-export function Discussions({ items, now }: { items: DiscussionSummary[]; now: number }) {
+/** Open discussions not already listed under 誰在等誰 (`shown` holds those URLs), then the closed ones folded. */
+export function Discussions({ items, shown, now }: { items: DiscussionSummary[]; shown: Set<string>; now: number }) {
   const byUpdated = (a: DiscussionSummary, b: DiscussionSummary) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
-  const open = items.filter((d) => !d.closed).sort(byUpdated);
+  const open = items.filter((d) => !d.closed && !shown.has(d.url)).sort(byUpdated);
   const closed = items.filter((d) => d.closed).sort(byUpdated);
   return (
     <>
-      <Group label="討論和問題" count={open.length}>
+      <Group label={shown.size > 0 ? "其他討論" : "討論和問題"} count={open.length}>
         {open.map((d) => (
           <Row key={d.id} d={d} now={now} />
         ))}

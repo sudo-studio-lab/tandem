@@ -1,6 +1,7 @@
 import type { BoardData, Decision, Strength } from "@tandem/contracts";
 import { Ext } from "./Ext.tsx";
 import { Group } from "./Group.tsx";
+import { Glyph } from "./icons.tsx";
 
 const STRENGTH: Record<Strength, string> = {
   hard: "不能違反",
@@ -22,9 +23,10 @@ function DecisionRow({ d, board }: { d: Decision; board: BoardData }) {
     <li className={`lg-dec${replaced ? " is-replaced" : ""}`}>
       <details>
         <summary className="tb-row" title={f.title}>
+          <Glyph name="chevron" size={12} className="lg-chev" />
           <span className="tb-title">{f.title}</span>
           <span className="tb-meta">
-            {replaced ? <span>已被取代</span> : <span className={f.strength === "hard" ? "tb-stuck" : undefined}>{STRENGTH[f.strength]}</span>}
+            {replaced ? <span>已被取代</span> : <span className={f.strength === "hard" ? "lg-hard" : undefined}>{STRENGTH[f.strength]}</span>}
             <span>{f.date.slice(5).replace("-", "/")}</span>
           </span>
         </summary>

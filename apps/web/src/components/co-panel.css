@@ -29,20 +29,8 @@
   font-size: 12px;
 }
 
-/* Folding sections: a quiet row with a chevron, like the board's groups. */
-.page .co-page .co-settings {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-bottom: 1px solid var(--border);
-}
-.page .co-page .co-settings > :not(summary) {
-  margin-left: 18px;
-}
-.page .co-page .co-settings[open] {
-  padding-bottom: 10px;
-}
-.page .co-page details > summary {
+/* Folding details inside a section (transcripts, previews): a quiet row with a small chevron. */
+.page .co-page details:not(.tb-group) > summary {
   list-style: none;
   display: flex;
   align-items: center;
@@ -53,10 +41,10 @@
   font-weight: 600;
   cursor: pointer;
 }
-.page .co-page details > summary::-webkit-details-marker {
+.page .co-page details:not(.tb-group) > summary::-webkit-details-marker {
   display: none;
 }
-.page .co-page details > summary::before {
+.page .co-page details:not(.tb-group) > summary::before {
   content: "";
   flex: none;
   width: 5px;
@@ -67,10 +55,10 @@
   transform: rotate(-45deg);
   transition: transform 0.15s;
 }
-.page .co-page details[open] > summary::before {
+.page .co-page details:not(.tb-group)[open] > summary::before {
   transform: rotate(45deg);
 }
-.page .co-page details > summary .pill {
+.page .co-page details:not(.tb-group) > summary .pill {
   margin-left: auto;
   font-size: 11px;
   font-weight: 500;
@@ -106,10 +94,35 @@
 .page .co-page .co-check {
   min-height: var(--ctl-h);
   gap: 8px;
+  font-size: 13px;
+}
+/* A label that stands alone above a field reads like the labels inside .co-fields. */
+.page .co-page form > label {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
 }
 .page .co-page .co-check input {
   width: 14px;
   height: 14px;
+}
+
+/* Sections: the board's group label row, then the body indented to the panel gutter. */
+.page .co-page .co-sec-body {
+  padding: 2px 10px 12px;
+}
+.page .co-page .co-meta {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.page .co-page .co-message header {
+  justify-content: flex-start;
+  gap: 4px 8px;
+}
+.page .co-page .co-message footer:empty {
+  display: none;
 }
 
 /* Lists and messages. */
@@ -136,16 +149,26 @@
 .page .co-page .co-message footer {
   margin-top: 8px;
 }
-.page .co-page .co-answer {
+/* Replies and transcripts read as quotes, not cards: a thin rule on the left, no fill. */
+.page .co-page .co-answer,
+.page .co-page .co-preview {
   margin-top: 8px;
-  padding: 8px 10px;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--border);
+  border-radius: 0;
+  background: none;
 }
 .page .co-page .co-preview {
-  padding: 10px;
   font-size: 12px;
 }
 .page .co-page .co-preview > div + div {
   margin-top: 10px;
+}
+.page .co-page .co-reading h3 {
+  margin: 10px 0 2px;
+  font-size: 13px;
+  letter-spacing: 0;
+  color: var(--text);
 }
 .page .co-page .co-reading,
 .page .co-page .co-share-confirm {
@@ -168,7 +191,7 @@
 }
 @media (pointer: coarse) {
   .page .co-page .btn,
-  .page .co-page details > summary,
+  .page .co-page details:not(.tb-group) > summary,
   .page .co-page .input {
     min-height: 44px;
   }

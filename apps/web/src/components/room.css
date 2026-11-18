@@ -64,13 +64,8 @@
 .rm-head {
   padding: 2px 0 8px;
 }
-.rm-title {
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.35;
-}
 .rm-sub {
-  margin-top: 2px;
+  margin: 0;
   font-size: 12px;
   color: var(--muted);
 }
@@ -228,6 +223,12 @@
 }
 .rm-compose .btn {
   min-height: var(--ctl-h);
+}
+/* Side-panel width: keep the hint on one line by dropping the least-needed key. */
+@media (max-width: 480px) {
+  .rm-hint-shift {
+    display: none;
+  }
 }
 @media (pointer: coarse) {
   .rm-hint-keys {

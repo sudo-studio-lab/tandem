@@ -28,3 +28,20 @@ export function Group({ label, count, open = true, dim, children }: { label: str
     </details>
   );
 }
+
+/**
+ * A folding section on the Agent and 對話與交接 pages: the same label row as a Group, but the body
+ * holds forms and messages instead of one-line rows. `end` sits where a group's count would.
+ */
+export function Section({ label, end, open, children }: { label: string; end?: ReactNode; open?: boolean; children: ReactNode }) {
+  return (
+    <details className="tb-group co-sec" open={open}>
+      <summary className="tb-sum">
+        <Glyph name="chevron" size={12} className="tb-chev" />
+        <span className="tb-group-label">{label}</span>
+        {end !== undefined && <span className="tb-count">{end}</span>}
+      </summary>
+      <div className="co-sec-body">{children}</div>
+    </details>
+  );
+}

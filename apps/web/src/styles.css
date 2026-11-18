@@ -2,6 +2,7 @@
    Tokens
    =========================================================================== */
 :root {
+  --ic-out: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3.5H3.5v9h9V10M9 3.5h3.5V7M12.5 3.5 7 9'/%3E%3C/svg%3E");
   --bg: #f7f7f8;
   --surface: #ffffff;
   --surface-2: #efeff1;
@@ -1730,17 +1731,17 @@ dialog.modal::backdrop {
     width: 32px !important;
     height: 32px !important;
   }
-  .tb .tb-row {
+  .tb .tb-rows .tb-row {
     min-height: 44px;
   }
-  .tb .tb-title {
+  .tb .tb-rows .tb-title {
     line-height: 44px;
   }
   .tb-dot {
     right: calc((var(--ctl-h) - 32px) / 2 - 1px);
     bottom: calc((var(--ctl-h) - 32px) / 2 - 1px);
   }
-  .tb .tb-sum,
+  .tb .tb-group > .tb-sum,
   .problems > summary {
     min-height: 44px;
     padding-top: 8px;
@@ -1844,14 +1845,39 @@ dialog.modal::backdrop {
   min-height: 28px;
   padding: 0 10px;
 }
-.tb .tb-row:hover {
-  --row-bg: var(--surface-2);
-}
-.tb .tb-group-wait .tb-row {
+.tb .tb-group-wait .tb-row,
+.tb .tb-row.is-mine {
   --row-bg: var(--accent-soft);
 }
-.tb .tb-group-wait .tb-row:hover {
-  --row-bg: color-mix(in srgb, var(--accent-soft), var(--accent) 10%);
+@media (hover: hover) {
+  .tb .tb-row:hover {
+    --row-bg: var(--surface-2);
+  }
+  .tb .tb-group-wait .tb-row:hover,
+  .tb .tb-row.is-mine:hover {
+    --row-bg: color-mix(in srgb, var(--accent-soft), var(--accent) 10%);
+  }
+  .tb a.tb-title:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  /* A title that is a link opens GitHub in a new tab: a small out-arrow follows it on hover.
+     It sits in the title's own line, so it takes no room from the meta on the right. */
+  .tb a.tb-title::after {
+    content: "";
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    margin-left: 4px;
+    vertical-align: -1px;
+    background: var(--muted);
+    -webkit-mask: var(--ic-out) center / contain no-repeat;
+    mask: var(--ic-out) center / contain no-repeat;
+    opacity: 0;
+  }
+  .tb .tb-row:hover > a.tb-title::after {
+    opacity: 1;
+  }
 }
 .tb-num {
   flex: none;
@@ -1871,10 +1897,6 @@ dialog.modal::backdrop {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.tb .tb-title:hover {
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 .tb-done-group .tb-title {
   color: var(--muted);
@@ -1931,7 +1953,6 @@ dialog.modal::backdrop {
 .tb-log {
   display: flex;
   flex-direction: column;
-  gap: 20px;
 }
 .tb-back {
   margin: 0;
@@ -1992,16 +2013,37 @@ dialog.modal::backdrop {
 .lg-dec > details[open] > summary {
   --row-bg: var(--surface-2);
 }
+.lg-chev {
+  flex: none;
+  margin-right: -2px;
+  color: var(--muted);
+  transform: rotate(-90deg);
+  transition: transform 0.15s;
+}
+.lg-dec > details[open] .lg-chev {
+  transform: none;
+}
+.lg-hard {
+  color: var(--text);
+  font-weight: 600;
+}
+.lg-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.lg-arrow {
+  color: var(--muted);
+}
 .lg-dec.is-replaced .tb-title {
   color: var(--muted);
   text-decoration: line-through;
   text-decoration-color: var(--border);
 }
 .lg-body {
-  padding: 6px 10px 12px 20px;
+  padding: 6px 10px 14px 30px;
   font-size: 13px;
   line-height: 1.55;
-  border-bottom: 1px solid var(--border);
 }
 .lg-body p {
   margin: 0 0 6px;
@@ -2010,6 +2052,8 @@ dialog.modal::backdrop {
   margin: 0 0 8px;
   padding: 0 0 0 10px;
   border-left: 2px solid var(--border);
+  border-radius: 0;
+  background: none;
 }
 .lg-quote p {
   margin: 0;

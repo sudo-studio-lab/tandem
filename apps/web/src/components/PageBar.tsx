@@ -23,7 +23,7 @@ export function PageBar({ back = HOME, title, titleId, onBack, children }: { bac
     <div className="pg-bar">
       <Back label={back} onClick={onBack} />
       {title && (
-        <h2 id={titleId} className="pg-title">
+        <h2 id={titleId} className="pg-title" title={title}>
           {title}
         </h2>
       )}

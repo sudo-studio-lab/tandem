@@ -9,7 +9,7 @@ export function Problems({ items }: { items: Problem[] }) {
     <details className={`problems${errors ? " has-errors" : ""}`}>
       <summary>
         <Glyph name="chevron" size={12} className="problems-chev" />
-        {items.length} 個紀錄格式問題{errors ? `（${errors} 個錯誤）` : ""}
+        {items.length} 筆紀錄的格式要修正{errors ? `（${errors} 筆是錯誤）` : ""}，點開看
       </summary>
       <ul className="rows card">
         {items.map((p, i) => (

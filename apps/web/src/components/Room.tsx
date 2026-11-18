@@ -351,7 +351,7 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
 
   return (
     <div className="rm-room">
-      <PageBar back="房間" onBack={onBack}>
+      <PageBar back="房間" title={room.title} onBack={onBack}>
         {noting && <span className="rm-busy">AI 整理筆記中…</span>}
         {isHost && !room.closed && (
           <span className="pg-bar-end">
@@ -365,9 +365,8 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
         )}
       </PageBar>
       <header className="rm-head">
-        <h2 className="rm-title">{room.title}</h2>
         <p className="rm-sub">
-          <span>{isHost ? "你主持・AI 跑在你的電腦" : `@${room.host} 主持・AI 跑在主持人的電腦`}</span>
+          <span>{isHost ? "你主持・AI 跑在你的電腦" : `@${room.host} 主持・AI 跑在主持人的電腦，回覆會晚幾秒`}</span>
           {room.closed && <span>・已結束</span>}
           <span>・</span>
           <a href={room.url} target="_blank" rel="noreferrer">
@@ -459,8 +458,8 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
             </button>
           </div>
           <p className="rm-hint">
-            <span className="rm-hint-keys">Enter 送出・Ctrl+Enter 問 AI・Shift+Enter 換行・</span>
-            只有「問 AI」會叫 AI 回答{isHost ? "" : `，AI 在 @${room.host} 的電腦，會晚幾秒`}
+            <span className="rm-hint-keys">Enter 送出・Ctrl+Enter 問 AI・<span className="rm-hint-shift">Shift+Enter 換行・</span></span>
+            只有「問 AI」會叫 AI 回答
           </p>
         </div>
       )}

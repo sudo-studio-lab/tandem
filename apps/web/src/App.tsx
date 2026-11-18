@@ -235,7 +235,7 @@ export function App() {
           }}
         />
       ) : view === "chat" ? (
-        <><div className="page"><PageBar back="對話與交接" onBack={()=>{setView("board");setBoardTab("shared-chats");}} /></div><ChatView key={project.id} projectId={project.id} now={now} initialChatId={forkId} onOpenSettings={() => setDialog("agents")} /></>
+        <><div className="page"><PageBar back="對話與交接" title="接續對話" onBack={()=>{setView("board");setBoardTab("shared-chats");}} /></div><ChatView key={project.id} projectId={project.id} now={now} initialChatId={forkId} onOpenSettings={() => setDialog("agents")} /></>
       ) : !board ? (
         <main className="page">
           {app.boardError ? (
@@ -272,13 +272,13 @@ export function App() {
             <div className="tb-log">
               <PageBar title="決定和討論" onBack={() => setBoardTab("list")} />
               <div className="tb">
-                <Waiting items={board.waiting} now={now} />
+                <Waiting items={board.waiting} me={board.me} now={now} />
                 <Decisions board={board} />
-                <Discussions items={board.discussions} now={now} />
+                <Discussions items={board.discussions} shown={new Set(board.waiting.filter((w) => w.kind === "discussion").map((w) => w.url))} now={now} />
               </div>
             </div>
           )}
-          <Problems items={board.problems} />
+          {(boardTab === "list" || boardTab === "log") && <Problems items={board.problems} />}
         </main>
       )}
       {dialog === "invite" && project && <InviteDialog projectId={project.id} onClose={() => setDialog(null)} />}
