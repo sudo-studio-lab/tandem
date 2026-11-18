@@ -3,8 +3,9 @@ import { api } from "./api.ts";
 import { useApp } from "./useApp.ts";
 import { useNow } from "./time.ts";
 import { Header, type View } from "./components/Header.tsx";
-import { TaskBoard } from "./components/TaskBoard.tsx";
-import { Waiting } from "./components/Waiting.tsx";
+import { TaskBoard, waitingOnMe } from "./components/TaskBoard.tsx";
+import { Teammates, blockedTeammates } from "./components/People.tsx";
+import { BoardTabs, TAB_LABEL, TAB_PANEL, tabId, type BoardTab } from "./components/Tabs.tsx";
 import { Discussions } from "./components/Discussions.tsx";
 import { Decisions } from "./components/Decisions.tsx";
 import { Problems } from "./components/Problems.tsx";
@@ -37,7 +38,21 @@ export function App() {
   const [op, setOp] = useState<Op | null>(null);
   const [dialog, setDialog] = useState<"invite" | "settings" | "agents" | null>(null);
   const [view, setView] = useState<View>("board");
-  const [boardTab, setBoardTab] = useState<"list" | "log" | "context" | "agent-messages" | "shared-chats">("list");
+  const [tab, setTab] = useState<BoardTab>("tasks");
+  /** A page opened from the ⋯ menu, shown instead of the tabs until its back link is used. */
+  const [page, setPage] = useState<"context" | "agent-messages" | "shared-chats" | null>(null);
+  /** Set when a page's back link is used, so focus lands on the tab it returned to. */
+  const returning = useRef(false);
+  const backToTabs = () => {
+    returning.current = true;
+    setView("board");
+    setPage(null);
+  };
+  useEffect(() => {
+    if (!returning.current || page !== null || view !== "board") return;
+    returning.current = false;
+    document.getElementById(tabId(tab))?.focus();
+  });
   const [forkId,setForkId]=useState<string|undefined>();
   const [toast, setToast] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
@@ -178,18 +193,20 @@ export function App() {
       view={view}
       onView={(v) => {
         setView(v);
-        if (v === "board") setBoardTab("list");
-      }}
-      onLog={() => {
-        setView("board");
-        setBoardTab("log");
+        if (v === "board") setPage(null);
       }}
       onContext={() => {
         setView("board");
-        setBoardTab("context");
+        setPage("context");
       }}
-      onAgentMessages={()=>{setView("board");setBoardTab("agent-messages");}}
-      onSharedChats={()=>{setView("board");setBoardTab("shared-chats");}}
+      onAgentMessages={() => {
+        setView("board");
+        setPage("agent-messages");
+      }}
+      onSharedChats={() => {
+        setView("board");
+        setPage("shared-chats");
+      }}
       onRooms={() => setView("room")}
     />
   );
@@ -228,14 +245,12 @@ export function App() {
           projectId={project.id}
           me={session.login}
           now={now}
+          back={TAB_LABEL[tab]}
           onOpenSettings={() => setDialog("agents")}
-          onBack={() => {
-            setView("board");
-            setBoardTab("list");
-          }}
+          onBack={backToTabs}
         />
       ) : view === "chat" ? (
-        <><div className="page"><PageBar back="對話與交接" title="接續對話" onBack={()=>{setView("board");setBoardTab("shared-chats");}} /></div><ChatView key={project.id} projectId={project.id} now={now} initialChatId={forkId} onOpenSettings={() => setDialog("agents")} /></>
+        <><div className="page"><PageBar back="對話與交接" title="接續對話" onBack={() => { setView("board"); setPage("shared-chats"); }} /></div><ChatView key={project.id} projectId={project.id} now={now} initialChatId={forkId} onOpenSettings={() => setDialog("agents")} /></>
       ) : !board ? (
         <main className="page">
           {app.boardError ? (
@@ -251,34 +266,51 @@ export function App() {
         </main>
       ) : (
         <main className="page board">
-          {app.boardError && (
-            <p className="board-error" role="alert">
-              <span className="status-dot" aria-hidden="true" />
-              <span className="board-error-text">{HOME}沒有更新：{app.boardError}</span>
-              <button type="button" className="tb-link" onClick={() => void app.reloadBoard()}>
-                再試一次
-              </button>
-            </p>
-          )}
-          {boardTab === "list" ? (
-            <TaskBoard key={project.id} board={board} now={now} />
-          ) : boardTab === "context" ? (
-            <ContextPage key={project.id} projectId={project.id} now={now} onBack={() => setBoardTab("list")} />
-          ) : boardTab === "agent-messages" ? (
-            <AgentMessagesPage key={project.id} projectId={project.id} me={session.login} now={now} onBack={()=>setBoardTab("list")} />
-          ) : boardTab === "shared-chats" ? (
-            <SharedChatsPage key={project.id} board={board} now={now} onBack={()=>setBoardTab("list")} onChanged={app.reloadBoard} onFork={id=>{setForkId(id);setView("chat");}}/>
+          {page === "context" ? (
+            <ContextPage key={project.id} projectId={project.id} now={now} back={TAB_LABEL[tab]} onBack={backToTabs} />
+          ) : page === "agent-messages" ? (
+            <AgentMessagesPage key={project.id} projectId={project.id} me={session.login} now={now} back={TAB_LABEL[tab]} onBack={backToTabs} />
+          ) : page === "shared-chats" ? (
+            <SharedChatsPage
+              key={project.id}
+              board={board}
+              now={now}
+              back={TAB_LABEL[tab]}
+              onBack={backToTabs}
+              onChanged={app.reloadBoard}
+              onFork={(id) => {
+                setForkId(id);
+                setView("chat");
+              }}
+            />
           ) : (
-            <div className="tb-log">
-              <PageBar title="決定和討論" onBack={() => setBoardTab("list")} />
-              <div className="tb">
-                <Waiting items={board.waiting} me={board.me} now={now} />
-                <Decisions board={board} />
-                <Discussions items={board.discussions} shown={new Set(board.waiting.filter((w) => w.kind === "discussion").map((w) => w.url))} now={now} />
+            <>
+              <BoardTabs tab={tab} waiting={waitingOnMe(board).length} stuck={blockedTeammates(board)} onTab={setTab} />
+              {/* Under the tabs, so the tabs stay put when this line comes and goes. */}
+              {app.boardError && (
+                <p className="board-error" role="alert">
+                  <span className="status-dot" aria-hidden="true" />
+                  <span className="board-error-text">資料沒有更新：{app.boardError}</span>
+                  <button type="button" className="tb-link" onClick={() => void app.reloadBoard()}>
+                    再試一次
+                  </button>
+                </p>
+              )}
+              <div role="tabpanel" id={TAB_PANEL} aria-labelledby={tabId(tab)} className="bt-panel">
+                {tab === "tasks" ? (
+                  <TaskBoard key={project.id} board={board} now={now} />
+                ) : tab === "people" ? (
+                  <Teammates board={board} now={now} onInvite={() => setDialog("invite")} />
+                ) : (
+                  <div className="tb">
+                    <Decisions board={board} />
+                    <Discussions items={board.discussions} shown={new Set()} now={now} />
+                  </div>
+                )}
+                <Problems items={board.problems} />
               </div>
-            </div>
+            </>
           )}
-          {(boardTab === "list" || boardTab === "log") && <Problems items={board.problems} />}
         </main>
       )}
       {dialog === "invite" && project && <InviteDialog projectId={project.id} onClose={() => setDialog(null)} />}

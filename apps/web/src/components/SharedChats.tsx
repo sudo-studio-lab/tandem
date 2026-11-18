@@ -10,7 +10,7 @@ import "./collaboration.css";
 import "./co-panel.css";
 
 interface Data{settings:SharedChatSettings;chats:SharedChat[];handoffs:Handoff[]}
-export function SharedChatsPage({board,now,onBack,onFork,onChanged}:{board:ProjectBoard;now:number;onBack:()=>void;onFork:(id:string)=>void;onChanged:()=>void|Promise<void>}){
+export function SharedChatsPage({board,now,back,onBack,onFork,onChanged}:{board:ProjectBoard;now:number;back?:string;onBack:()=>void;onFork:(id:string)=>void;onChanged:()=>void|Promise<void>}){
   const id=board.projectId;const [data,setData]=useState<Data|null>(null);const [error,setError]=useState<string|null>(null);const [busy,setBusy]=useState(false);const [notice,setNotice]=useState("");
   const [choices,setChoices]=useState<ProjectTranscript[]|null>(null);const [selected,setSelected]=useState<string[]>([]);const [preview,setPreview]=useState<{token:string;transcripts:ProjectTranscript[]}|null>(null);
   const [reading,setReading]=useState<string|null>(null);const [agents,setAgents]=useState<AgentStatus[]>([]);const [provider,setProvider]=useState<"claude"|"codex">("codex");const [model,setModel]=useState("");
@@ -24,8 +24,7 @@ export function SharedChatsPage({board,now,onBack,onFork,onChanged}:{board:Proje
   const chat=data?.chats.find(c=>`${c.owner}/${c.id}`===reading);
   const fork=async()=>{if(!chat)return;setBusy(true);try{const r=await api<{id:string}>("POST",projectPath(id,"/shared-chats/fork"),{owner:chat.owner,id:chat.id,provider,model});onFork(r.id);}catch(e){setError(errMsg(e));}finally{setBusy(false);}};
   const handoff=async(e:FormEvent)=>{e.preventDefault();if(!confirm(`把任務 #${task} 改指派給 @${to}，並送出這份交接筆記？`))return;setBusy(true);try{const r=await api<{write:{result:string}}>("POST",projectPath(id,"/handoffs"),{task:Number(task),to,note,confirm:true});setNote("");setNotice(r.write.result==="pushed"?"已完成交接，接手人的開工報告會看到筆記。":"任務已改指派，交接筆記等待同步。");await load();await onChanged();}catch(e){setError(errMsg(e));}finally{setBusy(false);}};
-  return <section className="co-page" aria-labelledby="co-shared-title"><PageBar title="對話與交接" titleId="co-shared-title" onBack={onBack} />
-    <p className="muted co-lead">分享自己選定的專案對話，或把目前的工作清楚交給隊友。</p>
+  return <section className="co-page" aria-labelledby="co-shared-title"><PageBar back={back} title="對話與交接" titleId="co-shared-title" onBack={onBack} />
     {error&&<p className="banner banner-error" role="alert">{error} <button type="button" className="btn btn-small" onClick={()=>void load()}>重新載入</button></p>}
     {notice&&<p role="status" className="banner">{notice}</p>}
     {!data&&!error&&<Spinner label="載入分享中…"/>}

@@ -16,7 +16,7 @@ export function TranscriptChoices({items,selected,onChange}:{items:ProjectTransc
     <div className="co-preview">{t.messages.map((m,i)=><div key={i}><strong>{m.role==="user"?"你":"AI"}</strong><p>{m.text}</p></div>)}</div>
   </details>)}</div>;
 }
-export function AgentMessagesPage({projectId,me,now,onBack}:{projectId:string;me:string;now:number;onBack:()=>void}) {
+export function AgentMessagesPage({projectId,me,now,back,onBack}:{projectId:string;me:string;now:number;back?:string;onBack:()=>void}) {
   const [data,setData]=useState<Data|null>(null);const [settings,setSettings]=useState<AgentMessageSettings|null>(null);
   const [agents,setAgents]=useState<AgentStatus[]>([]);const [transcripts,setTranscripts]=useState<ProjectTranscript[]|null>(null);
   const [error,setError]=useState<string|null>(null);const [busy,setBusy]=useState(false);const [notice,setNotice]=useState("");
@@ -32,13 +32,12 @@ export function AgentMessagesPage({projectId,me,now,onBack}:{projectId:string;me
   const archivedCount=data?.messages.filter(m=>m.archived).length??0;
   const openTo=data?.members.filter(m=>m.enabled).map(m=>mine(m.login)?"你":`@${m.login}`)??[];
   return <section className="co-page" aria-labelledby="co-agent-title">
-    <PageBar title="Agent 問答" titleId="co-agent-title" onBack={onBack} />
-    <p className="muted co-lead">隊友的 agent 可以問專案問題；你的 agent 只回答，不能替你動手。</p>
+    <PageBar back={back} title="Agent 問答" titleId="co-agent-title" onBack={onBack} />
     {error&&<p className="banner banner-error" role="alert">{error} <button type="button" className="btn btn-small" onClick={()=>void load()}>重新載入</button></p>}
     {!data&&!error&&<Spinner label="載入問答中…"/>}
     {data&&<div className="tb">
       <Section label="問答紀錄" end={shown.length} open>
-        <p className="co-meta">已開放回答：{openTo.join("、")||"還沒有人"}。這裡只能閱讀、停止或封存；要提問請在你原本的 AI 對話裡說。</p>
+        <p className="co-meta">已開放回答：{openTo.join("、")||"還沒有人"}。要提問，在你原本的 AI 對話裡說。</p>
         {archivedCount>0&&<label className="co-check"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/>顯示已封存（{archivedCount}）</label>}
         {shown.length===0&&<p className="co-empty">還沒有問答。你的 agent 可以用 Tandem 工具問已開放的成員。</p>}
         {shown.map(m=><article className="co-message" key={m.request.id}>

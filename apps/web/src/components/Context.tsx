@@ -341,7 +341,7 @@ function FileView({
   );
 }
 
-export function ContextPage({ projectId, now, onBack }: { projectId: string; now: number; onBack: () => void }) {
+export function ContextPage({ projectId, now, back, onBack }: { projectId: string; now: number; back?: string; onBack: () => void }) {
   const [files, setFiles] = useState<ContextFileInfo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -371,10 +371,10 @@ export function ContextPage({ projectId, now, onBack }: { projectId: string; now
   const hasNotes = !!files?.some((f) => f.path === CONTEXT_NOTES);
   return (
     <div className="tb-log ctx">
-      <PageBar title="脈絡" titleId="ctx-title" onBack={onBack} />
+      <PageBar back={back} title="脈絡" titleId="ctx-title" onBack={onBack} />
       <section className="panel-block" aria-labelledby="ctx-title">
         <div className="ctx-intro">
-          <p className="muted small grow">背景、規格和圖，隊友和大家的 AI 都讀得到。不要放金鑰或密碼。</p>
+          <p className="muted small grow">不要放金鑰或密碼。</p>
           {creating === null && (
             <button type="button" className="btn btn-small" onClick={() => setCreating("")}>
               新增檔案

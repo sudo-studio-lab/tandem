@@ -1,6 +1,7 @@
 import type { DiscussionSummary } from "@tandem/contracts";
 import { Ext } from "./Ext.tsx";
 import { Group } from "./Group.tsx";
+import { Avatar } from "./ui.tsx";
 import { relTime } from "../time.ts";
 
 const KIND = { question: "問題", disagreement: "意見不同", other: "討論" } as const;
@@ -11,10 +12,19 @@ function Row({ d, now }: { d: DiscussionSummary; now: number }) {
     <li className="tb-row" title={d.title}>
       <Ext href={d.url} className="tb-title">
         {d.title}
+        {waiting && <span className="sr-only">（等 {waiting} 回答）</span>}
       </Ext>
       <span className="tb-meta">
         <span className={d.kind === "disagreement" ? "lg-hard" : "tb-kind"}>{KIND[d.kind]}</span>
-        {waiting && <span className="tb-from">等 {waiting}</span>}
+        {/* Who it waits on, as faces, so it still shows at side-panel width. */}
+        {d.waitingOn.length > 0 && (
+          <span className="tb-wait-who" aria-hidden="true">
+            等
+            {d.waitingOn.slice(0, 3).map((l) => (
+              <Avatar key={l} login={l} size={16} />
+            ))}
+          </span>
+        )}
         {d.answered && <span>已有回答</span>}
         <span>{relTime(d.updatedAt, now)}</span>
       </span>
