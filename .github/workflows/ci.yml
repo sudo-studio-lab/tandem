@@ -1,0 +1,43 @@
+# Checks every pull request and every push to main: build, typecheck and the unit tests.
+# Runs on Windows because that is where Tandem is developed and shipped. Live GitHub tests
+# (TANDEM_LIVE) and real-model agent tests (npm run test:agents) stay off here.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Tests make throwaway git repos and commit in them.
+      - name: Git identity for test commits
+        run: |
+          git config --global user.name "Tandem CI"
+          git config --global user.email "ci@example.com"
+
+      - run: npm run build
+      - run: npm run typecheck
+      - run: npx vitest run

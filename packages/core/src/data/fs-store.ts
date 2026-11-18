@@ -71,7 +71,7 @@ export function openFsDataStore(root: string): DataStore {
       const out = new Map<string, PathChange>();
       for (const { rel, file } of await walk(prefix)) {
         const st = await fs.stat(file);
-        out.set(rel, { message: "", authorName: "", at: st.mtime.toISOString() });
+        out.set(rel, { message: "", authorName: "", authorEmail: "", at: st.mtime.toISOString() });
       }
       return out;
     },

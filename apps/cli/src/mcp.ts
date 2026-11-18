@@ -334,7 +334,7 @@ export function createMcpServer(ctx: () => Promise<Context>, approve?: ApproveBr
     },
     guard(async () => {
       const c = await ctx();
-      const files = await listContext(c.store);
+      const files = await listContext(c.store, c.self);
       if (!files.length) return ok(`共享脈絡還是空的。使用者要分享背景或規格時，可以用 tandem_context_write 建立 ${CONTEXT_NOTES}。`);
       const lines = files.map(
         (f) =>

@@ -211,22 +211,22 @@ export function openGitDataStore(repoRoot: string, opts: GitDataStoreOptions = {
     for (const { entry } of (await readOutbox()).reverse()) {
       for (const c of entry.changes) {
         if (!c.path.startsWith(pre) || out.has(c.path)) continue;
-        out.set(c.path, { message: entry.message, authorName: entry.author?.name ?? "", at: entry.createdAt, pending: true });
+        out.set(c.path, { message: entry.message, authorName: entry.author?.name ?? "", authorEmail: entry.author?.email ?? "", at: entry.createdAt, pending: true });
       }
     }
     if (!(await remoteSha())) return out;
     const r = await git(
-      ["log", "-n", "300", "--format=%x1e%aI%x1f%an%x1f%B%x1d", "--name-only", "--no-renames", await remoteRef(), "--", pre],
+      ["log", "-n", "300", "--format=%x1e%aI%x1f%an%x1f%ae%x1f%B%x1d", "--name-only", "--no-renames", await remoteRef(), "--", pre],
       { allowFail: true },
     );
     if (r.code !== 0) return out;
     for (const rec of r.stdout.split(RS)) {
       const [head, names] = rec.split(GS);
       if (!head || names === undefined) continue;
-      const [at, authorName, ...msg] = head.split(US);
+      const [at, authorName, authorEmail, ...msg] = head.split(US);
       for (const name of names.split("\n").map((n) => n.trim())) {
         if (!name.startsWith(pre) || out.has(name)) continue;
-        out.set(name, { message: msg.join(US).trim(), authorName: authorName ?? "", at: at ?? "" });
+        out.set(name, { message: msg.join(US).trim(), authorName: authorName ?? "", authorEmail: authorEmail ?? "", at: at ?? "" });
       }
     }
     return out;
