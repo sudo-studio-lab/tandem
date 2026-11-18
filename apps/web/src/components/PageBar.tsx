@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Glyph } from "./icons.tsx";
 
 /** The name of the home page (the task board). Every back link and the header use it, so a rename is one edit. */
@@ -19,11 +19,14 @@ export function Back({ label = HOME, onClick }: { label?: string; onClick: () =>
  * then anything the page puts at the end (children).
  */
 export function PageBar({ back = HOME, title, titleId, onBack, children }: { back?: string; title?: string; titleId?: string; onBack: () => void; children?: ReactNode }) {
+  // Opening a page moves focus to its title, so keyboard and screen-reader users start there.
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => heading.current?.focus({ preventScroll: true }), []);
   return (
     <div className="pg-bar">
       <Back label={back} onClick={onBack} />
       {title && (
-        <h2 id={titleId} className="pg-title" title={title}>
+        <h2 id={titleId} ref={heading} tabIndex={-1} className="pg-title" title={title}>
           {title}
         </h2>
       )}

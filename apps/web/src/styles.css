@@ -544,8 +544,8 @@ label {
   font-weight: 500;
 }
 /* Narrow (side panel, phone): drop what the board already shows. A healthy
-   status says nothing; teammates' faces are in the board's own bar; the
-   members dialog stays in the ⋯ menu. */
+   status says nothing; teammates are in the 隊友 tab; the members dialog
+   stays in the ⋯ menu. */
 @media (max-width: 640px) {
   .brand-name,
   .switcher-owner,
@@ -748,163 +748,9 @@ label {
   color: var(--muted);
 }
 
-/* People */
-.people-grid {
-  display: grid;
-  align-items: start;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
-  gap: 14px;
-}
-.person {
-  padding: 14px 16px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.person.is-me {
-  border-color: var(--border-strong);
-}
-.person.is-blocked {
-  border-color: var(--bad-line);
-}
-.person-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.person-name {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.person-name h3 {
-  font-size: 1rem;
-  display: flex;
-  align-items: center;
-}
-.person-name h3 a {
-  color: var(--text);
-}
-.person-flags {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
-}
-.flag {
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 0 7px;
-  border-radius: 999px;
-  background: var(--surface-2);
-  color: var(--muted);
-  border: 1px solid var(--border);
-  white-space: nowrap;
-  cursor: default;
-}
-.flag-warn {
-  background: var(--warn-bg);
-  color: var(--warn-fg);
-  border-color: transparent;
-}
-.person-body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.label {
-  display: block;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  margin-bottom: 1px;
-}
-.doing p {
-  font-size: 1.02rem;
-  font-weight: 600;
-  line-height: 1.4;
-}
-.blocked {
-  background: var(--bad-bg);
-  border-radius: var(--radius-sm);
-  padding: 7px 10px;
-  color: var(--bad-fg);
-}
-.blocked .label {
-  color: var(--bad-fg);
-}
-.blocked p {
-  font-weight: 600;
-}
-.next p {
-  font-size: 0.9rem;
-  color: var(--muted);
-}
-.next .label {
-  display: inline;
-  margin-right: 6px;
-}
-.next p {
-  display: inline;
-}
-.fyi {
-  font-size: 0.85rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-}
 .ref-link {
   white-space: nowrap;
   font-family: ui-monospace, Consolas, monospace;
-  font-size: 0.8rem;
-}
-.person-more {
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
-  margin-top: auto;
-}
-.person-more > summary {
-  cursor: pointer;
-  font-size: 0.82rem;
-  color: var(--muted);
-}
-.person-more > summary:hover {
-  color: var(--text);
-}
-.sub-block {
-  margin-top: 10px;
-}
-.sub-block h4 {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  margin-bottom: 4px;
-}
-.mini-list {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-size: 0.88rem;
-}
-.mini-list li {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-.mini-icon {
-  width: 1.3em;
-  text-align: center;
-  flex: none;
-  color: var(--muted);
-}
-.mini-time {
-  white-space: nowrap;
   font-size: 0.8rem;
 }
 
@@ -1619,13 +1465,6 @@ dialog.modal::backdrop {
   line-height: 1.45;
   margin: 0 -10px;
 }
-.tb-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 8px;
-  padding: 6px 10px;
-}
 /* Shared control system: every control in a toolbar is var(--ctl-h) tall,
    6px corners, no border at rest; the selected state is a filled surface. */
 .ctl {
@@ -1653,93 +1492,15 @@ dialog.modal::backdrop {
   background: var(--surface-2);
   color: var(--accent);
 }
-.seg {
-  display: inline-flex;
-  height: var(--ctl-h);
-  gap: 2px;
-  flex: none;
-}
-.seg button {
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  display: inline-grid;
-  place-items: center;
-  padding: 0 8px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-.seg button:hover {
-  color: var(--text);
-}
-.seg button[aria-pressed="true"] {
-  background: var(--surface-2);
-  color: var(--text);
-}
-.tb-faces {
-  display: flex;
-  gap: 2px;
-  margin-left: 2px;
-}
-.tb-face {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-  width: var(--ctl-h);
-  height: var(--ctl-h);
-  border: 0;
-  padding: 0;
-  background: none;
-  border-radius: 50%;
-  cursor: pointer;
-}
-.tb-face:hover,
-.tb-face:focus-visible {
-  z-index: 1;
-}
-.tb-face.is-sel .avatar {
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent);
-}
-.tb-face:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 1px;
-}
-.tb-dot {
-  position: absolute;
-  right: 1px;
-  bottom: 1px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--border-strong);
-  border: 2px solid var(--bg);
-}
-.tb-dot.is-fresh {
-  background: var(--accent);
-}
-.tb-dot.is-blocked {
-  background: var(--bad-fg);
-}
 @media (pointer: coarse) {
   :root {
     --ctl-h: 44px;
-  }
-  .tb-face .avatar {
-    width: 32px !important;
-    height: 32px !important;
   }
   .tb .tb-rows .tb-row {
     min-height: 44px;
   }
   .tb .tb-rows .tb-title {
     line-height: 44px;
-  }
-  .tb-dot {
-    right: calc((var(--ctl-h) - 32px) / 2 - 1px);
-    bottom: calc((var(--ctl-h) - 32px) / 2 - 1px);
   }
   .tb .tb-group > .tb-sum,
   .problems > summary {
@@ -1754,19 +1515,6 @@ dialog.modal::backdrop {
   .pg-back {
     min-height: 44px;
   }
-}
-@media (max-width: 480px) {
-  .tb-from {
-    display: none;
-  }
-}
-.tb-picked {
-  margin: 0 10px 8px;
-}
-.tb-filter-note {
-  margin: 0;
-  font-size: 12px;
-  color: var(--muted);
 }
 .tb-link {
   border: 0;
@@ -2109,84 +1857,7 @@ dialog.modal::backdrop {
   justify-content: flex-end;
   gap: 6px;
 }
-/* A teammate's status inside the board: panel text, not a card. */
-.tb-picked .person {
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  padding: 4px 0 10px;
-  gap: 6px;
-  font-size: 13px;
-}
-.tb-picked .person-head .avatar {
-  width: 22px !important;
-  height: 22px !important;
-  font-size: 10px !important;
-}
-.tb-picked .person-name h3 {
-  font-size: 13px;
-}
-.tb-picked .person-name .small {
-  font-size: 12px;
-}
-.tb-picked .badge-me {
-  font-size: 11px;
-}
-.tb-picked .flag,
-.tb-picked .flag-warn {
-  background: none;
-  border: 0;
-  padding: 0;
-  font-size: 12px;
-  font-weight: 500;
-}
-.tb-picked .label,
-.tb-picked .sub-block h4 {
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-}
-.tb-picked .doing p {
-  font-size: 13px;
-}
-.tb-picked .blocked {
-  background: none;
-  padding: 0;
-}
-.tb-picked .next p,
-.tb-picked .mini-list {
-  font-size: 13px;
-}
-.tb-picked .fyi {
-  background: none;
-  padding: 0;
-  font-size: 13px;
-}
-.tb-picked .fyi li {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-.tb-picked .fyi-ic,
-.tb-picked .mini-icon {
-  flex: none;
-  align-self: center;
-  color: var(--muted);
-}
-.tb-picked .ref-link {
-  font-family: inherit;
-  font-size: 12px;
-  color: var(--muted);
-}
-.tb-picked .person-more {
-  border-top: 0;
-  padding-top: 0;
-}
-.tb-picked .person-more > summary {
-  font-size: 12px;
-}
+
 .tb-new {
   border: 0;
   background: var(--surface-2);
@@ -2373,4 +2044,230 @@ dialog.modal::backdrop {
 .ctx-pick:focus-within {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
+}
+
+/* ===========================================================================
+   Board tabs (任務／隊友／決定) and the 隊友 tab
+   =========================================================================== */
+/* Three equal segments under the top bar: a surface-2 track, the chosen tab
+   raised one step (white in light mode, a lighter grey in dark mode) and in
+   semibold. Same height as every other control (--ctl-h, 44px on touch). */
+.bt {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  margin: 8px 0 2px;
+  padding: 2px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.bt button {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: var(--ctl-h);
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bt button:hover {
+  color: var(--text);
+}
+.bt button[aria-selected="true"] {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(16 24 40 / 0.1);
+}
+.bt button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+/* How many things wait on you: the one number on the tabs, in the accent colour. */
+.bt-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* A teammate is stuck: one small dot on 隊友, no number. */
+.bt-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bad-fg);
+}
+.tb-meta .tb-ready {
+  color: var(--accent);
+}
+.tb-wait-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.tb-wait-who .avatar + .avatar {
+  margin-left: -4px;
+  box-shadow: 0 0 0 1.5px var(--row-bg, var(--bg));
+}
+
+/* 隊友: one section per person, panel text with a thin line between people, not cards. */
+.mt {
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.mt:last-of-type {
+  border-bottom: 0;
+}
+.mt-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.mt-h {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.tb .mt-name {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mt-me {
+  flex: none;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+}
+.mt-when {
+  margin-left: auto;
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+.mt-when.is-old {
+  color: var(--warn-fg);
+}
+.tb .mt p {
+  margin: 0;
+}
+.mt-doing {
+  margin-top: 4px !important;
+  padding-left: 30px;
+}
+.mt-line {
+  padding-left: 30px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.mt-k {
+  margin-right: 6px;
+  font-weight: 600;
+}
+.mt-blocked,
+.mt-blocked .mt-k {
+  color: var(--bad-fg);
+}
+.mt-fyi {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0 0 0 30px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.mt-fyi li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.mt-pin {
+  flex: none;
+  align-self: center;
+}
+.mt-ref {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+}
+/* The work in their hands: the same rows as 任務, starting under the name, reaching the right edge. */
+.tb .mt-work {
+  margin: 4px -10px 0 20px;
+}
+.mt-doc {
+  vertical-align: -2px;
+}
+.mt-more {
+  margin: 2px -10px 0 20px;
+}
+.mt-more > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.mt-more > summary::-webkit-details-marker {
+  display: none;
+}
+.mt-more[open] .tb-chev {
+  transform: none;
+}
+@media (hover: hover) {
+  .bt button:hover {
+    background: color-mix(in srgb, var(--surface-2), var(--text) 4%);
+  }
+  .bt button[aria-selected="true"]:hover {
+    background: var(--surface);
+  }
+  .mt-more > summary:hover {
+    color: var(--text);
+  }
+  .tb .mt-name:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+@media (pointer: coarse) {
+  .mt-more > summary,
+  .mt-who {
+    min-height: 44px;
+  }
+  .tb .mt-name {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .bt button[aria-selected="true"],
+  .bt button[aria-selected="true"]:hover {
+    background: color-mix(in srgb, var(--surface-2), var(--text) 12%);
+    box-shadow: none;
+  }
 }

@@ -1,40 +1,32 @@
-import { useState } from "react";
-import type { BoardMember, ProjectBoard, WaitingItem } from "@tandem/contracts";
+import type { ProjectBoard, WaitingItem } from "@tandem/contracts";
 import { Ext } from "./Ext.tsx";
 import { Avatar } from "./ui.tsx";
 import { Glyph } from "./icons.tsx";
-import { PersonCard } from "./People.tsx";
 import { relTime, waitedFor } from "../time.ts";
 
 /*
- * The board as one narrow column (fits an editor's side panel), laid out
- * like a task board: all / mine on the left, teammates' faces on the right,
- * then what waits on me (only when something does) and PRs and tasks grouped
- * by state. Clicking a face filters the list to that person and opens their
- * full status.
+ * The 任務 tab: one narrow column (fits an editor's side panel). What waits on
+ * you (only when something does), then what you own, then what your teammates
+ * own, then what finished lately. Each row says its state on the right. The
+ * 隊友 tab lists the same items per person with the same rows (collect + Row).
  */
 
-type GroupKey = "ready" | "working" | "done";
+/** Where an item stands: a PR is open for review, work is under way, or it is finished. */
+type State = "ready" | "working" | "done";
 
-interface Item {
+export interface Item {
   key: string;
   number: number;
   title: string;
   url: string;
   kind: "pr" | "task";
   owners: string[];
-  group: GroupKey;
+  state: State;
   blocked: boolean;
   draft: boolean;
   time: string;
-  prs?: { number:number;url:string }[];
+  prs?: { number: number; url: string }[];
 }
-
-const GROUPS: { key: GroupKey; label: string; open: boolean }[] = [
-  { key: "ready", label: "已開 PR", open: true },
-  { key: "working", label: "進行中", open: true },
-  { key: "done", label: "最近完成", open: false },
-];
 
 const WAIT_KIND: Record<WaitingItem["kind"], string> = {
   discussion: "請你回答",
@@ -42,7 +34,9 @@ const WAIT_KIND: Record<WaitingItem["kind"], string> = {
   blocked_issue: "等你完成",
 };
 
-function Icon({ name, className }: { name: "wait" | "ready" | "working" | "done" | "pr" | "task"; className?: string }) {
+type IconName = "wait" | "working" | "done" | "task";
+
+function Icon({ name, className }: { name: IconName; className?: string }) {
   const common = { className: `tb-ic${className ? ` ${className}` : ""}`, viewBox: "0 0 16 16", "aria-hidden": true } as const;
   switch (name) {
     case "wait":
@@ -50,15 +44,6 @@ function Icon({ name, className }: { name: "wait" | "ready" | "working" | "done"
         <svg {...common}>
           <circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" strokeWidth="1.5" />
           <path d="M8 4.8V8l2.2 1.6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      );
-    case "ready":
-      return (
-        <svg {...common}>
-          <circle cx="4.5" cy="3.5" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
-          <circle cx="4.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
-          <circle cx="11.5" cy="8" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
-          <path d="M4.5 5.1v5.8M4.5 5.5c0 2 2 2.5 5.4 2.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
         </svg>
       );
     case "working":
@@ -73,15 +58,6 @@ function Icon({ name, className }: { name: "wait" | "ready" | "working" | "done"
           <path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
-    case "pr":
-      return (
-        <svg {...common}>
-          <circle cx="4.5" cy="3.5" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.3" />
-          <circle cx="4.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.3" />
-          <circle cx="11.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.3" />
-          <path d="M4.5 5.1v5.8M11.5 10.9V7c0-1.5-1-2.5-2.5-2.5H7" fill="none" stroke="currentColor" strokeWidth="1.3" />
-        </svg>
-      );
     case "task":
       return (
         <svg {...common}>
@@ -92,11 +68,12 @@ function Icon({ name, className }: { name: "wait" | "ready" | "working" | "done"
   }
 }
 
-function collect(board: ProjectBoard): Item[] {
+export function collect(board: ProjectBoard): Item[] {
   const items: Item[] = [];
   for (const p of board.pullRequests) {
     if (p.state === "closed") continue;
-    if(p.closes?.some(n=>board.tasks.some(t=>t.number===n))) continue;
+    // A PR that closes a task on the board shows on that task's row instead.
+    if (p.closes?.some((n) => board.tasks.some((t) => t.number === n))) continue;
     items.push({
       key: `pr${p.number}`,
       number: p.number,
@@ -104,14 +81,14 @@ function collect(board: ProjectBoard): Item[] {
       url: p.url,
       kind: "pr",
       owners: [p.author],
-      group: p.state === "merged" ? "done" : p.draft ? "working" : "ready",
+      state: p.state === "merged" ? "done" : p.draft ? "working" : "ready",
       blocked: false,
       draft: p.draft,
       time: p.mergedAt ?? p.updatedAt,
     });
   }
   for (const t of board.tasks) {
-    const linked=board.pullRequests.filter(p=>p.closes?.includes(t.number));
+    const linked = board.pullRequests.filter((p) => p.closes?.includes(t.number));
     items.push({
       key: `task${t.number}`,
       number: t.number,
@@ -119,55 +96,79 @@ function collect(board: ProjectBoard): Item[] {
       url: t.url,
       kind: "task",
       owners: t.assignees.length ? t.assignees : [t.author],
-      group: t.state === "closed" ? "done" : linked.some(p=>p.state==="open"&&!p.draft)?"ready":"working",
+      state: t.state === "closed" ? "done" : linked.some((p) => p.state === "open" && !p.draft) ? "ready" : "working",
       blocked: t.state === "open" && t.blockedBy.length > 0,
       draft: false,
       time: t.closedAt ?? t.updatedAt,
-      prs:linked.map(p=>({number:p.number,url:p.url})),
+      prs: linked.map((p) => ({ number: p.number, url: p.url })),
     });
   }
-  // Stuck items first in every group, then newest first.
-  return items.sort((a, b) => Number(b.blocked) - Number(a.blocked) || Date.parse(b.time) - Date.parse(a.time));
+  // Stuck items first, then PRs ready for review, then work under way; newest first within each.
+  const rank: Record<State, number> = { ready: 0, working: 1, done: 2 };
+  return items.sort((a, b) => Number(b.blocked) - Number(a.blocked) || rank[a.state] - rank[b.state] || Date.parse(b.time) - Date.parse(a.time));
 }
 
-function Row({ it, now }: { it: Item; now: number }) {
-  const kind = it.kind === "pr" ? (it.draft ? "草稿 PR" : "PR") : "任務";
-  const owners = it.owners.map((o) => `@${o}`).join("、");
-  const detail = `${kind}・負責 ${owners}・${relTime(it.time, now)}更新`;
+/** The same state in plain words, for the hover text and screen readers. */
+function stateWords(it: Item): string {
+  if (it.state === "done") return it.kind === "pr" ? "已合併" : "完成";
+  const work = it.kind === "pr" ? (it.draft ? "草稿" : "待審查") : it.prs?.length ? it.prs.map((p) => `PR #${p.number}`).join("、") : it.blocked ? "" : "進行中";
+  return [it.blocked ? "卡住" : "", work].filter(Boolean).join("・");
+}
+
+/** The right side of a row: its state in words (and, for a task, the PRs that carry it). */
+function StateText({ it }: { it: Item }) {
+  if (it.state === "done") return <span>{it.kind === "pr" ? "已合併" : "完成"}</span>;
   return (
-    <li className="tb-row" title={`#${it.number} ${it.title}
-${detail}`}>
+    <>
+      {it.blocked && <span className="tb-stuck">卡住</span>}
+      {it.kind === "pr" ? (
+        <span className={it.draft ? undefined : "tb-ready"}>{it.draft ? "草稿" : "待審查"}</span>
+      ) : it.prs?.length ? (
+        it.prs.map((p) => (
+          <Ext key={p.number} href={p.url} className={it.state === "ready" ? "tb-ready" : undefined}>
+            PR #{p.number}
+          </Ext>
+        ))
+      ) : (
+        !it.blocked && <span>進行中</span>
+      )}
+    </>
+  );
+}
+
+export function Row({ it, now, owners }: { it: Item; now: number; owners: boolean }) {
+  const kind = it.kind === "pr" ? "PR" : "任務";
+  const detail = `${kind}・${stateWords(it)}・負責 ${it.owners.map((o) => `@${o}`).join("、")}・${relTime(it.time, now)}更新`;
+  return (
+    <li className="tb-row" title={`#${it.number} ${it.title}\n${detail}`}>
       <span className="tb-num">#{it.number}</span>
       <Ext href={it.url} className="tb-title">
         {it.title}
         <span className="sr-only">（{detail}）</span>
       </Ext>
       <span className="tb-meta">
-        {it.blocked && <span className="tb-stuck">卡住</span>}
-        {it.draft && <span>草稿</span>}
-        {it.prs?.map((p) => (
-          <Ext key={p.number} href={p.url}>
-            PR #{p.number}
-          </Ext>
-        ))}
-        <span className="tb-owners">
-          {it.owners.slice(0, 3).map((o) => (
-            <Avatar key={o} login={o} size={16} />
-          ))}
-        </span>
+        <StateText it={it} />
+        {owners && (
+          <span className="tb-owners">
+            {it.owners.slice(0, 3).map((o) => (
+              <Avatar key={o} login={o} size={16} />
+            ))}
+          </span>
+        )}
       </span>
     </li>
   );
 }
 
-function Group({ label, k, open, items, now }: { label: string; k: GroupKey; open: boolean; items: Item[]; now: number }) {
+function Group(props: { label: string; icon: IconName; open: boolean; items: Item[]; now: number; owners: boolean; done?: boolean }) {
+  const { label, icon, open, items, now, owners, done } = props;
   if (items.length === 0) {
     // Nothing here: one quiet line, nothing to expand.
     return (
       <div className="tb-group tb-group-empty">
         <div className="tb-sum">
           <span className="tb-chev-space" aria-hidden="true" />
-          <Icon name={k} className={`tb-${k}`} />
+          <Icon name={icon} />
           <span className="tb-group-label">{label}</span>
           <span className="tb-count">0</span>
         </div>
@@ -176,10 +177,10 @@ function Group({ label, k, open, items, now }: { label: string; k: GroupKey; ope
   }
   const stuck = items.filter((it) => it.blocked).length;
   return (
-    <details className={`tb-group${k === "done" ? " tb-done-group" : ""}`} open={open}>
+    <details className={`tb-group${done ? " tb-done-group" : ""}`} open={open}>
       <summary className="tb-sum">
         <Glyph name="chevron" size={12} className="tb-chev" />
-        <Icon name={k} className={`tb-${k}`} />
+        <Icon name={icon} />
         <span className="tb-group-label">{label}</span>
         <span className="tb-count">
           {stuck > 0 && <span className="tb-count-stuck">{stuck} 卡住・</span>}
@@ -188,23 +189,10 @@ function Group({ label, k, open, items, now }: { label: string; k: GroupKey; ope
       </summary>
       <ul className="tb-rows">
         {items.map((it) => (
-          <Row key={it.key} it={it} now={now} />
+          <Row key={it.key} it={it} now={now} owners={owners} />
         ))}
       </ul>
     </details>
-  );
-}
-
-function Face({ m, me, now, selected, onPick }: { m: BoardMember; me: string; now: number; selected: boolean; onPick: () => void }) {
-  const s = m.status;
-  const fresh = s && now - Date.parse(s.updated) < 24 * 3600_000;
-  const line = s?.blocked ? `卡在：${s.blocked}` : s?.doing || "還沒寫狀態";
-  const label = `${m.login}${m.login === me ? "（你）" : ""}：${line}${s ? `（${relTime(s.updated, now)}更新）` : ""}`;
-  return (
-    <button type="button" className={`tb-face${selected ? " is-sel" : ""}`} aria-pressed={selected} aria-label={label} title={label} onClick={onPick}>
-      <Avatar login={m.login} size={22} />
-      <i className={`tb-dot${s?.blocked ? " is-blocked" : fresh ? " is-fresh" : ""}`} aria-hidden="true" />
-    </button>
   );
 }
 
@@ -221,27 +209,26 @@ function WaitGroup({ items, now }: { items: WaitingItem[]; now: number }) {
       <summary className="tb-sum">
         <Glyph name="chevron" size={12} className="tb-chev" />
         <Icon name="wait" className="tb-wait-ic" />
-        <span className="tb-group-label">等你</span>
+        <span className="tb-group-label">在等你</span>
         <span className="tb-count tb-count-strong">{items.length}</span>
       </summary>
       <ul className="tb-rows">
         {items.map((w, i) => {
           const { num, title } = splitNumber(w.title, w.url);
           return (
-          <li key={i} className="tb-row" title={`${w.title}
-${WAIT_KIND[w.kind]}・@${w.from}・${waitedFor(w.since, now)}`}>
-            {num && <span className="tb-num">#{num}</span>}
-            <Ext href={w.url} className="tb-title">
-              {title}
-            </Ext>
-            <span className="tb-meta">
-              <span className="tb-kind">{WAIT_KIND[w.kind]}</span>
-              <span>
-                <span className="tb-from">@{w.from}・</span>
-                {waitedFor(w.since, now).replace(/^等了 /, "")}
+            <li key={i} className="tb-row" title={`${w.title}\n${WAIT_KIND[w.kind]}・@${w.from}・${waitedFor(w.since, now)}`}>
+              {num && <span className="tb-num">#{num}</span>}
+              <Ext href={w.url} className="tb-title">
+                {title}
+              </Ext>
+              <span className="sr-only">（{WAIT_KIND[w.kind]}，@{w.from} 在等，{waitedFor(w.since, now)}）</span>
+              <span className="tb-meta" aria-hidden="true">
+                <span className="tb-kind">{WAIT_KIND[w.kind]}</span>
+                {/* Who is waiting: a face, so it still shows at side-panel width. */}
+                <Avatar login={w.from} size={16} />
+                <span>{waitedFor(w.since, now).replace(/^等了 /, "")}</span>
               </span>
-            </span>
-          </li>
+            </li>
           );
         })}
       </ul>
@@ -249,62 +236,36 @@ ${WAIT_KIND[w.kind]}・@${w.from}・${waitedFor(w.since, now)}`}>
   );
 }
 
+/** Things that wait on you (login compared without case), oldest first. */
+export function waitingOnMe(board: ProjectBoard): WaitingItem[] {
+  const me = board.me.toLowerCase();
+  return board.waiting.filter((w) => w.to.toLowerCase() === me).sort((a, b) => Date.parse(a.since) - Date.parse(b.since));
+}
+
 export function TaskBoard({ board, now }: { board: ProjectBoard; now: number }) {
-  const [scope, setScope] = useState<"all" | "mine">("all");
-  const [person, setPerson] = useState<string | null>(null);
-  const members = [...board.members].sort((a, b) => Number(b.login === board.me) - Number(a.login === board.me));
-  const mine = board.waiting
-    .filter((w) => w.to === board.me && (!person || person === board.me || w.from === person))
-    .sort((a, b) => Date.parse(a.since) - Date.parse(b.since));
+  const me = board.me.toLowerCase();
+  const waits = waitingOnMe(board);
+  const items = collect(board);
+  const open = items.filter((it) => it.state !== "done");
+  const done = items.filter((it) => it.state === "done");
+  const isMine = (it: Item) => it.owners.some((o) => o.toLowerCase() === me);
+  const mine = open.filter(isMine);
+  const theirs = open.filter((it) => !isMine(it));
 
-  const who = person ?? (scope === "mine" ? board.me : null);
-  const items = collect(board).filter((it) => !who || it.owners.includes(who));
-  const picked = person ? members.find((m) => m.login === person) : undefined;
-
+  if (items.length === 0 && waits.length === 0) {
+    return (
+      <div className="tb">
+        <p className="tb-empty-note">還沒有任務。跟你的 AI 說要開什麼任務，或直接在 GitHub 開 issue。</p>
+      </div>
+    );
+  }
   return (
     <div className="tb">
-      <div className="tb-bar">
-        {person ? (
-          <p className="tb-filter-note">
-            只看 @{person}・
-            <button type="button" className="tb-link" onClick={() => setPerson(null)}>
-              看全部
-            </button>
-          </p>
-        ) : (
-          <div className="seg" role="group" aria-label="範圍">
-            <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")}>
-              全部
-            </button>
-            <button type="button" aria-pressed={scope === "mine"} onClick={() => setScope("mine")}>
-              我負責
-            </button>
-          </div>
-        )}
-        {members.length > 1 && (
-          <div className="tb-faces" role="group" aria-label="依成員篩選">
-            {members.map((m) => (
-              <Face key={m.login} m={m} me={board.me} now={now} selected={person === m.login} onPick={() => setPerson((p) => (p === m.login ? null : m.login))} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {mine.length > 0 && <WaitGroup items={mine} now={now} />}
-
-      {picked && (
-        <div className="tb-picked">
-          <PersonCard m={picked} board={board} now={now} />
-        </div>
-      )}
-
-      {items.length === 0 && mine.length === 0 && (
-        <p className="tb-empty-note">{who ? `@${who} 目前沒有負責的任務。` : "還沒有任務。跟你的 AI 說要開什麼任務，或直接在 GitHub 開 issue。"}</p>
-      )}
-
-      {GROUPS.map((g) => (
-        <Group key={g.key} k={g.key} label={g.label} open={g.open} now={now} items={items.filter((it) => it.group === g.key)} />
-      ))}
+      {waits.length > 0 && <WaitGroup items={waits} now={now} />}
+      <Group label="你負責的" icon="working" open items={mine} now={now} owners={false} />
+      {/* With nothing of your own and nothing waiting, your teammates' work is the useful first screen. */}
+      <Group label="隊友負責的" icon="task" open={mine.length === 0 && waits.length === 0} items={theirs} now={now} owners />
+      {done.length > 0 && <Group label="最近完成" icon="done" open={false} items={done} now={now} owners done />}
     </div>
   );
 }

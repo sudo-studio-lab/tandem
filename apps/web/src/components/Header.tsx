@@ -41,8 +41,6 @@ interface Props {
   onError: (msg: string) => void;
   view: View;
   onView: (v: View) => void;
-  /** Open the decisions / discussions / who-waits-on-whom page. */
-  onLog?: () => void;
   /** Open the shared context page (脈絡). */
   onContext?: () => void;
   onAgentMessages?: () => void;
@@ -210,16 +208,16 @@ function Switcher({ session, project, onSelect, onRemove, onAddProject, onError 
 }
 
 /** "⋯" menu: the less frequent actions (terminal, folder, refresh). */
-function MoreMenu({ items }: { items: { key: string; label: string; hint?: string; disabled?: boolean; run: () => void }[] }) {
+function MoreMenu({ items }: { items: { key: string; label: string; disabled?: boolean; run: () => void }[] }) {
   const [open, setOpen] = useState(false);
   const [position,setPosition]=useState({left:12,top:60});
   const ref = useRef<HTMLDivElement>(null);
   useDismiss(ref, open, () => setOpen(false));
   const toggle=()=>{if(!open){const rect=ref.current?.getBoundingClientRect();setPosition({left:Math.max(12,Math.min((rect?.right??292)-280,window.innerWidth-292)),top:(rect?.bottom??54)+6});}setOpen(v=>!v);};
   useEffect(()=>{if(!open)return;const resize=()=>{const r=ref.current?.getBoundingClientRect();setPosition({left:Math.max(12,Math.min((r?.right??292)-280,window.innerWidth-292)),top:(r?.bottom??54)+6});};window.addEventListener("resize",resize);return()=>window.removeEventListener("resize",resize);},[open]);
-  const collaboration=new Set(["log","context","agent-messages","shared-chats","rooms"]);
+  const collaboration=new Set(["context","agent-messages","shared-chats","rooms"]);
   const tools=items.filter(it=>!collaboration.has(it.key)&&!["members","folder","refresh"].includes(it.key));
-  const renderItem=(it:typeof items[number])=><button key={it.key} type="button" className="menu-item" disabled={it.disabled} onClick={()=>{setOpen(false);it.run();}}><span className="grow">{it.label}{it.hint&&<span className="block muted small">{it.hint}</span>}</span></button>;
+  const renderItem=(it:typeof items[number])=><button key={it.key} type="button" className="menu-item" disabled={it.disabled} onClick={()=>{setOpen(false);it.run();}}><span className="grow">{it.label}</span></button>;
   return (
     <div className="more-menu" ref={ref} onKeyDown={e=>{if(e.key==="Escape"){setOpen(false);ref.current?.querySelector("button")?.focus();}}}>
       <button type="button" className="icon-btn" aria-label="更多動作" title="更多動作" aria-expanded={open} aria-controls="tandem-project-actions" onClick={toggle}>
@@ -263,11 +261,10 @@ export function Header(p: Props) {
   const more =
     usable && id
       ? [
-          ...(p.onLog ? [{ key: "log", label: "決定和討論", hint: "誰在等誰、團隊的決定、討論", run: p.onLog }] : []),
-          ...(p.onContext ? [{ key: "context", label: "脈絡", hint: "背景、規格和圖，大家和 AI 都讀得到", run: p.onContext }] : []),
-          ...(p.onAgentMessages ? [{ key: "agent-messages", label: "Agent 問答", hint: "閱讀問答、停止或設定開放", run: p.onAgentMessages }] : []),
-          ...(p.onSharedChats ? [{ key: "shared-chats", label: "對話與交接", hint: "選擇分享、閱讀隊友對話與交接任務", run: p.onSharedChats }] : []),
-          ...(p.onRooms ? [{ key: "rooms", label: "房間", hint: "一起討論，需要時按「問 AI」", run: p.onRooms }] : []),
+          ...(p.onContext ? [{ key: "context", label: "脈絡", run: p.onContext }] : []),
+          ...(p.onAgentMessages ? [{ key: "agent-messages", label: "Agent 問答", run: p.onAgentMessages }] : []),
+          ...(p.onSharedChats ? [{ key: "shared-chats", label: "對話與交接", run: p.onSharedChats }] : []),
+          ...(p.onRooms ? [{ key: "rooms", label: "房間", run: p.onRooms }] : []),
           ...agents
             .filter((a) => a.installed && a.terminalAvailable !== false)
             .map((a) => ({
@@ -278,7 +275,7 @@ export function Header(p: Props) {
             })),
           { key: "members", label: "成員與邀請", run: p.onInvite },
           { key: "folder", label: "打開專案資料夾", disabled: opening === "folder", run: () => void run("folder", projectPath(id, "/open-folder")) },
-          { key: "refresh", label: `重新整理${HOME}`, disabled: p.refreshing, run: p.onRefresh },
+          { key: "refresh", label: "重新整理", disabled: p.refreshing, run: p.onRefresh },
         ]
       : [];
 

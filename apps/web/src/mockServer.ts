@@ -270,7 +270,23 @@ function runProgress(fullName: string, withAccept: boolean) {
   return { opId };
 }
 
-const boardFor = (id: string) => mockProjectBoard(id, login ?? ME);
+/**
+ * `?board=empty` shows a project with no work yet; `?board=solo` one where you are the only
+ * member and have not written a status. For checking those states by eye.
+ */
+const boardFor = (id: string) => {
+  const b = mockProjectBoard(id, login ?? ME);
+  const variant = params.get("board");
+  if (variant === "empty" || variant === "solo") {
+    Object.assign(b, { waiting: [], tasks: [], pullRequests: [], discussions: [], problems: [] });
+    for (const m of b.members) Object.assign(m, { waitingOn: [], waitedOnBy: [], openTasks: [], recentPullRequests: [] });
+  }
+  if (variant === "solo") {
+    b.members = b.members.filter((m) => m.login === b.me).map((m) => ({ ...m, status: undefined }));
+    b.activity = {};
+  }
+  return b;
+};
 
 // --- shared context (脈絡) ----------------------------------------------------
 // Saving "specs/conflict-demo.md" the first time pretends a teammate changed it just before.

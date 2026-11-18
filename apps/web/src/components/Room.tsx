@@ -30,7 +30,7 @@ function ErrorLine({ text, onDismiss }: { text: string; onDismiss: () => void })
   );
 }
 
-export function RoomView({ projectId, me, now, onOpenSettings, onBack }: { projectId: string; me: string; now: number; onOpenSettings: () => void; onBack: () => void }) {
+export function RoomView({ projectId, me, now, back, onOpenSettings, onBack }: { projectId: string; me: string; now: number; back?: string; onOpenSettings: () => void; onBack: () => void }) {
   const [list, setList] = useState<RoomRef[] | null>(null);
   const [current, setCurrent] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
@@ -79,7 +79,7 @@ export function RoomView({ projectId, me, now, onOpenSettings, onBack }: { proje
 
   return (
     <main className="page board rm">
-      <PageBar title="房間" onBack={onBack}>
+      <PageBar back={back} title="房間" onBack={onBack}>
         <button type="button" className="ctl pg-bar-end" aria-expanded={creating} onClick={() => setCreating((c) => !c)}>
           <Glyph name="plus" />
           <span>開房間</span>

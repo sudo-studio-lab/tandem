@@ -54,6 +54,14 @@ export function mockBoard(): BoardData {
       to: "jielle2453",
       since: ago(3 * H),
     },
+    {
+      kind: "blocked_issue",
+      title: "做登入頁（被 #9 擋住）",
+      url: `${REPO}/issues/8`,
+      from: "theroyatlas",
+      to: "jielle2453",
+      since: ago(1 * D),
+    },
   ];
   const tasks = [
     {
