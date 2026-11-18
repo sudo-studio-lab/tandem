@@ -202,3 +202,25 @@
 .page .co-page .co-sec-body > :last-child {
   margin-bottom: 0;
 }
+
+/* A shared chat is one 48px line like a board row: title left, who and when right. */
+.page .co-page .co-chat-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--row-h);
+  padding: 0;
+}
+.page .co-page .co-chat-pick strong {
+  flex: 1;
+  min-width: 0;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.page .co-page .co-chat-pick .row-meta {
+  display: inline;
+  flex: none;
+  white-space: nowrap;
+}

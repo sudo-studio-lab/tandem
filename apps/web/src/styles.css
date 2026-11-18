@@ -45,10 +45,10 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #18191c;
-    --surface: #1e1f23;
-    --surface-2: #26272b;
-    --border: #2c2d32;
-    --border-strong: #3b3c42;
+    --surface: #232429;
+    --surface-2: #2c2d33;
+    --border: #33343a;
+    --border-strong: #43444a;
     --text: #d6d8dd;
     --muted: #8f939b;
     --accent: #6f9bff;
@@ -1689,7 +1689,7 @@ dialog.modal::backdrop {
   color: var(--bad-fg);
 }
 .tb-empty-note {
-  margin: 10px 4px;
+  margin: 18px 4px 0;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -1960,6 +1960,31 @@ dialog.modal::backdrop {
 .ctx-row {
   border-radius: 0;
 }
+/* A file is one 48px line like a board row: name on the left, who and when on the right. */
+.ctx .ctx-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--row-h);
+  padding: 0 14px;
+}
+.ctx .ctx-row-name {
+  flex: 1;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+.ctx .ctx-row .row-title {
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ctx .ctx-row .row-meta {
+  flex: none;
+  margin: 0;
+  font-size: 13px;
+  white-space: nowrap;
+}
 .ctx-row:hover {
   background: var(--surface-2);
 }
@@ -2147,7 +2172,7 @@ dialog.modal::backdrop {
 /* 隊友: one rounded block per person, the same block as a group of rows. */
 .mt {
   margin-top: 12px;
-  padding: 14px 14px 10px;
+  padding: 14px 14px 6px;
   background: var(--surface);
   border-radius: var(--radius-group);
 }
@@ -2224,7 +2249,8 @@ dialog.modal::backdrop {
 }
 .mt-pin {
   flex: none;
-  align-self: center;
+  align-self: flex-start;
+  margin-top: 0.3em;
 }
 .mt-ref {
   font-family: ui-monospace, Consolas, monospace;
@@ -2252,7 +2278,7 @@ dialog.modal::backdrop {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 36px;
+  min-height: 32px;
   padding: 0 14px;
   font-size: 13px;
   color: var(--muted);
@@ -2296,4 +2322,22 @@ dialog.modal::backdrop {
     background: color-mix(in srgb, var(--surface-2), var(--text) 12%);
     box-shadow: none;
   }
+}
+
+/* A link at the end of a wrapping footer line moves as a whole, never split mid-phrase. */
+.lg-foot a,
+.rm-sub a {
+  white-space: nowrap;
+}
+/* Faces on light-blue rows get a ring in the block colour so the letter stays readable. */
+.tb .tb-group-wait .avatar,
+.tb .tb-row.is-mine .avatar {
+  box-shadow: 0 0 0 1.5px var(--surface);
+}
+/* Work rows inside a person's block: the line between them stops where the text does. */
+.tb .mt-work > li + li {
+  border-top: 0;
+  background-image: linear-gradient(var(--sep), var(--sep));
+  background-size: calc(100% - 14px) 1px;
+  background-repeat: no-repeat;
 }

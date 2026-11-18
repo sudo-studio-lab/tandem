@@ -80,15 +80,14 @@
 
 /* Notes: a folded group label above the talk, same as the board's groups. */
 .rm-notes {
-  margin: 0 -14px;
-  border-bottom: 1px solid var(--border);
+  margin: 0;
 }
 .rm .rm-notes > .tb-sum {
   list-style: none;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 14px;
+  padding: 18px 4px 8px;
   font-size: 13px;
   font-weight: 600;
   color: var(--muted);
@@ -113,7 +112,9 @@
   letter-spacing: 0;
 }
 .rm-notes-body {
-  padding: 0 14px 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border-radius: var(--radius-group);
 }
 
 /* The talk: a log, not bubbles. Name line, then the words. */
@@ -221,7 +222,7 @@
   text-align: right;
 }
 .rm-compose .btn {
-  min-height: var(--ctl-h);
+  min-height: 44px;
 }
 /* Side-panel width: keep the hint on one line by dropping the least-needed key. */
 @media (max-width: 480px) {
