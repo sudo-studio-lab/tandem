@@ -397,7 +397,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
       await requirePrivateDataRepo(rt.ctx);
       return { gh: rt.ctx.dataGh!, me: rt.ctx.me, cwd: rt.ctx.repoRoot, members: async () => (await rt.ctx.gh.listProjectMembers()).map((m) => m.login) };
     },
-    agentLabel: (kind) => (kind === "codex" ? "Codex" : "Claude"),
+    agentLabel: (kind) => ({ claude: "Claude", codex: "Codex", antigravity: "Antigravity", grok: "Grok", cursor: "Cursor" })[kind] ?? kind,
   });
   const projectPathOf = async (projectId: string) => {
     const p = (await loadAppState()).projects.find((x) => x.id === projectId);

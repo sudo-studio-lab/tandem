@@ -13,10 +13,12 @@ import { appStateDir } from "@tandem/core";
 import { agentEnv, killTree, onLines, openTerminal, resolveCommand, runCapture, spawnAgent } from "./proc.ts";
 import { summarize, truncate, type AdapterEvent, type AgentAdapter, type AgentSession, type StartOptions } from "./types.ts";
 
+/** `claude --effort` levels; Haiku has none. */
+const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 const MODELS: ModelChoice[] = [
-  { id: "", label: "預設", isDefault: true },
-  { id: "opus", label: "Opus" },
-  { id: "sonnet", label: "Sonnet" },
+  { id: "", label: "預設", isDefault: true, reasoningEfforts: EFFORTS },
+  { id: "opus", label: "Opus", reasoningEfforts: EFFORTS },
+  { id: "sonnet", label: "Sonnet", reasoningEfforts: EFFORTS },
   { id: "haiku", label: "Haiku" },
 ];
 
@@ -122,6 +124,7 @@ class ClaudeSession implements AgentSession {
     if (opts.answerOnly) args.push("--restricted", "--tools", "", "--strict-mcp-config", "--permission-mode", "dontAsk", "--no-session-persistence", "--setting-sources", "", "--settings", '{"disableAllHooks":true}', "--system-prompt", opts.answerOnly.instructions);
     else if (opts.approveBridge) args.push("--permission-prompt-tool", "mcp__tandem__approve");
     if (opts.model) args.push("--model", opts.model);
+    if (opts.reasoningEffort) args.push("--effort", opts.reasoningEffort);
     if (this.sessionId) args.push("--resume", this.sessionId);
 
     this.stopping = false;

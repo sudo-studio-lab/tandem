@@ -96,8 +96,10 @@ const agents: AgentStatus[] = [
     auth: "subscription",
     plan: "pro",
     models: [
-      { id: "", label: "預設", isDefault: true },
-      { id: "sonnet", label: "Sonnet" },
+      { id: "", label: "預設", isDefault: true, reasoningEfforts: ["low", "medium", "high", "xhigh", "max"] },
+      { id: "opus", label: "Opus", reasoningEfforts: ["low", "medium", "high", "xhigh", "max"] },
+      { id: "sonnet", label: "Sonnet", reasoningEfforts: ["low", "medium", "high", "xhigh", "max"] },
+      { id: "haiku", label: "Haiku" },
     ],
     installUrl: "https://code.claude.com/docs/en/setup",
     supportsImages: true,
@@ -152,10 +154,38 @@ const rooms: Room[] = [
     updatedAt: ago(4 * 60_000),
     notes: ["## 重點", "- 第一版先做 GitHub 登入", "- Google 登入等有使用者再說", "", "## 待辦", "- @theroyatlas 畫登入流程圖"].join("\n"),
     messages: [
+      {
+        id: "r0",
+        by: "theroyatlas",
+        text: [
+          "**🤖 Codex:**",
+          "",
+          "今天想定下第一版的登入方式，順便把還沒講清楚的地方列出來。",
+          "",
+          "**目前知道的**",
+          "- 使用者都有 GitHub 帳號",
+          "- 有兩位試用者問過 Google 登入",
+          "- 登入之後要能直接加入專案",
+          "",
+          "**想一起決定的**",
+          "1. 第一版只做 GitHub，還是 GitHub 加 Google？",
+          "2. 邀請連結要不要先登入才能打開？",
+          "3. 登入失敗時要留在哪一頁？",
+          "",
+          "**還不確定的**",
+          "- Google 登入要多久能做完",
+          "- 試用者是不是真的會用 Google",
+          "",
+          "先聊第 1 題，需要查舊紀錄時再問 AI。",
+        ].join("\n"),
+        url: "#r0",
+        at: ago(22 * 60_000),
+        ai: false,
+      },
       { id: "r1", by: "theroyatlas", text: "登入要不要一開始就支援 Google？", url: "#r1", at: ago(20 * 60_000), ai: false },
       { id: "r2", by: ME, text: "我覺得先只做 GitHub 就好，我們的使用者都有 GitHub", url: "#r2", at: ago(19 * 60_000), ai: false },
       { id: "r3", by: "theroyatlas", text: "之前有沒有決定過這件事？", url: "#r3", at: ago(18 * 60_000), ai: false, ask: true },
-      { id: "r4", by: "theroyatlas", text: "（範例回覆）有。D-20261115-za46 記了「假設使用者都會用 GitHub」，跟先只做 GitHub 登入的方向一致。要我把「第一版只做 GitHub 登入」記成決定嗎？", url: "#r4", at: ago(17 * 60_000), ai: true },
+      { id: "r4", by: "theroyatlas", text: "（範例回覆）有。D-20261115-za46 記了「假設使用者都會用 GitHub」，跟先只做 GitHub 登入的方向一致。要我把「第一版只做 GitHub 登入」記成決定嗎？", url: "#r4", at: ago(17 * 60_000), ai: true, label: "Codex · gpt-6.1-sol · high" },
     ],
   },
   {
@@ -619,7 +649,8 @@ export async function handle(method: string, path: string, body: unknown): Promi
       const t = new Date().toISOString();
       const number = 30 + rooms.length;
       const title = String((b as { title?: string }).title || "房間");
-      const c: Chat = { id: `chat${chats.length + 1}`, projectId: id, agent: "claude", model: "", title, createdAt: t, updatedAt: t, running: false, items: [], room: { number, url: "#" } };
+      const pick = b as { agent?: AgentKind; model?: string };
+      const c: Chat = { id: `chat${chats.length + 1}`, projectId: id, agent: pick.agent ?? "claude", model: pick.model ?? "", title, createdAt: t, updatedAt: t, running: false, items: [], room: { number, url: "#" } };
       chats.push(c);
       const r: Room = { number, url: `https://github.com/${proj.owner}/${proj.name}/discussions/${number}`, title, host: ME, closed: false, updatedAt: t, notes: "", messages: [], chatId: c.id };
       rooms.unshift(r);

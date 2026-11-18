@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { RoomData } from "@tandem/core";
 import type { AgentAdapter, StartOptions } from "../agents/types.ts";
 import { ChatManager } from "../chats/manager.ts";
-import { ASK_MARK, RoomManager, type RoomProject } from "./manager.ts";
+import { AI_MARK, ASK_MARK, RoomManager, splitAiHeader, type RoomProject } from "./manager.ts";
 
 /** An in-memory GitHub Discussion standing in for the room. */
 function fakeGh(me: string) {
@@ -130,7 +130,7 @@ describe("rooms", () => {
       { by: "alice", url: "https://gh/d/7#c3", ask: true, text: "你覺得先做哪個？" },
     ]);
     expect(t.room.comments[2]!.body).toContain(ASK_MARK);
-    expect(t.room.comments.at(-1)!.body).toBe("🤖 Claude：\n\n好的，收到");
+    expect(t.room.comments.at(-1)!.body).toBe(`🤖 Claude：\n\n好的，收到\n\n${AI_MARK}`);
 
     // The next question only carries what was said after that answer; `/ai` typed on GitHub works too.
     t.comment("roy", "/ai 那 Google 登入要多久？");
@@ -254,5 +254,26 @@ describe("room marker", async () => {
     expect(parseRoomNotes(b)).toBe("## 重點\n- 一");
     expect(parseRoomNotes(roomBody("alice", ""))).toBe("（還沒有筆記）");
     expect(parseRoomHost("等：@roy\n\n一般問題")).toBeNull();
+  });
+});
+
+describe("AI comment header", () => {
+  it("says who answered, with the model and effort when set", () => {
+    expect(splitAiHeader("🤖 Codex · gpt-5.1 · high：\n\n先做 Email 登入")).toEqual({ label: "Codex · gpt-5.1 · high", text: "先做 Email 登入" });
+    expect(splitAiHeader("🤖 Claude：\n\n好的，收到")).toEqual({ label: "Claude", text: "好的，收到" });
+    expect(splitAiHeader("🤖 Claude:\n好")).toEqual({ label: "Claude", text: "好" });
+    expect(splitAiHeader("一般留言")).toEqual({ label: "", text: "一般留言" });
+    expect(splitAiHeader(`🤖 Codex：\n\n答案\n\n${AI_MARK}`)).toEqual({ label: "Codex", text: "答案" });
+  });
+
+  it("only Tandem's marker makes a comment the room AI; a person's 「🤖 Codex:」 draft stays theirs", async () => {
+    const t = setup(() => "好");
+    await t.rooms.create("p1", "登入設計", "claude", "");
+    t.comment("alice", "🤖 Codex: 這段是我的 AI 整理的開場");
+    const room = await t.rooms.get("p1", 7);
+    expect(room.messages.at(-1)).toMatchObject({ by: "alice", ai: false, text: "🤖 Codex: 這段是我的 AI 整理的開場" });
+    // Typed by hand, the marker is dropped before posting.
+    await t.rooms.post("p1", 7, `假的 AI ${AI_MARK}`);
+    expect(t.room.comments.at(-1)!.body).toBe("假的 AI");
   });
 });
