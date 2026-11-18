@@ -3,6 +3,7 @@ import type { AgentKind, AgentStatus, AppSession, ProjectBoard, ProjectRef } fro
 import { api, projectPath } from "../api.ts";
 import { relTime } from "../time.ts";
 import { Avatar, errMsg } from "./ui.tsx";
+import { Glyph } from "./icons.tsx";
 
 const AGENT_NAME: Record<AgentKind, string> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity", grok: "Grok", cursor: "Cursor" };
 
@@ -74,60 +75,66 @@ function useDismiss(ref: RefObject<HTMLElement | null>, open: boolean, close: ()
   }, [open, ref, close]);
 }
 
-/** One compact pill: shows the sync state; clicking it refreshes (or retries a failed sync). */
-function SyncPill({ board, now, syncing, refreshing, onSync, onRefresh, usable }: Pick<Props, "board" | "now" | "syncing" | "refreshing" | "onSync" | "onRefresh"> & { usable: boolean }) {
-  if (!board) return null;
-  const s = board.sync;
-  const pending = board.pendingWrites > 0 ? ` · ${board.pendingWrites} 筆待同步` : "";
-  let tone = "ok";
+/**
+ * One quiet status: a dot plus a few words. Losing the live link to the local
+ * Tandem app wins over the last sync result, so the two never contradict each
+ * other. Clicking refreshes (or retries a failed sync).
+ */
+function Status({ board, now, syncing, refreshing, onSync, onRefresh, usable, connected }: Pick<Props, "board" | "now" | "syncing" | "refreshing" | "onSync" | "onRefresh" | "connected"> & { usable: boolean }) {
+  let tone: "ok" | "busy" | "warn" | "bad" = "ok";
   let text: string;
-  let action = onRefresh;
+  let action: (() => void) | undefined = onRefresh;
   let title = "重新整理";
-  switch (s.state) {
-    case "syncing":
-      tone = "info";
-      text = "同步中…";
-      break;
-    case "idle":
-      text = `已同步${s.lastSyncAt ? ` · ${relTime(s.lastSyncAt, now)}` : ""}`;
-      break;
-    case "offline":
-      tone = "warn";
-      text = "離線，恢復後自動同步";
-      break;
-    case "conflict":
-      tone = "bad";
-      text = "同步衝突，需要處理";
-      action = onSync;
-      title = "重試同步";
-      break;
-    case "error":
-      tone = "bad";
-      text = `同步失敗${s.message ? `：${s.message}` : ""}`;
-      action = onSync;
-      title = "重試同步";
-      break;
-  }
-  if (refreshing) {
-    tone = "info";
+  if (!connected) {
+    tone = "warn";
+    text = "連不上本機的 Tandem，重試中…";
+    action = undefined;
+    title = "等本機的 Tandem 回來";
+  } else if (!board) {
+    return null;
+  } else if (refreshing) {
+    tone = "busy";
     text = "更新中…";
+  } else {
+    const s = board.sync;
+    switch (s.state) {
+      case "syncing":
+        tone = "busy";
+        text = "同步中…";
+        break;
+      case "idle":
+        text = `已同步${s.lastSyncAt ? `・${relTime(s.lastSyncAt, now)}` : ""}`;
+        break;
+      case "offline":
+        tone = "warn";
+        text = "離線，恢復後自動同步";
+        break;
+      case "conflict":
+        tone = "bad";
+        text = "同步衝突，需要處理";
+        action = onSync;
+        title = "重試同步";
+        break;
+      case "error":
+        tone = "bad";
+        text = `同步失敗${s.message ? `：${s.message}` : ""}`;
+        action = onSync;
+        title = "重試同步";
+        break;
+    }
+    if (board.pendingWrites > 0) text += `・${board.pendingWrites} 筆待同步`;
   }
   return (
     <button
       type="button"
-      role="status"
-      className={`sync-pill pill-${tone}`}
+      className={`status status-${tone}`}
       onClick={action}
-      disabled={syncing || refreshing || !usable}
-      title={`${title}（按一下）`}
+      disabled={!action || syncing || refreshing || !usable}
+      title={action ? `${text}（按一下${title}）` : `${text}（${title}）`}
     >
-      <span className="sync-dot" aria-hidden="true" />
-      <span className="sync-text">
+      <span className="status-dot" aria-hidden="true" />
+      <span className="status-text" aria-live="polite">
         {text}
-        {pending}
-      </span>
-      <span className="sync-icon" aria-hidden="true">
-        ↻
       </span>
     </button>
   );
@@ -145,16 +152,14 @@ function Switcher({ session, project, onSelect, onRemove, onAddProject, onError 
       <button type="button" className="switcher-btn" aria-expanded={open} aria-haspopup="true" onClick={() => setOpen((v) => !v)}>
         {project ? (
           <>
-            <span className="muted">{project.owner}/</span>
-            <strong>{project.name}</strong>
+            <span className="muted switcher-owner">{project.owner}/</span>
+            <strong className="switcher-name">{project.name}</strong>
           </>
         ) : (
           <strong>選擇專案</strong>
         )}
         {others > 0 && <span className="dot-badge" aria-label={`其他專案有 ${others} 件事`}>{others}</span>}
-        <span aria-hidden="true" className="chev">
-          ▾
-        </span>
+        <Glyph name="chevron" size={14} className="chev" />
       </button>
       {open && (
         <div className="menu card">
@@ -217,18 +222,18 @@ function MoreMenu({ items }: { items: { key: string; label: string; hint?: strin
   const toggle=()=>{if(!open){const rect=ref.current?.getBoundingClientRect();setPosition({left:Math.max(12,Math.min((rect?.right??292)-280,window.innerWidth-292)),top:(rect?.bottom??54)+6});}setOpen(v=>!v);};
   useEffect(()=>{if(!open)return;const resize=()=>{const r=ref.current?.getBoundingClientRect();setPosition({left:Math.max(12,Math.min((r?.right??292)-280,window.innerWidth-292)),top:(r?.bottom??54)+6});};window.addEventListener("resize",resize);return()=>window.removeEventListener("resize",resize);},[open]);
   const collaboration=new Set(["log","context","agent-messages","shared-chats"]);
-  const tools=items.filter(it=>!collaboration.has(it.key)&&!["folder","refresh"].includes(it.key));
+  const tools=items.filter(it=>!collaboration.has(it.key)&&!["members","folder","refresh"].includes(it.key));
   const renderItem=(it:typeof items[number])=><button key={it.key} type="button" className="menu-item" disabled={it.disabled} onClick={()=>{setOpen(false);it.run();}}><span className="grow">{it.label}{it.hint&&<span className="block muted small">{it.hint}</span>}</span></button>;
   return (
     <div className="more-menu" ref={ref} onKeyDown={e=>{if(e.key==="Escape"){setOpen(false);ref.current?.querySelector("button")?.focus();}}}>
       <button type="button" className="icon-btn" aria-label="更多動作" title="更多動作" aria-expanded={open} aria-controls="tandem-project-actions" onClick={toggle}>
-        ⋯
+        <Glyph name="more" />
       </button>
       {open && (
         <div id="tandem-project-actions" className="menu menu-right card co-more-menu" style={{position:"fixed",left:position.left,right:"auto",top:position.top,width:280,minWidth:0,maxHeight:`calc(100dvh - ${position.top+12}px)`,overflowY:"auto"}} role="region" aria-label="專案功能">
           <div role="group" aria-label="協作"><p className="co-menu-heading">協作</p>{items.filter(it=>collaboration.has(it.key)).map(renderItem)}</div>
           {tools.length>0&&<details className="co-menu-tools"><summary>開啟我的 AI 工具</summary>{tools.map(renderItem)}</details>}
-          <div role="group" aria-label="專案操作" className="co-menu-project">{items.filter(it=>["folder","refresh"].includes(it.key)).map(renderItem)}</div>
+          <div role="group" aria-label="專案操作" className="co-menu-project">{items.filter(it=>["members","folder","refresh"].includes(it.key)).map(renderItem)}</div>
         </div>
       )}
     </div>
@@ -274,6 +279,7 @@ export function Header(p: Props) {
               disabled: opening === a.agent,
               run: () => void run(a.agent, projectPath(id, "/open-agent"), { agent: a.agent }),
             })),
+          { key: "members", label: "成員與邀請", run: p.onInvite },
           { key: "folder", label: "打開專案資料夾", disabled: opening === "folder", run: () => void run("folder", projectPath(id, "/open-folder")) },
           { key: "refresh", label: "重新整理看板", disabled: p.refreshing, run: p.onRefresh },
         ]
@@ -282,11 +288,9 @@ export function Header(p: Props) {
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <h1 className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            ◆
-          </span>
-          Tandem
+        <h1 className="brand" title="Tandem">
+          <Glyph name="mark" size={18} className="brand-mark" />
+          <span className="brand-name">Tandem</span>
         </h1>
         <Switcher {...p} />
         {usable && tabs.length > 1 && (
@@ -299,21 +303,30 @@ export function Header(p: Props) {
           </nav>
         )}
         <div className="spacer" />
-        {p.mock && <span className="pill pill-warn">範例資料</span>}
-        {!p.connected && (
-          <span className="pill pill-warn" role="status">
-            重新連線中…
-          </span>
-        )}
-        <SyncPill board={p.board} now={p.now} syncing={p.syncing} refreshing={p.refreshing} onSync={p.onSync} onRefresh={p.onRefresh} usable={usable} />
+        {p.mock && <span className="tag">範例資料</span>}
+        <Status board={p.board} now={p.now} syncing={p.syncing} refreshing={p.refreshing} onSync={p.onSync} onRefresh={p.onRefresh} usable={usable} connected={p.connected} />
         {usable && (
-          <button type="button" className="btn btn-small co-members-button" onClick={p.onInvite} aria-label="邀請與成員">
-            {(p.board?.members.length??0)>1?<><span className="co-member-faces" aria-hidden="true">{p.board!.members.slice(0,3).map(m=><Avatar key={m.login} login={m.login} size={22}/>)}</span><span>{p.board!.members.length} 位成員</span></>:"邀請隊友"}
+          <button
+            type="button"
+            className="icon-btn topbar-members"
+            onClick={p.onInvite}
+            aria-label={(p.board?.members.length ?? 0) > 1 ? `${p.board!.members.length} 位成員・邀請與成員` : "邀請隊友"}
+            title={(p.board?.members.length ?? 0) > 1 ? `${p.board!.members.length} 位成員` : "邀請隊友"}
+          >
+            {(p.board?.members.length ?? 0) > 1 ? (
+              <span className="topbar-faces" aria-hidden="true">
+                {p.board!.members.slice(0, 3).map((m) => (
+                  <Avatar key={m.login} login={m.login} size={20} />
+                ))}
+              </span>
+            ) : (
+              <span className="topbar-invite">邀請</span>
+            )}
           </button>
         )}
         {more.length > 0 && <MoreMenu items={more} />}
         <button type="button" className="icon-btn" onClick={p.onSettings} aria-label="設定" title="設定">
-          ⚙
+          <Glyph name="settings" />
         </button>
       </div>
     </header>
