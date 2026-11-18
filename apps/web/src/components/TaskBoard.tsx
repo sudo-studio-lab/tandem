@@ -128,14 +128,36 @@ function collect(board: ProjectBoard): Item[] {
       prs:linked.map(p=>({number:p.number,url:p.url})),
     });
   }
-  return items.sort((a, b) => Date.parse(b.time) - Date.parse(a.time));
+  // Stuck items first in every group, then newest first.
+  return items.sort((a, b) => Number(b.blocked) - Number(a.blocked) || Date.parse(b.time) - Date.parse(a.time));
 }
 
 function Row({ it, now }: { it: Item; now: number }) {
+  const kind = it.kind === "pr" ? (it.draft ? "草稿 PR" : "PR") : "任務";
+  const owners = it.owners.map((o) => `@${o}`).join("、");
+  const detail = `${kind}・負責 ${owners}・${relTime(it.time, now)}更新`;
   return (
-    <li className="tb-row">
-      <div className="tb-item-top"><Icon name={it.group} className={`tb-${it.group}`} /><span className="tb-num">#{it.number}</span><Ext href={it.url} className="tb-title">{it.title}</Ext></div>
-      <div className="tb-item-meta"><span title={relTime(it.time,now)}>{it.kind==="pr"?(it.draft?"草稿 PR":"PR"):"任務"}</span>{it.blocked&&<span className="tag tag-bad">被卡住</span>}<span>負責 {it.owners.map(o=>`@${o}`).join("、")}</span>{it.prs?.map(p=><Ext key={p.number} href={p.url}>PR #{p.number}</Ext>)}</div>
+    <li className="tb-row" title={`#${it.number} ${it.title}
+${detail}`}>
+      <span className="tb-num">#{it.number}</span>
+      <Ext href={it.url} className="tb-title">
+        {it.title}
+        <span className="sr-only">（{detail}）</span>
+      </Ext>
+      <span className="tb-meta">
+        {it.blocked && <span className="tb-stuck">卡住</span>}
+        {it.draft && <span>草稿</span>}
+        {it.prs?.map((p) => (
+          <Ext key={p.number} href={p.url}>
+            PR #{p.number}
+          </Ext>
+        ))}
+        <span className="tb-owners">
+          {it.owners.slice(0, 3).map((o) => (
+            <Avatar key={o} login={o} size={16} />
+          ))}
+        </span>
+      </span>
     </li>
   );
 }
@@ -154,13 +176,17 @@ function Group({ label, k, open, items, now }: { label: string; k: GroupKey; ope
       </div>
     );
   }
+  const stuck = items.filter((it) => it.blocked).length;
   return (
-    <details className="tb-group" open={open}>
+    <details className={`tb-group${k === "done" ? " tb-done-group" : ""}`} open={open}>
       <summary className="tb-sum">
-        <Glyph name="chevron" size={14} className="tb-chev" />
+        <Glyph name="chevron" size={12} className="tb-chev" />
         <Icon name={k} className={`tb-${k}`} />
         <span className="tb-group-label">{label}</span>
-        <span className="tb-count">{items.length}</span>
+        <span className="tb-count">
+          {stuck > 0 && <span className="tb-count-stuck">{stuck} 卡住・</span>}
+          {items.length}
+        </span>
       </summary>
       <ul className="tb-rows">
         {items.map((it) => (
@@ -178,7 +204,7 @@ function Face({ m, me, now, selected, onPick }: { m: BoardMember; me: string; no
   const label = `${m.login}${m.login === me ? "（你）" : ""}：${line}${s ? `（${relTime(s.updated, now)}更新）` : ""}`;
   return (
     <button type="button" className={`tb-face${selected ? " is-sel" : ""}`} aria-pressed={selected} aria-label={label} title={label} onClick={onPick}>
-      <Avatar login={m.login} size={32} />
+      <Avatar login={m.login} size={22} />
       <i className={`tb-dot${s?.blocked ? " is-blocked" : fresh ? " is-fresh" : ""}`} aria-hidden="true" />
     </button>
   );
@@ -195,7 +221,7 @@ function WaitGroup({ items, now }: { items: WaitingItem[]; now: number }) {
   return (
     <details className="tb-group tb-group-wait" open>
       <summary className="tb-sum">
-        <Glyph name="chevron" size={14} className="tb-chev" />
+        <Glyph name="chevron" size={12} className="tb-chev" />
         <Icon name="wait" className="tb-wait-ic" />
         <span className="tb-group-label">等你</span>
         <span className="tb-count tb-count-strong">{items.length}</span>
@@ -204,19 +230,19 @@ function WaitGroup({ items, now }: { items: WaitingItem[]; now: number }) {
         {items.map((w, i) => {
           const { num, title } = splitNumber(w.title, w.url);
           return (
-          <li key={i} className="tb-row">
-            <div className="tb-item-top">
-              <Icon name="wait" className="tb-wait-ic" />
-              {num && <span className="tb-num">#{num}</span>}
-              <Ext href={w.url} className="tb-title">
-                {title}
-              </Ext>
-            </div>
-            <div className="tb-item-meta">
+          <li key={i} className="tb-row" title={`${w.title}
+${WAIT_KIND[w.kind]}・@${w.from}・${waitedFor(w.since, now)}`}>
+            {num && <span className="tb-num">#{num}</span>}
+            <Ext href={w.url} className="tb-title">
+              {title}
+            </Ext>
+            <span className="tb-meta">
               <span className="tb-kind">{WAIT_KIND[w.kind]}</span>
-              <span>@{w.from}</span>
-              <span>{waitedFor(w.since, now)}</span>
-            </div>
+              <span>
+                <span className="tb-from">@{w.from}・</span>
+                {waitedFor(w.since, now).replace(/^等了 /, "")}
+              </span>
+            </span>
           </li>
           );
         })}
@@ -396,13 +422,22 @@ export function TaskBoard({ board, now, onTaskCreated }: { board: ProjectBoard; 
         />
       )}
 
+      {mine.length > 0 && <WaitGroup items={mine} now={now} />}
+
       {picked && (
         <div className="tb-picked">
           <PersonCard m={picked} board={board} now={now} />
         </div>
       )}
 
-      {mine.length > 0 && <WaitGroup items={mine} now={now} />}
+      {items.length === 0 && mine.length === 0 && !adding && (
+        <p className="tb-empty-note">
+          {who ? `@${who} 目前沒有負責的任務。` : "還沒有任務。"}
+          <button type="button" className="tb-link" onClick={() => setAdding(true)}>
+            新增任務
+          </button>
+        </p>
+      )}
 
       <div className="tb-groups">{GROUPS.map((g) => (
         <Group

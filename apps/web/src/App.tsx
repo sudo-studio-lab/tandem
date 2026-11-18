@@ -240,8 +240,12 @@ export function App() {
       ) : (
         <main className="page board">
           {app.boardError && (
-            <p className="banner banner-error" role="alert">
-              {app.boardError}
+            <p className="board-error" role="alert">
+              <span className="status-dot" aria-hidden="true" />
+              <span className="board-error-text">看板沒有更新：{app.boardError}</span>
+              <button type="button" className="tb-link" onClick={() => void app.reloadBoard()}>
+                再試一次
+              </button>
             </p>
           )}
           {boardTab === "list" ? (
