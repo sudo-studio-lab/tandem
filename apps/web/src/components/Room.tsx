@@ -6,7 +6,7 @@
  * One column so it fits an editor side panel: the room list, or one room with a back link.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { AgentKind, Chat, ChatSummary, ChatUpdate, Room, RoomMessage, RoomRef } from "@tandem/contracts";
+import type { AgentKind, Chat, ChatSummary, ChatUpdate, Room, RoomMessage } from "@tandem/contracts";
 import { api, onAppEvent, projectPath } from "../api.ts";
 import { relTime, waitedFor } from "../time.ts";
 import { Avatar, MarkdownLite, Spinner, errMsg } from "./ui.tsx";
@@ -41,128 +41,37 @@ function ErrorLine({ text, onDismiss }: { text: string; onDismiss: () => void })
   );
 }
 
-export function RoomView({ projectId, me, now, back, onOpenSettings, onBack }: { projectId: string; me: string; now: number; back?: string; onOpenSettings: () => void; onBack: () => void }) {
-  const [list, setList] = useState<RoomRef[] | null>(null);
-  const [current, setCurrent] = useState<number | null>(null);
-  const [creating, setCreating] = useState(false);
+/**
+ * One room (`room` is its number), or the form that opens a new one ("new"). The list of rooms
+ * lives in the 對話 tab with the rest of the talk; back returns there.
+ */
+export function RoomView({ projectId, me, now, room, back, onOpenSettings, onBack, onChanged }: { projectId: string; me: string; now: number; room: number | "new"; back?: string; onOpenSettings: () => void; onBack: () => void; onChanged: () => void }) {
+  const [current, setCurrent] = useState<number | null>(room === "new" ? null : room);
   const [error, setError] = useState<string | null>(null);
-
-  const loadList = useCallback(async () => {
-    try {
-      setList(await api<RoomRef[]>("GET", projectPath(projectId, "/rooms")));
-    } catch (e) {
-      setError(errMsg(e));
-      setList((l) => l ?? []);
-    }
-  }, [projectId]);
-
-  useEffect(() => {
-    setCurrent(null);
-    setList(null);
-    void loadList();
-    const t = setInterval(() => document.visibilityState !== "hidden" && void loadList(), POLL_MS * 4);
-    return () => clearInterval(t);
-  }, [loadList]);
-
-  const open = list?.filter((r) => !r.closed) ?? [];
-  const closed = list?.filter((r) => r.closed) ?? [];
 
   if (current !== null) {
     return (
       <main className="page board rm">
         {error && <ErrorLine text={error} onDismiss={() => setError(null)} />}
-        <RoomPane
-          key={current}
-          projectId={projectId}
-          number={current}
-          me={me}
-          now={now}
-          onError={setError}
-          onChanged={loadList}
-          onBack={() => {
-            setCurrent(null);
-            void loadList();
-          }}
-        />
+        <RoomPane key={current} projectId={projectId} number={current} me={me} now={now} back={back} onError={setError} onChanged={onChanged} onBack={onBack} />
       </main>
     );
   }
 
   return (
     <main className="page board rm">
-      <PageBar back={back} title="房間" onBack={onBack}>
-        <button type="button" className="ctl pg-bar-end" aria-expanded={creating} onClick={() => setCreating((c) => !c)}>
-          <Glyph name="plus" />
-          <span>開房間</span>
-        </button>
-      </PageBar>
+      <PageBar back={back} title="開房間" onBack={onBack} />
       {error && <ErrorLine text={error} onDismiss={() => setError(null)} />}
-      {creating && (
-        <NewRoom
-          onOpenSettings={onOpenSettings}
-          onCancel={() => setCreating(false)}
-          onCreate={async (title, agent, model) => {
-            const r = await api<Room>("POST", projectPath(projectId, "/rooms"), { title, agent, model });
-            setCreating(false);
-            setCurrent(r.number);
-            void loadList();
-          }}
-        />
-      )}
-      {list === null ? (
-        <Spinner label="載入房間…" />
-      ) : open.length + closed.length === 0 ? (
-        !creating && (
-          <p className="tb-empty-note">
-            還沒有房間。在房間裡可以一起討論，需要時按「問 AI」。
-            <button type="button" className="tb-link" onClick={() => setCreating(true)}>
-              開一個房間
-            </button>
-          </p>
-        )
-      ) : (
-        <div className="tb">
-          <RoomGroup label="進行中" rooms={open} now={now} me={me} onOpen={setCurrent} />
-          {closed.length > 0 && <RoomGroup label="最近結束" rooms={closed} now={now} me={me} onOpen={setCurrent} folded />}
-        </div>
-      )}
+      <NewRoom
+        onOpenSettings={onOpenSettings}
+        onCancel={onBack}
+        onCreate={async (title, agent, model) => {
+          const r = await api<Room>("POST", projectPath(projectId, "/rooms"), { title, agent, model });
+          setCurrent(r.number);
+          onChanged();
+        }}
+      />
     </main>
-  );
-}
-
-function RoomGroup({ label, rooms, now, me, onOpen, folded }: { label: string; rooms: RoomRef[]; now: number; me: string; onOpen: (n: number) => void; folded?: boolean }) {
-  if (rooms.length === 0) {
-    return (
-      <div className="tb-group tb-group-empty">
-        <div className="tb-sum">
-          <span className="tb-chev-space" aria-hidden="true" />
-          <span className="tb-group-label">{label}</span>
-          <span className="tb-count">0</span>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <details className={`tb-group${folded ? " tb-done-group" : ""}`} open={!folded}>
-      <summary className="tb-sum">
-        <Glyph name="chevron" size={12} className="tb-chev" />
-        <span className="tb-group-label">{label}</span>
-        <span className="tb-count">{rooms.length}</span>
-      </summary>
-      <ul className="tb-rows">
-        {rooms.map((r) => (
-          <li key={r.number} className="tb-row">
-            <button type="button" className="tb-title rm-open" title={r.title} onClick={() => onOpen(r.number)}>
-              {r.title}
-            </button>
-            <span className="tb-meta">
-              <span>{r.host.toLowerCase() === me.toLowerCase() ? "你主持" : `@${r.host} 主持`}</span>
-              <span>{relTime(r.updatedAt, now)}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </details>
   );
 }
 
@@ -243,7 +152,7 @@ function NewRoom(props: { onOpenSettings: () => void; onCancel: () => void; onCr
   );
 }
 
-function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { projectId: string; number: number; me: string; now: number; onError: (m: string) => void; onChanged: () => void; onBack: () => void }) {
+function RoomPane({ projectId, number, me, now, back, onError, onChanged, onBack }: { projectId: string; number: number; me: string; now: number; back?: string; onError: (m: string) => void; onChanged: () => void; onBack: () => void }) {
   const [room, setRoom] = useState<Room | null>(null);
   const [chat, setChat] = useState<Chat | null>(null);
   const { draft, setDraft } = useDraft(`room:${projectId}:${number}:${me}`);
@@ -371,7 +280,7 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
 
   return (
     <div className="rm-room">
-      <PageBar back="房間" title={room.title} onBack={onBack}>
+      <PageBar back={back} title={room.title} onBack={onBack}>
         <span className="pg-bar-end">
           {noting && <span className="rm-busy">AI 整理筆記中…</span>}
           <RoomMenu

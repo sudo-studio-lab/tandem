@@ -1,6 +1,7 @@
 /**
  * 脈絡: the team's shared context folder (tandem/context/ in the data repo). Everyone and every
- * agent can read and write it. Laid out for a narrow side panel: a list, then one file at a time.
+ * agent can read and write it. The list sits in the 決定 tab (ContextGroup); a file, or a new
+ * one, opens as its own page.
  */
 import { useCallback, useEffect, useState } from "react";
 import type { ContextConflict, ContextFile, ContextFileInfo, ContextWriteResult } from "@tandem/contracts";
@@ -18,6 +19,7 @@ import { relTime } from "../time.ts";
 import { MarkdownLite, Spinner, errMsg } from "./ui.tsx";
 import { PageBar } from "./PageBar.tsx";
 import { Glyph } from "./icons.tsx";
+import { Group } from "./Group.tsx";
 
 const ACCEPT = [...Object.keys(CONTEXT_TEXT_TYPES), ...Object.keys(CONTEXT_IMAGE_TYPES)].join(",");
 const MAX_MB = CONTEXT_MAX_BYTES / 1024 / 1024;
@@ -168,12 +170,14 @@ function FileView({
   projectId,
   path,
   now,
+  back,
   onBack,
   onChanged,
 }: {
   projectId: string;
   path: string;
   now: number;
+  back: string;
   onBack: () => void;
   onChanged: () => void;
 }) {
@@ -264,7 +268,7 @@ function FileView({
   const text = file?.kind === "text";
   return (
     <>
-      <PageBar back="脈絡" onBack={onBack} />
+      <PageBar back={back} onBack={onBack} />
       {!file ? (
         loadError ? (
           <p className="banner banner-error" role="alert">
@@ -343,11 +347,75 @@ function FileView({
   );
 }
 
-export function ContextPage({ projectId, now, back, onBack }: { projectId: string; now: number; back?: string; onBack: () => void }) {
+/**
+ * The shared context files as a group in the 決定 tab: one row per file, the pinned notes first.
+ * A row opens the file as a page; 「新增檔案」 opens an empty one.
+ */
+export function ContextGroup({ projectId, now, onOpen, onNew }: { projectId: string; now: number; onOpen: (path: string) => void; onNew: (name: string) => void }) {
   const [files, setFiles] = useState<ContextFileInfo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
-  const [creating, setCreating] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      setFiles(await api<ContextFileInfo[]>("GET", projectPath(projectId, "/context")));
+    } catch (e) {
+      setError(errMsg(e));
+    }
+  }, [projectId]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  const sorted = [...(files ?? [])].sort((a, b) => Number(b.path === CONTEXT_NOTES) - Number(a.path === CONTEXT_NOTES));
+  const hasNotes = sorted.some((f) => f.path === CONTEXT_NOTES);
+  return (
+    <>
+      {error ? (
+        <p className="board-error" role="alert">
+          <span className="status-dot" aria-hidden="true" />
+          <span className="board-error-text">脈絡沒有載入：{error}</span>
+          <button type="button" className="tb-link" onClick={() => void load()}>
+            再試一次
+          </button>
+        </p>
+      ) : files === null ? (
+        <Spinner label="載入脈絡…" />
+      ) : (
+        <Group label="脈絡" count={sorted.length}>
+          {sorted.map((f) => (
+            <li key={f.path} className="tb-row" title={`${f.path}\n${meta(f, now)}`}>
+              <button type="button" className="tb-title tk-open" onClick={() => onOpen(f.path)}>
+                {f.path}
+              </button>
+              <span className="tb-meta">
+                {f.path === CONTEXT_NOTES && <span className="tb-kind">置頂</span>}
+                {f.kind === "image" && <span className="tb-kind">圖片</span>}
+                {f.pending && <span>還沒同步</span>}
+                <span>{relTime(f.at, now)}</span>
+              </span>
+            </li>
+          ))}
+        </Group>
+      )}
+      {files !== null && (
+        <button type="button" className="ctl tk-new" onClick={() => onNew(hasNotes ? "" : CONTEXT_NOTES)}>
+          <Glyph name="plus" />
+          <span>{hasNotes ? "新增脈絡檔" : `建立 ${CONTEXT_NOTES}`}</span>
+        </button>
+      )}
+    </>
+  );
+}
+
+/**
+ * One context file as a page (`file`), or a new one (`create`, the suggested name). Without
+ * either it is the old list page.
+ */
+export function ContextPage({ projectId, now, back = "脈絡", onBack, file, create }: { projectId: string; now: number; back?: string; onBack: () => void; file?: string; create?: string }) {
+  const [files, setFiles] = useState<ContextFileInfo[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(file ?? null);
+  const [creating, setCreating] = useState<string | null>(create ?? null);
+  const direct = file !== undefined || create !== undefined;
 
   const load = useCallback(async () => {
     setError(null);
@@ -365,7 +433,17 @@ export function ContextPage({ projectId, now, back, onBack }: { projectId: strin
   if (open) {
     return (
       <div className="tb-log ctx">
-        <FileView projectId={projectId} path={open} now={now} onBack={() => setOpen(null)} onChanged={() => void load()} />
+        <FileView projectId={projectId} path={open} now={now} back={direct ? back : "脈絡"} onBack={direct ? onBack : () => setOpen(null)} onChanged={() => void load()} />
+      </div>
+    );
+  }
+  if (direct) {
+    return (
+      <div className="tb-log ctx">
+        <PageBar back={back} title="新增脈絡檔" titleId="ctx-title" onBack={onBack} />
+        <section className="panel-block" aria-labelledby="ctx-title">
+          <NewFile projectId={projectId} initialName={creating ?? ""} onCancel={onBack} onDone={(p) => setOpen(p)} />
+        </section>
       </div>
     );
   }

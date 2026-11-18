@@ -41,12 +41,7 @@ interface Props {
   onError: (msg: string) => void;
   view: View;
   onView: (v: View) => void;
-  /** Open the shared context page (脈絡). */
-  onContext?: () => void;
-  onAgentMessages?: () => void;
-  onSharedChats?: () => void;
-  onRooms?: () => void;
-  /** Extra tabs (e.g. rooms) appended after TABS. */
+  /** Extra tabs appended after TABS. */
   tabs?: { id: View; label: string }[];
 }
 
@@ -207,7 +202,10 @@ function Switcher({ session, project, onSelect, onRemove, onAddProject, onError 
   );
 }
 
-/** "⋯" menu: the less frequent actions (terminal, folder, refresh). */
+/**
+ * "⋯" menu: actions only, each one opening something outside Tandem (your AI tool in a terminal,
+ * the project folder). Pages live in the tabs; settings behind the settings button.
+ */
 function MoreMenu({ items }: { items: { key: string; label: string; disabled?: boolean; run: () => void }[] }) {
   const [open, setOpen] = useState(false);
   const [position,setPosition]=useState({left:12,top:60});
@@ -215,19 +213,18 @@ function MoreMenu({ items }: { items: { key: string; label: string; disabled?: b
   useDismiss(ref, open, () => setOpen(false));
   const toggle=()=>{if(!open){const rect=ref.current?.getBoundingClientRect();setPosition({left:Math.max(12,Math.min((rect?.right??292)-280,window.innerWidth-292)),top:(rect?.bottom??54)+6});}setOpen(v=>!v);};
   useEffect(()=>{if(!open)return;const resize=()=>{const r=ref.current?.getBoundingClientRect();setPosition({left:Math.max(12,Math.min((r?.right??292)-280,window.innerWidth-292)),top:(r?.bottom??54)+6});};window.addEventListener("resize",resize);return()=>window.removeEventListener("resize",resize);},[open]);
-  const collaboration=new Set(["context","agent-messages","shared-chats","rooms"]);
-  const tools=items.filter(it=>!collaboration.has(it.key)&&!["members","folder","refresh"].includes(it.key));
-  const renderItem=(it:typeof items[number])=><button key={it.key} type="button" className="menu-item" disabled={it.disabled} onClick={()=>{setOpen(false);it.run();}}><span className="grow">{it.label}</span></button>;
+  useEffect(()=>{if(open)ref.current?.querySelector<HTMLButtonElement>(".co-more-menu .menu-item:not(:disabled)")?.focus();},[open]);
+  const tools=items.filter(it=>it.key!=="folder");
+  const renderItem=(it:typeof items[number])=><button key={it.key} type="button" className="menu-item" disabled={it.disabled} onClick={()=>{setOpen(false);it.run();}}><span className="grow">{it.label}</span><Glyph name="arrow" size={12} className="co-ext"/></button>;
   return (
     <div className="more-menu" ref={ref} onKeyDown={e=>{if(e.key==="Escape"){setOpen(false);ref.current?.querySelector("button")?.focus();}}}>
-      <button type="button" className="icon-btn" aria-label="更多動作" title="更多動作" aria-expanded={open} aria-controls="tandem-project-actions" onClick={toggle}>
+      <button type="button" className="icon-btn" aria-label="打開 AI 工具或資料夾" title="打開 AI 工具或資料夾" aria-expanded={open} aria-controls="tandem-project-actions" onClick={toggle}>
         <Glyph name="more" />
       </button>
       {open && (
-        <div id="tandem-project-actions" className="menu menu-right card co-more-menu" style={{position:"fixed",left:position.left,right:"auto",top:position.top,width:280,minWidth:0,maxHeight:`calc(100dvh - ${position.top+12}px)`,overflowY:"auto"}} role="region" aria-label="專案功能">
-          <div role="group" aria-label="協作">{items.filter(it=>collaboration.has(it.key)).map(renderItem)}</div>
-          {tools.length>0&&<details className="co-menu-tools"><summary>開啟我的 AI 工具</summary>{tools.map(renderItem)}</details>}
-          <div role="group" aria-label="專案操作" className="co-menu-project">{items.filter(it=>["members","folder","refresh"].includes(it.key)).map(renderItem)}</div>
+        <div id="tandem-project-actions" className="menu menu-right card co-more-menu" style={{position:"fixed",left:position.left,right:"auto",top:position.top,width:280,minWidth:0,maxHeight:`calc(100dvh - ${position.top+12}px)`,overflowY:"auto"}} role="group" aria-label="打開 AI 工具或資料夾">
+          {tools.length>0&&<div role="group" aria-label="我的 AI 工具">{tools.map(renderItem)}</div>}
+          <div role="group" aria-label="專案" className="co-menu-project">{items.filter(it=>it.key==="folder").map(renderItem)}</div>
         </div>
       )}
     </div>
@@ -261,10 +258,6 @@ export function Header(p: Props) {
   const more =
     usable && id
       ? [
-          ...(p.onContext ? [{ key: "context", label: "脈絡", run: p.onContext }] : []),
-          ...(p.onAgentMessages ? [{ key: "agent-messages", label: "Agent 問答", run: p.onAgentMessages }] : []),
-          ...(p.onSharedChats ? [{ key: "shared-chats", label: "對話與交接", run: p.onSharedChats }] : []),
-          ...(p.onRooms ? [{ key: "rooms", label: "房間", run: p.onRooms }] : []),
           ...agents
             .filter((a) => a.installed && a.terminalAvailable !== false)
             .map((a) => ({
@@ -273,9 +266,7 @@ export function Header(p: Props) {
               disabled: opening === a.agent,
               run: () => void run(a.agent, projectPath(id, "/open-agent"), { agent: a.agent }),
             })),
-          { key: "members", label: "成員與邀請", run: p.onInvite },
           { key: "folder", label: "打開專案資料夾", disabled: opening === "folder", run: () => void run("folder", projectPath(id, "/open-folder")) },
-          { key: "refresh", label: "重新整理", disabled: p.refreshing, run: p.onRefresh },
         ]
       : [];
 

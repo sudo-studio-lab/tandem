@@ -252,6 +252,21 @@ export function mockProjectBoard(projectId: string, me: string): ProjectBoard {
   b.repo = { owner, name, url: `https://github.com/${owner}/${name}` };
   b.me = me;
   b.members.push({ login: "mei-lin", waitingOn: [], waitedOnBy: [], openTasks: [], recentPullRequests: [] });
+  // A question that names you: it waits in 對話.
+  b.discussions.unshift({
+    id: "disc-21",
+    number: 21,
+    title: "正式對外的名字要叫什麼？",
+    url: `${b.repo.url}/discussions/21`,
+    kind: "question",
+    author: "theroyatlas",
+    waitingOn: [me],
+    commenters: [],
+    answered: false,
+    closed: false,
+    createdAt: ago(3 * D),
+    updatedAt: ago(3 * D),
+  });
   const activity: Record<string, ActivityItem[]> = {
     jielle2453: [
       { kind: "commit", login: "jielle2453", title: "加上看板的活動區塊", url: `${REPO}/commit/a1`, time: ago(2 * H), branch: "main", count: 3 },

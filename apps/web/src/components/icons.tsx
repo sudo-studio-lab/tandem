@@ -2,7 +2,7 @@
  * Small line icons drawn for Tandem: one 16px grid, 1.5px stroke, round caps.
  * They inherit the text colour, so a control's colour is the icon's colour.
  */
-type Name = "mark" | "more" | "settings" | "chevron" | "plus" | "pin" | "doc" | "pr" | "task" | "arrow" | "check";
+type Name = "mark" | "more" | "settings" | "chevron" | "plus" | "pin" | "doc" | "pr" | "task" | "arrow" | "check" | "handoff";
 
 export function Glyph({ name, size = 16, className }: { name: Name; size?: number; className?: string }) {
   const p = {
@@ -95,6 +95,14 @@ export function Glyph({ name, size = 16, className }: { name: Name; size?: numbe
       return (
         <svg {...p}>
           <path d="M3.5 8.5l3 3 6-7" />
+        </svg>
+      );
+    case "handoff":
+      // Passing a task on: out of your hands, towards someone else.
+      return (
+        <svg {...p}>
+          <path d="M8.5 3.5H4.5a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h4" />
+          <path d="M6.5 8h7M11 5.5 13.5 8 11 10.5" />
         </svg>
       );
   }

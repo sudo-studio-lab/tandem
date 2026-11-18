@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { BoardData, Decision, Strength } from "@tandem/contracts";
 import { Ext } from "./Ext.tsx";
 import { Group } from "./Group.tsx";
@@ -14,14 +15,14 @@ const STRENGTH: Record<Strength, string> = {
 const SHOWN = 8;
 
 /** One line per decision; open it to read the original words, the decision and the reason. */
-function DecisionRow({ d, board }: { d: Decision; board: BoardData }) {
+function DecisionRow({ d, board, focused }: { d: Decision; board: BoardData; focused?: boolean }) {
   const f = d.frontmatter;
   // Decision files live in the data repo (same as the code repo unless .tandem.json says otherwise).
   const repoUrl = board.dataRepo?.url ?? board.repo.url;
   const replaced = d.supersededBy.length > 0;
   return (
-    <li className={`lg-dec${replaced ? " is-replaced" : ""}`}>
-      <details>
+    <li id={`dec-${f.id}`} className={`lg-dec${replaced ? " is-replaced" : ""}${focused ? " is-focused" : ""}`}>
+      <details open={focused || undefined}>
         <summary className="tb-row" title={f.title}>
           <Glyph name="chevron" size={12} className="lg-chev" />
           <span className="tb-title">{f.title}</span>
@@ -64,7 +65,8 @@ function DecisionRow({ d, board }: { d: Decision; board: BoardData }) {
   );
 }
 
-export function Decisions({ board }: { board: BoardData }) {
+/** `focus`: a decision opened from somewhere else (a teammate's note); it opens and scrolls into view. */
+export function Decisions({ board, focus }: { board: BoardData; focus?: string }) {
   const sorted = [...board.decisions].sort((a, b) =>
     a.frontmatter.date === b.frontmatter.date
       ? b.frontmatter.id.localeCompare(a.frontmatter.id)
@@ -73,17 +75,20 @@ export function Decisions({ board }: { board: BoardData }) {
   // Current decisions first; replaced ones only in the folded group.
   const current = sorted.filter((d) => d.supersededBy.length === 0);
   const rest = [...current.slice(SHOWN), ...sorted.filter((d) => d.supersededBy.length > 0)];
+  useEffect(() => {
+    if (focus) document.getElementById(`dec-${focus}`)?.scrollIntoView({ block: "center" });
+  }, [focus]);
   return (
     <>
       <Group label="決定" count={current.length}>
         {current.slice(0, SHOWN).map((d) => (
-          <DecisionRow key={d.frontmatter.id} d={d} board={board} />
+          <DecisionRow key={d.frontmatter.id} d={d} board={board} focused={d.frontmatter.id === focus} />
         ))}
       </Group>
       {rest.length > 0 && (
-        <Group label="更早的和已被取代的決定" count={rest.length} open={false} dim>
+        <Group label="更早的和已被取代的決定" count={rest.length} open={rest.some((d) => d.frontmatter.id === focus)} dim>
           {rest.map((d) => (
-            <DecisionRow key={d.frontmatter.id} d={d} board={board} />
+            <DecisionRow key={d.frontmatter.id} d={d} board={board} focused={d.frontmatter.id === focus} />
           ))}
         </Group>
       )}

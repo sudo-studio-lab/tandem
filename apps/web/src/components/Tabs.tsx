@@ -1,12 +1,16 @@
 import { useRef, type KeyboardEvent } from "react";
 
-/** The three board tabs. The order is the order on screen; the board opens on the first. */
-export type BoardTab = "tasks" | "people" | "decisions";
+/**
+ * The four board tabs, one per kind of thing: work, talk, what was decided (and the shared notes
+ * behind it), and the people. The order is the order on screen; the board opens on the first.
+ */
+export type BoardTab = "tasks" | "talk" | "decisions" | "people";
 
 export const BOARD_TABS: { id: BoardTab; label: string }[] = [
   { id: "tasks", label: "任務" },
-  { id: "people", label: "隊友" },
+  { id: "talk", label: "對話" },
   { id: "decisions", label: "決定" },
+  { id: "people", label: "隊友" },
 ];
 
 export const TAB_LABEL = Object.fromEntries(BOARD_TABS.map((t) => [t.id, t.label])) as Record<BoardTab, string>;
@@ -15,12 +19,16 @@ export const TAB_LABEL = Object.fromEntries(BOARD_TABS.map((t) => [t.id, t.label
 export const TAB_PANEL = "board-panel";
 export const tabId = (t: BoardTab) => `board-tab-${t}`;
 
+/** Spoken after a tab's number: what the number counts. */
+const COUNT_WORDS: Partial<Record<BoardTab, string>> = { tasks: "件在等你", talk: "則要你回" };
+
 /**
- * Three equal segments under the top bar. Only 任務 carries a number: how many things wait on you.
- * 隊友 carries a small dot when a teammate's status says they are stuck (`stuck` holds their logins).
- * Arrow keys, Home and End move between tabs (one tab stop, like any tab list).
+ * Four equal segments under the top bar. 任務 and 對話 carry a number: what waits on you there
+ * (each thing counted in one tab only). 隊友 carries a small dot when a teammate is stuck on
+ * something outside the team (`stuck` holds their logins). Arrow keys, Home and End move between
+ * tabs (one tab stop, like any tab list).
  */
-export function BoardTabs({ tab, waiting, stuck, onTab }: { tab: BoardTab; waiting: number; stuck: string[]; onTab: (t: BoardTab) => void }) {
+export function BoardTabs({ tab, counts, stuck, onTab }: { tab: BoardTab; counts: Partial<Record<BoardTab, number>>; stuck: string[]; onTab: (t: BoardTab) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const move = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
     const n = BOARD_TABS.length;
@@ -34,6 +42,7 @@ export function BoardTabs({ tab, waiting, stuck, onTab }: { tab: BoardTab; waiti
     <div className="bt" role="tablist" aria-label="看板" ref={ref}>
       {BOARD_TABS.map((t, i) => {
         const on = t.id === tab;
+        const count = counts[t.id] ?? 0;
         return (
           <button
             key={t.id}
@@ -47,12 +56,14 @@ export function BoardTabs({ tab, waiting, stuck, onTab }: { tab: BoardTab; waiti
             onKeyDown={(e) => move(e, i)}
           >
             {t.label}
-            {t.id === "tasks" && waiting > 0 && (
+            {count > 0 && (
               <>
                 <span className="bt-count" aria-hidden="true">
-                  {waiting}
+                  {count}
                 </span>
-                <span className="sr-only">，{waiting} 件在等你</span>
+                <span className="sr-only">
+                  ，{count} {COUNT_WORDS[t.id]}
+                </span>
               </>
             )}
             {t.id === "people" && stuck.length > 0 && (
