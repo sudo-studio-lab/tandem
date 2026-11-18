@@ -17,6 +17,7 @@ import { ApiError, api, projectPath } from "../api.ts";
 import { relTime } from "../time.ts";
 import { MarkdownLite, Spinner, errMsg } from "./ui.tsx";
 import { PageBar } from "./PageBar.tsx";
+import { Glyph } from "./icons.tsx";
 
 const ACCEPT = [...Object.keys(CONTEXT_TEXT_TYPES), ...Object.keys(CONTEXT_IMAGE_TYPES)].join(",");
 const MAX_MB = CONTEXT_MAX_BYTES / 1024 / 1024;
@@ -119,6 +120,7 @@ function NewFile({ projectId, initialName, onDone, onCancel }: { projectId: stri
   return (
     <div className="card pad ctx-form">
       <h3 className="ctx-name">新增檔案</h3>
+      <p className="muted small">不要放金鑰或密碼。</p>
       <label>
         檔名
         <input className="input full" value={name} onChange={(e) => setName(e.target.value)} placeholder="例如 specs/api.md" autoFocus />
@@ -371,16 +373,15 @@ export function ContextPage({ projectId, now, back, onBack }: { projectId: strin
   const hasNotes = !!files?.some((f) => f.path === CONTEXT_NOTES);
   return (
     <div className="tb-log ctx">
-      <PageBar back={back} title="脈絡" titleId="ctx-title" onBack={onBack} />
+      <PageBar back={back} title="脈絡" titleId="ctx-title" onBack={onBack}>
+        {creating === null && (
+          <button type="button" className="ctl pg-bar-end" onClick={() => setCreating("")}>
+            <Glyph name="plus" />
+            <span>新增檔案</span>
+          </button>
+        )}
+      </PageBar>
       <section className="panel-block" aria-labelledby="ctx-title">
-        <div className="ctx-intro">
-          <p className="muted small grow">不要放金鑰或密碼。</p>
-          {creating === null && (
-            <button type="button" className="btn btn-small" onClick={() => setCreating("")}>
-              新增檔案
-            </button>
-          )}
-        </div>
         {creating !== null && (
           <NewFile
             projectId={projectId}

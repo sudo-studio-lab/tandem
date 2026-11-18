@@ -1,6 +1,6 @@
 /* Rooms: one column in the board's panel style (DESIGN.md「房間」). */
 .rm {
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.5;
 }
 .page.board.rm {
@@ -11,12 +11,12 @@
   position: sticky;
   top: var(--topbar-h);
   z-index: 3;
-  margin: 0 -10px;
-  padding: 0 10px;
+  margin: 0 -14px;
+  padding: 0 14px;
   background: var(--bg);
 }
 .rm-busy {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--accent);
 }
 .ctl:disabled {
@@ -39,7 +39,7 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .rm-new .rm-field .input {
@@ -48,7 +48,7 @@
 }
 .rm-note {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 
@@ -66,7 +66,7 @@
 }
 .rm-sub {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .rm-sub a {
@@ -80,18 +80,16 @@
 
 /* Notes: a folded group label above the talk, same as the board's groups. */
 .rm-notes {
-  margin: 0 -10px;
-  border-bottom: 1px solid var(--border);
+  margin: 0;
 }
 .rm .rm-notes > .tb-sum {
   list-style: none;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 10px;
-  font-size: 11px;
+  padding: 18px 4px 8px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.06em;
   color: var(--muted);
   cursor: pointer;
 }
@@ -114,7 +112,9 @@
   letter-spacing: 0;
 }
 .rm-notes-body {
-  padding: 0 10px 10px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border-radius: var(--radius-group);
 }
 
 /* The talk: a log, not bubbles. Name line, then the words. */
@@ -128,7 +128,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
 }
 .rm-name {
   font-weight: 600;
@@ -138,12 +138,12 @@
   color: var(--muted);
 }
 .rm-ask {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--accent);
 }
 .rm-text {
-  margin: 2px 0 0 22px;
+  margin: 2px 0 0 24px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -156,18 +156,18 @@
 .rm-ai-mark {
   display: inline-grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   flex: none;
 }
 .rm-text .notes p,
 .rm-text .notes .notes-li {
-  font-size: 13px;
+  font-size: 15px;
 }
 .rm-item {
   margin: 6px 0 6px 22px;
@@ -175,7 +175,7 @@
 .rm-running,
 .rm-waiting {
   margin: 6px 0 0 22px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--accent);
 }
 .rm-waiting {
@@ -183,11 +183,11 @@
 }
 .rm-send-error {
   margin: 0 0 6px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--bad-fg);
 }
 .rm-closed {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
   padding: 8px 0;
 }
@@ -196,8 +196,8 @@
 .rm-compose {
   position: sticky;
   bottom: 0;
-  margin: 0 -10px;
-  padding: 8px 10px 10px;
+  margin: 0 -14px;
+  padding: 10px 14px 12px;
   background: var(--bg);
   border-top: 1px solid var(--border);
 }
@@ -206,7 +206,7 @@
   resize: vertical;
   min-height: 52px;
   max-height: 40dvh;
-  font-size: 13px;
+  font-size: 15px;
 }
 .rm-compose-row {
   display: flex;
@@ -217,12 +217,12 @@
 }
 .rm-hint {
   margin: 4px 0 0;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   text-align: right;
 }
 .rm-compose .btn {
-  min-height: var(--ctl-h);
+  min-height: 44px;
 }
 /* Side-panel width: keep the hint on one line by dropping the least-needed key. */
 @media (max-width: 480px) {

@@ -225,7 +225,7 @@ function MoreMenu({ items }: { items: { key: string; label: string; disabled?: b
       </button>
       {open && (
         <div id="tandem-project-actions" className="menu menu-right card co-more-menu" style={{position:"fixed",left:position.left,right:"auto",top:position.top,width:280,minWidth:0,maxHeight:`calc(100dvh - ${position.top+12}px)`,overflowY:"auto"}} role="region" aria-label="專案功能">
-          <div role="group" aria-label="協作"><p className="co-menu-heading">協作</p>{items.filter(it=>collaboration.has(it.key)).map(renderItem)}</div>
+          <div role="group" aria-label="協作">{items.filter(it=>collaboration.has(it.key)).map(renderItem)}</div>
           {tools.length>0&&<details className="co-menu-tools"><summary>開啟我的 AI 工具</summary>{tools.map(renderItem)}</details>}
           <div role="group" aria-label="專案操作" className="co-menu-project">{items.filter(it=>["members","folder","refresh"].includes(it.key)).map(renderItem)}</div>
         </div>
