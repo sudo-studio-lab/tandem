@@ -18,6 +18,8 @@ export interface DesktopState {
   pendingUpdate?: string;
   /** The "tandem command added to PATH" toast was shown. */
   shimHintShown?: boolean;
+  /** The port the server last ran on; tried first next time so the side-panel address stays the same. */
+  port?: number;
 }
 
 const file = () => path.join(app.getPath("userData"), "desktop-state.json");

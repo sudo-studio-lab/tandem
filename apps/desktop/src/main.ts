@@ -3,6 +3,7 @@ import path from "node:path";
 import {
   app,
   BrowserWindow,
+  clipboard,
   ipcMain,
   Menu,
   nativeImage,
@@ -19,6 +20,7 @@ import { findDeepLink, isHttps, parseJoinLink, parseJoinSecret } from "./deeplin
 import { EventStream } from "./events.ts";
 import { cliPath, gitExe, iconPath } from "./paths.ts";
 import { defaultBinDir, ensureShim } from "./shim.ts";
+import { SIDEBAR_PORT, newSidebarKey, sidebarKey, sidebarUrl } from "./sidebar.ts";
 import { startStub } from "./stub.ts";
 import { readState, writeState } from "./state.ts";
 import { startUpdater } from "./updater.ts";
@@ -80,9 +82,18 @@ async function boot(): Promise<void> {
     backend = new Backend({ cliPath: "", gitExe: gitExe(), logDir, token });
     backend.port = stub.port;
   } else {
-    backend = new Backend({ cliPath: cliPath(), gitExe: gitExe(), logDir, token });
+    backend = new Backend({
+      cliPath: cliPath(),
+      gitExe: gitExe(),
+      logDir,
+      token,
+      // Same port and key every start, so the address pasted into an editor's side panel keeps working.
+      port: () => readState().port ?? SIDEBAR_PORT,
+      sidebarKey,
+    });
     backend.on("ready", () => {
       origin = backend!.origin;
+      if (readState().port !== backend!.port) writeState({ port: backend!.port });
       serverError = null;
       events.connect(origin, token);
       loadApp(pendingJoin ?? undefined,pendingJoinSecret??undefined);
@@ -257,6 +268,7 @@ function createTray(): void {
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: "開啟 Tandem", click: showWindow },
+      { label: "複製側欄網址", click: () => void copySidebarFromTray() },
       // TODO: wire to the server (POST /api/sync/pause) once it exists; no-op for now.
       { label: "暫停同步", type: "checkbox", checked: false, click: () => {} },
       { type: "separator" },
@@ -269,6 +281,43 @@ function createTray(): void {
       },
     ]),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Side-panel address (fixed port + long-lived key; see sidebar.ts)
+// ---------------------------------------------------------------------------
+function copySidebar(): boolean {
+  const url = sidebarUrl(origin);
+  if (!url) return false;
+  clipboard.writeText(url);
+  return true;
+}
+
+function copySidebarFromTray(): void {
+  const ok = copySidebar();
+  if (!Notification.isSupported()) return;
+  new Notification(
+    ok
+      ? { title: "已複製側欄網址", body: "貼進編輯器的內建瀏覽器。App 重開或更新後不用重貼。" }
+      : { title: "Tandem 還在啟動", body: "等一下再複製一次。" },
+  ).show();
+}
+
+/** Make a new key and tell the running server; the old address and its cookies stop working at once. */
+async function replaceSidebarKey(): Promise<string> {
+  const key = newSidebarKey();
+  if (origin) {
+    const r = await fetch(`${origin}/internal/sidebar-key`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ key }),
+    }).catch(() => null);
+    if (!r?.ok) {
+      backend?.note(`sidebar key update failed: ${r ? `HTTP ${r.status}` : "no response"}`);
+      throw new Error("沒有換成功。重開 Tandem 後新網址才會生效。");
+    }
+  }
+  return sidebarUrl(origin);
 }
 
 function badgeImage(): Electron.NativeImage {
@@ -338,6 +387,9 @@ function registerIpc(): void {
     return app.isPackaged ? openAtLogin() : v;
   });
   ipcMain.handle("tandem:getOpenAtLogin", (e) => (fromOurPage(e) ? openAtLogin() : false));
+  ipcMain.handle("tandem:getSidebarUrl", (e) => (fromOurPage(e) ? sidebarUrl(origin) : ""));
+  ipcMain.handle("tandem:copySidebarUrl", (e) => (fromOurPage(e) ? copySidebar() : false));
+  ipcMain.handle("tandem:replaceSidebarUrl", (e) => (fromOurPage(e) ? replaceSidebarKey() : ""));
   ipcMain.on("tandem:setBadge", (e, n: unknown) => {
     if (!fromOurPage(e) || typeof n !== "number" || !Number.isInteger(n) || n < 0 || n > 9999) return;
     updateAttention(n);

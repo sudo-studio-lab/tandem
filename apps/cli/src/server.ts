@@ -2,9 +2,12 @@
  * Local app server: one process serves every project on this computer.
  * Used by `tandem` (browser) and by the desktop app (`tandem serve`).
  * Binds 127.0.0.1 only; a one-time token becomes a cookie; the desktop main process
- * may also send it as a Bearer header. Updates go out over Server-Sent Events.
+ * may also send it as a Bearer header. The desktop app can also pass a long-lived
+ * side-panel key: `/?t=<key>` becomes a year-long cookie, so an editor's built-in
+ * browser keeps working across app restarts and updates. Updates go out over
+ * Server-Sent Events.
  */
-import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import os from "node:os";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -80,6 +83,19 @@ import pkg from "../package.json" with { type: "json" };
 const DEFAULT_PORT = 4318;
 const GITHUB_POLL_MS = 3 * 60_000;
 const COOKIE = "tandem_session";
+/** The side-panel cookie: its own name, so it never clobbers a session cookie on the same host. */
+const SIDEBAR_COOKIE = "tandem_sidebar";
+const SIDEBAR_COOKIE_MAX_AGE = 365 * 24 * 3600;
+/** Ports tried after the preferred one before falling back to a random port (desktop only). */
+const PORT_TRIES = 20;
+
+/** Constant-time compare; an empty secret never matches. */
+function sameSecret(given: string | undefined, secret: string): boolean {
+  if (!given || !secret) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(secret);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 const ACTIVITY_DAYS = 7;
 
 const MIME: Record<string, string> = {
@@ -140,6 +156,11 @@ export interface ServerOptions {
   desktop?: boolean;
   /** Print a ServeReadyLine on stdout (desktop). */
   readyLine?: boolean;
+  /**
+   * Long-lived key for an editor's side panel (desktop). `/?t=<key>` is swapped for a cookie that
+   * holds a value derived from the key, so replacing the key (POST /internal/sidebar-key) ends old cookies.
+   */
+  sidebarKey?: string;
 }
 
 export interface AppServer {
@@ -151,6 +172,8 @@ export interface AppServer {
 export async function startServer(opts: ServerOptions = {}): Promise<AppServer> {
   const sessionToken = opts.sessionToken ?? randomBytes(24).toString("base64url");
   const desktop = !!opts.desktop;
+  let sidebarKey = opts.sidebarKey ?? "";
+  const sidebarCookie = () => (sidebarKey ? createHmac("sha256", sidebarKey).update("tandem-sidebar-cookie").digest("base64url") : "");
   const listeners = new Set<(e: AppEvent) => void>();
   const emit = (e: AppEvent) => listeners.forEach((l) => l(e));
 
@@ -417,17 +440,36 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
     }
   });
 
+  // The desktop main process replaces the side-panel key ("換一個網址"). Session token as Bearer only:
+  // a page holding just a cookie (including the side panel itself) cannot do this.
+  app.post("/internal/sidebar-key", async (c) => {
+    const bearer = c.req.header("authorization")?.replace(/^Bearer\s+/i, "");
+    if (!sameSecret(bearer, sessionToken)) return c.json({ message: "forbidden" }, 403);
+    const b = (await c.req.json().catch(() => ({}))) as { key?: unknown };
+    if (typeof b.key !== "string" || b.key.length < 32) return c.json({ message: "invalid key" }, 400);
+    sidebarKey = b.key;
+    return c.json({ ok: true });
+  });
+
   app.use("*", async (c, next) => {
     const t = c.req.query("t");
     if (t !== undefined) {
-      if (t !== sessionToken) return c.text(`連結已失效，請重新打開 ${PRODUCT.displayName}`, 403);
-      setCookie(c, COOKIE, sessionToken, { httpOnly: true, sameSite: "Strict", path: "/" });
       const u = new URL(c.req.url);
       u.searchParams.delete("t");
-      return c.redirect(`${u.pathname}${u.search}`);
+      const to = `${u.pathname}${u.search}`;
+      if (sameSecret(t, sessionToken)) {
+        setCookie(c, COOKIE, sessionToken, { httpOnly: true, sameSite: "Strict", path: "/" });
+        return c.redirect(to);
+      }
+      if (sameSecret(t, sidebarKey)) {
+        setCookie(c, SIDEBAR_COOKIE, sidebarCookie(), { httpOnly: true, sameSite: "Strict", path: "/", maxAge: SIDEBAR_COOKIE_MAX_AGE });
+        return c.redirect(to);
+      }
+      return c.text(`連結已失效，請重新打開 ${PRODUCT.displayName}`, 403);
     }
     const bearer = c.req.header("authorization")?.replace(/^Bearer\s+/i, "");
-    if (getCookie(c, COOKIE) !== sessionToken && bearer !== sessionToken) return c.text(`請從 ${PRODUCT.displayName} 打開`, 401);
+    const ok = getCookie(c, COOKIE) === sessionToken || bearer === sessionToken || sameSecret(getCookie(c, SIDEBAR_COOKIE), sidebarCookie());
+    if (!ok) return c.text(`請從 ${PRODUCT.displayName} 打開`, 401);
     await next();
   });
 
@@ -965,7 +1007,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
   }
 
   let server: ServerType | undefined;
-  const tryPorts = opts.port === 0 ? [0] : Array.from({ length: 20 }, (_, i) => port + i);
+  // The desktop app asks for a fixed port so the side-panel address stays the same; when that port
+  // and the next few are taken it still starts, on a random port.
+  const tryPorts = opts.port === 0 ? [0] : [...Array.from({ length: PORT_TRIES }, (_, i) => port + i), ...(desktop ? [0] : [])];
   for (const p of tryPorts) {
     server = await new Promise<ServerType | undefined>((resolve) => {
       const s = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: p }, (addr) => {

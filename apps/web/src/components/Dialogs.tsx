@@ -96,11 +96,87 @@ export function InviteDialog({ projectId, onClose }: { projectId: string; onClos
   );
 }
 
-const TOGGLES: { kind: NotificationKind; label: string; help: string }[] = [
-  { kind: "waiting", label: "有人在等我", help: "別人在等你回答或決定時" },
-  { kind: "review", label: "有人請我審查", help: "有人請你看一份修改時" },
-  { kind: "task", label: "有任務指派給我", help: "有新任務交給你時" },
+const TOGGLES: { kind: NotificationKind; label: string }[] = [
+  { kind: "waiting", label: "有人在等我" },
+  { kind: "review", label: "有人請我審查" },
+  { kind: "task", label: "有任務指派給我" },
 ];
+
+/**
+ * Desktop only: the address that puts this board in an editor's built-in browser. The key in it is
+ * masked on screen; copy puts the whole address on the clipboard. Replacing it ends the old one.
+ */
+function SidebarLink() {
+  const bridge = window.tandemDesktop;
+  const [url, setUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    bridge?.getSidebarUrl?.().then(setUrl, () => setUrl(""));
+  }, [bridge]);
+  if (!bridge?.getSidebarUrl) return null;
+
+  async function copy() {
+    setErr(null);
+    const ok = await bridge!.copySidebarUrl?.().catch(() => false);
+    if (!ok) return setErr("沒有複製成功，再試一次。");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+  async function replace() {
+    setBusy(true);
+    setErr(null);
+    try {
+      setUrl((await bridge!.replaceSidebarUrl?.()) ?? "");
+      setConfirming(false);
+      setCopied(false);
+    } catch (e) {
+      setErr(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const shown = url ? url.replace(/\?t=.*$/, "?t=••••••") : "";
+  return (
+    <section className="sb-link" aria-labelledby="sb-link-title">
+      <h3 id="sb-link-title" className="sub">
+        放在編輯器側欄
+      </h3>
+      <p className="muted small">把網址貼進編輯器的內建瀏覽器。App 重開或更新後不用重貼。</p>
+      <div className="sb-url">
+        <code className="mono" title={url ? "按「複製網址」取得完整網址" : undefined}>
+          {url === null ? "讀取中…" : shown || "Tandem 還在啟動，稍後再打開設定"}
+        </code>
+        <button type="button" className="btn btn-small" disabled={!url} onClick={() => void copy()}>
+          {copied ? "已複製" : "複製網址"}
+        </button>
+      </div>
+      {confirming ? (
+        <p className="sb-confirm" role="group" aria-label="換一個網址">
+          <span>舊網址會立刻失效，貼過的地方要重貼。</span>
+          <button type="button" className="btn btn-small btn-danger" disabled={busy} onClick={() => void replace()}>
+            {busy ? "換新中…" : "換新網址"}
+          </button>
+          <button type="button" className="btn btn-small btn-quiet" disabled={busy} onClick={() => setConfirming(false)}>
+            取消
+          </button>
+        </p>
+      ) : (
+        <button type="button" className="btn btn-small btn-quiet sb-replace" disabled={!url} onClick={() => setConfirming(true)}>
+          換一個網址
+        </button>
+      )}
+      {err && (
+        <p className="banner banner-error" role="alert">
+          {err}
+        </p>
+      )}
+    </section>
+  );
+}
 
 export function SettingsDialog({ session, onClose, onSignOut }: { session: AppSession; onClose: () => void; onSignOut: () => Promise<void> }) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -176,14 +252,12 @@ export function SettingsDialog({ session, onClose, onSignOut }: { session: AppSe
                   checked={settings.notifications[t.kind]}
                   onChange={(e) => save({ ...settings, notifications: { ...settings.notifications, [t.kind]: e.target.checked } })}
                 />
-                <span>
-                  {t.label}
-                  <span className="muted small block">{t.help}</span>
-                </span>
+                <span>{t.label}</span>
               </label>
             </li>
           ))}
-          {session.desktop && (
+          {/* Only inside the desktop app: in a browser (e.g. the side panel) there is nothing to start at login. */}
+          {session.desktop && window.tandemDesktop && (
             <li>
               <label className="toggle">
                 <input type="checkbox" checked={settings.openAtLogin} onChange={(e) => toggleLogin(e.target.checked)} />
@@ -201,6 +275,7 @@ export function SettingsDialog({ session, onClose, onSignOut }: { session: AppSe
           {err}
         </p>
       )}
+      <SidebarLink />
       <hr />
       <p className="muted small">
         已登入：@{session.login} · Tandem 版本 {session.version}

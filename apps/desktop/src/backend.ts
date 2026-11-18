@@ -10,6 +10,10 @@ export interface BackendOptions {
   gitExe: string;
   logDir: string;
   token: string;
+  /** Port to try first (and the next few after it); 0 or absent = any free port. */
+  port?: () => number;
+  /** Long-lived side-panel key, read on every start so a replaced key survives a restart. */
+  sidebarKey?: () => string;
 }
 
 const READY_TIMEOUT_MS = 30_000;
@@ -64,9 +68,11 @@ export class Backend extends EventEmitter {
     }
     const startedAt = Date.now();
     this.note(`starting ${this.opts.cliPath}`);
+    const port = this.opts.port?.() ?? 0;
+    const sidebarKey = this.opts.sidebarKey?.() ?? "";
     const child = spawn(
       process.execPath,
-      [this.opts.cliPath, "serve", "--port", "0", "--token-stdin", "--desktop"],
+      [this.opts.cliPath, "serve", "--port", String(port), "--token-stdin", ...(sidebarKey ? ["--sidebar-key-stdin"] : []), "--desktop"],
       {
         env: {
           ...process.env,
@@ -88,7 +94,8 @@ export class Backend extends EventEmitter {
     }, READY_TIMEOUT_MS);
 
     child.stdin?.on("error", () => {});
-    child.stdin?.write(this.opts.token + "\n");
+    // Secrets go over stdin, never argv: the session token first, then the side-panel key.
+    child.stdin?.write(this.opts.token + "\n" + (sidebarKey ? sidebarKey + "\n" : ""));
 
     createInterface({ input: child.stdout! }).on("line", (line) => {
       if (!ready) {
