@@ -1,4 +1,4 @@
-import type { ProjectBoard, WaitingItem } from "@tandem/contracts";
+import type { Handoff, ProjectBoard, WaitingItem } from "@tandem/contracts";
 import { Ext } from "./Ext.tsx";
 import { Avatar } from "./ui.tsx";
 import { Glyph } from "./icons.tsx";
@@ -6,9 +6,10 @@ import { relTime, waitedFor } from "../time.ts";
 
 /*
  * The 任務 tab: one narrow column (fits an editor's side panel). What waits on
- * you (only when something does), then what you own, then what your teammates
- * own, then what finished lately. Each row says its state on the right. The
- * 隊友 tab lists the same items per person with the same rows (collect + Row).
+ * you (only when something does: reviews, tasks blocking someone, tasks handed
+ * to you; questions live in 對話), then what you own, then what your teammates
+ * own, then what finished lately. Each row says its state on the right; your own
+ * open tasks can be handed to a teammate from the row.
  */
 
 /** Where an item stands: a PR is open for review, work is under way, or it is finished. */
@@ -136,7 +137,7 @@ function StateText({ it }: { it: Item }) {
   );
 }
 
-export function Row({ it, now, owners }: { it: Item; now: number; owners: boolean }) {
+export function Row({ it, now, owners, onHandoff }: { it: Item; now: number; owners: boolean; onHandoff?: (it: Item) => void }) {
   const kind = it.kind === "pr" ? "PR" : "任務";
   const detail = `${kind}・${stateWords(it)}・負責 ${it.owners.map((o) => `@${o}`).join("、")}・${relTime(it.time, now)}更新`;
   return (
@@ -156,12 +157,17 @@ export function Row({ it, now, owners }: { it: Item; now: number; owners: boolea
           </span>
         )}
       </span>
+      {onHandoff && it.kind === "task" && it.state !== "done" && (
+        <button type="button" className="tb-act" aria-label={`交接 #${it.number}`} title="交接給隊友" onClick={() => onHandoff(it)}>
+          <Glyph name="handoff" size={14} />
+        </button>
+      )}
     </li>
   );
 }
 
-function Group(props: { label: string; icon: IconName; open: boolean; items: Item[]; now: number; owners: boolean; done?: boolean }) {
-  const { label, icon, open, items, now, owners, done } = props;
+function Group(props: { label: string; icon: IconName; open: boolean; items: Item[]; now: number; owners: boolean; done?: boolean; onHandoff?: (it: Item) => void }) {
+  const { label, icon, open, items, now, owners, done, onHandoff } = props;
   if (items.length === 0) {
     // Nothing here: one quiet line, nothing to expand.
     return (
@@ -189,7 +195,7 @@ function Group(props: { label: string; icon: IconName; open: boolean; items: Ite
       </summary>
       <ul className="tb-rows">
         {items.map((it) => (
-          <Row key={it.key} it={it} now={now} owners={owners} />
+          <Row key={it.key} it={it} now={now} owners={owners} onHandoff={onHandoff} />
         ))}
       </ul>
     </details>
@@ -203,16 +209,41 @@ function splitNumber(title: string, url: string): { num: string | null; title: s
   return { num: url.match(/\/(\d+)\/?$/)?.[1] ?? null, title };
 }
 
-function WaitGroup({ items, now }: { items: WaitingItem[]; now: number }) {
+function WaitGroup({ items, handoffs, board, now }: { items: WaitingItem[]; handoffs: Handoff[]; board: ProjectBoard; now: number }) {
   return (
     <details className="tb-group tb-group-wait" open>
       <summary className="tb-sum">
         <Glyph name="chevron" size={12} className="tb-chev" />
         <Icon name="wait" className="tb-wait-ic" />
         <span className="tb-group-label">在等你</span>
-        <span className="tb-count tb-count-strong">{items.length}</span>
+        <span className="tb-count tb-count-strong">{items.length + handoffs.length}</span>
       </summary>
       <ul className="tb-rows">
+        {handoffs.map((h) => {
+          const t = board.tasks.find((x) => x.number === h.task);
+          const title = t?.title ?? `任務 #${h.task}`;
+          return (
+            <li key={h.id} className="tb-row tb-row-note" title={`#${h.task} ${title}
+@${h.from} 交接給你・${relTime(h.at, now)}
+${h.note}`}>
+              <span className="tb-num">#{h.task}</span>
+              {t ? (
+                <Ext href={t.url} className="tb-title">
+                  {title}
+                </Ext>
+              ) : (
+                <span className="tb-title">{title}</span>
+              )}
+              <span className="sr-only">（@{h.from} 交接給你，{relTime(h.at, now)}）</span>
+              <span className="tb-meta" aria-hidden="true">
+                <span className="tb-kind">交接給你</span>
+                <Avatar login={h.from} size={16} />
+                <span>{relTime(h.at, now)}</span>
+              </span>
+              <p className="tb-note">{h.note}</p>
+            </li>
+          );
+        })}
         {items.map((w, i) => {
           const { num, title } = splitNumber(w.title, w.url);
           return (
@@ -242,9 +273,14 @@ export function waitingOnMe(board: ProjectBoard): WaitingItem[] {
   return board.waiting.filter((w) => w.to.toLowerCase() === me).sort((a, b) => Date.parse(a.since) - Date.parse(b.since));
 }
 
-export function TaskBoard({ board, now }: { board: ProjectBoard; now: number }) {
+/** What waits on you in the 任務 tab: reviews and blocking tasks. Questions wait in 對話. */
+export function taskWaits(board: ProjectBoard): WaitingItem[] {
+  return waitingOnMe(board).filter((w) => w.kind !== "discussion");
+}
+
+export function TaskBoard({ board, now, handoffs, onHandoff }: { board: ProjectBoard; now: number; handoffs: Handoff[]; onHandoff: (it: Item) => void }) {
   const me = board.me.toLowerCase();
-  const waits = waitingOnMe(board);
+  const waits = taskWaits(board);
   const items = collect(board);
   const open = items.filter((it) => it.state !== "done");
   const done = items.filter((it) => it.state === "done");
@@ -252,7 +288,8 @@ export function TaskBoard({ board, now }: { board: ProjectBoard; now: number }) 
   const mine = open.filter(isMine);
   const theirs = open.filter((it) => !isMine(it));
 
-  if (items.length === 0 && waits.length === 0) {
+  const waitCount = waits.length + handoffs.length;
+  if (items.length === 0 && waitCount === 0) {
     return (
       <div className="tb">
         <p className="tb-empty-note">還沒有任務。跟你的 AI 說要開什麼任務，或直接在 GitHub 開 issue。</p>
@@ -261,10 +298,10 @@ export function TaskBoard({ board, now }: { board: ProjectBoard; now: number }) 
   }
   return (
     <div className="tb">
-      {waits.length > 0 && <WaitGroup items={waits} now={now} />}
-      <Group label="你負責的" icon="working" open items={mine} now={now} owners={false} />
+      {waitCount > 0 && <WaitGroup items={waits} handoffs={handoffs} board={board} now={now} />}
+      <Group label="你負責的" icon="working" open items={mine} now={now} owners={false} onHandoff={board.members.length > 1 ? onHandoff : undefined} />
       {/* With nothing of your own and nothing waiting, your teammates' work is the useful first screen. */}
-      <Group label="隊友負責的" icon="task" open={mine.length === 0 && waits.length === 0} items={theirs} now={now} owners />
+      <Group label="隊友負責的" icon="task" open={mine.length === 0 && waitCount === 0} items={theirs} now={now} owners />
       {done.length > 0 && <Group label="最近完成" icon="done" open={false} items={done} now={now} owners done />}
     </div>
   );

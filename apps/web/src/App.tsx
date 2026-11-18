@@ -2,24 +2,26 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api.ts";
 import { useApp } from "./useApp.ts";
 import { useNow } from "./time.ts";
-import { Header, type View } from "./components/Header.tsx";
-import { TaskBoard, waitingOnMe } from "./components/TaskBoard.tsx";
+import { Header } from "./components/Header.tsx";
+import { TaskBoard, taskWaits } from "./components/TaskBoard.tsx";
 import { Teammates, blockedTeammates } from "./components/People.tsx";
 import { BoardTabs, TAB_LABEL, TAB_PANEL, tabId, type BoardTab } from "./components/Tabs.tsx";
-import { Discussions } from "./components/Discussions.tsx";
+import { TalkTab, talkWaits } from "./components/Talk.tsx";
 import { Decisions } from "./components/Decisions.tsx";
 import { Problems } from "./components/Problems.tsx";
 import { SignIn } from "./components/SignIn.tsx";
 import { Picker, type StartOp } from "./components/Picker.tsx";
 import { ProgressView } from "./components/Progress.tsx";
-import { InviteDialog, SettingsDialog } from "./components/Dialogs.tsx";
+import { InviteDialog } from "./components/Dialogs.tsx";
+import { SettingsPage } from "./components/Settings.tsx";
 import { AgentSettingsDialog, ChatView } from "./components/Chat.tsx";
 import { RoomView } from "./components/Room.tsx";
-import { ContextPage } from "./components/Context.tsx";
+import { ContextGroup, ContextPage } from "./components/Context.tsx";
 import { AgentMessagesPage } from "./components/AgentMessages.tsx";
-import { SharedChatsPage } from "./components/SharedChats.tsx";
+import { HandoffPage, SharedChatPage } from "./components/SharedChats.tsx";
 import { Spinner, errMsg } from "./components/ui.tsx";
 import { HOME, PageBar } from "./components/PageBar.tsx";
+import { handoffsToMe, useCollab } from "./collab.ts";
 
 interface Op {
   /** null while the start request is in flight. */
@@ -30,37 +32,51 @@ interface Op {
 
 const joinHint = () => new URLSearchParams(location.search).get("join");
 
+/** A page opened from a tab (or the settings button), shown instead of the tabs until its back link is used. */
+type Page =
+  | { kind: "room"; room: number | "new" }
+  | { kind: "agent-messages" }
+  | { kind: "shared-chat"; owner: string; id: string }
+  | { kind: "chat"; forkId: string }
+  | { kind: "handoff"; task: { number: number; title: string } }
+  | { kind: "context"; file?: string; create?: string }
+  | { kind: "settings" };
+
 export function App() {
   const app = useApp();
   const { session, board, progress } = app;
   const now = useNow();
   const [showPicker, setShowPicker] = useState(false);
   const [op, setOp] = useState<Op | null>(null);
-  const [dialog, setDialog] = useState<"invite" | "settings" | "agents" | null>(null);
-  const [view, setView] = useState<View>("board");
+  const [dialog, setDialog] = useState<"invite" | "agents" | null>(null);
   const [tab, setTab] = useState<BoardTab>("tasks");
-  /** A page opened from the ⋯ menu, shown instead of the tabs until its back link is used. */
-  const [page, setPage] = useState<"context" | "agent-messages" | "shared-chats" | null>(null);
+  /** A decision opened from a teammate's note: the 決定 tab opens it and scrolls to it. */
+  const [focusDecision, setFocusDecision] = useState<string | undefined>();
+  const [page, setPage] = useState<Page | null>(null);
   /** Set when a page's back link is used, so focus lands on the tab it returned to. */
   const returning = useRef(false);
   const backToTabs = () => {
     returning.current = true;
-    setView("board");
     setPage(null);
   };
   useEffect(() => {
-    if (!returning.current || page !== null || view !== "board") return;
+    if (!returning.current || page !== null) return;
     returning.current = false;
     document.getElementById(tabId(tab))?.focus();
   });
-  const [forkId,setForkId]=useState<string|undefined>();
+  const collab = useCollab(session?.login ? (session.currentProjectId ?? undefined) : undefined);
   const [toast, setToast] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const handledDone = useRef<string | null>(null);
 
   const notify = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast((t) => (t === msg ? null : t)), 7000);
+  }, []);
+  const tell = useCallback((msg: string) => {
+    setNotice(msg);
+    setTimeout(() => setNotice((t) => (t === msg ? null : t)), 7000);
   }, []);
 
   // Desktop bridge: badge = everything waiting across all projects.
@@ -114,6 +130,7 @@ export function App() {
   const signOut = async () => {
     await api("POST", "/api/logout");
     setDialog(null);
+    setPage(null);
     setShowPicker(false);
     await app.loadSession();
   };
@@ -159,14 +176,25 @@ export function App() {
   const project = session.projects.find((x) => x.id === session.currentProjectId);
   const picking = showPicker || session.projects.length === 0 || !project;
 
-  const toastEl = toast && (
+  const toastEl = toast ? (
     <p className="banner banner-error toast" role="alert">
       {toast}{" "}
       <button type="button" className="btn btn-small" onClick={() => setToast(null)}>
         知道了
       </button>
     </p>
+  ) : (
+    notice && (
+      <p className="banner toast" role="status">
+        {notice}{" "}
+        <button type="button" className="btn btn-small" onClick={() => setNotice(null)}>
+          知道了
+        </button>
+      </p>
+    )
   );
+  const back = TAB_LABEL[tab];
+  const me = session.login;
 
   const header = (
     <Header
@@ -182,34 +210,26 @@ export function App() {
       onSync={app.sync}
       onSelect={(id) => {
         setShowPicker(false);
-        setForkId(undefined);
+        setPage(null);
+        setFocusDecision(undefined);
         void app.selectProject(id);
       }}
       onRemove={app.removeProject}
-      onAddProject={() => setShowPicker(true)}
+      onAddProject={() => {
+        setPage(null);
+        setShowPicker(true);
+      }}
       onInvite={() => setDialog("invite")}
-      onSettings={() => setDialog("settings")}
+      onSettings={() => setPage({ kind: "settings" })}
       onError={notify}
-      view={view}
-      onView={(v) => {
-        setView(v);
-        if (v === "board") setPage(null);
-      }}
-      onContext={() => {
-        setView("board");
-        setPage("context");
-      }}
-      onAgentMessages={() => {
-        setView("board");
-        setPage("agent-messages");
-      }}
-      onSharedChats={() => {
-        setView("board");
-        setPage("shared-chats");
-      }}
-      onRooms={() => setView("room")}
+      view="board"
+      onView={() => setPage(null)}
     />
   );
+  const openTab = (t: BoardTab) => {
+    setTab(t);
+    setFocusDecision(undefined);
+  };
 
   return (
     <>
@@ -220,7 +240,11 @@ export function App() {
           {startError}
         </p>
       )}
-      {picking ? (
+      {page?.kind === "settings" ? (
+        <main className="page board">
+          <SettingsPage session={session} board={!picking && project.available ? board : null} back={picking ? "專案" : back} onBack={backToTabs} onOpenAgents={() => setDialog("agents")} onSignOut={signOut} />
+        </main>
+      ) : picking ? (
         <Picker
           session={session}
           hint={joinHint()}
@@ -239,18 +263,25 @@ export function App() {
             </button>
           </div>
         </main>
-      ) : view === "room" ? (
+      ) : page?.kind === "room" ? (
         <RoomView
-          key={project.id}
+          key={`${project.id}:${page.room}`}
           projectId={project.id}
-          me={session.login}
+          me={me}
           now={now}
-          back={TAB_LABEL[tab]}
+          room={page.room}
+          back={back}
           onOpenSettings={() => setDialog("agents")}
           onBack={backToTabs}
+          onChanged={() => void collab.reload()}
         />
-      ) : view === "chat" ? (
-        <><div className="page"><PageBar back="對話與交接" title="接續對話" onBack={() => { setView("board"); setPage("shared-chats"); }} /></div><ChatView key={project.id} projectId={project.id} now={now} initialChatId={forkId} onOpenSettings={() => setDialog("agents")} /></>
+      ) : page?.kind === "chat" ? (
+        <>
+          <div className="page">
+            <PageBar back={back} title="接續對話" onBack={backToTabs} />
+          </div>
+          <ChatView key={project.id} projectId={project.id} now={now} initialChatId={page.forkId} onOpenSettings={() => setDialog("agents")} />
+        </>
       ) : !board ? (
         <main className="page">
           {app.boardError ? (
@@ -266,26 +297,34 @@ export function App() {
         </main>
       ) : (
         <main className="page board">
-          {page === "context" ? (
-            <ContextPage key={project.id} projectId={project.id} now={now} back={TAB_LABEL[tab]} onBack={backToTabs} />
-          ) : page === "agent-messages" ? (
-            <AgentMessagesPage key={project.id} projectId={project.id} me={session.login} now={now} back={TAB_LABEL[tab]} onBack={backToTabs} />
-          ) : page === "shared-chats" ? (
-            <SharedChatsPage
-              key={project.id}
+          {page?.kind === "context" ? (
+            <ContextPage key={`${project.id}:${page.file ?? ""}:${page.create ?? ""}`} projectId={project.id} now={now} back={back} file={page.file} create={page.create} onBack={backToTabs} />
+          ) : page?.kind === "agent-messages" ? (
+            <AgentMessagesPage key={project.id} projectId={project.id} me={me} now={now} back={back} onBack={backToTabs} onOpenSettings={() => setPage({ kind: "settings" })} />
+          ) : page?.kind === "shared-chat" ? (
+            <SharedChatPage key={`${project.id}:${page.owner}/${page.id}`} board={board} owner={page.owner} chatId={page.id} back={back} onBack={backToTabs} onFork={(forkId) => setPage({ kind: "chat", forkId })} />
+          ) : page?.kind === "handoff" ? (
+            <HandoffPage
+              key={`${project.id}:${page.task.number}`}
               board={board}
+              task={page.task}
               now={now}
-              back={TAB_LABEL[tab]}
+              back={back}
               onBack={backToTabs}
-              onChanged={app.reloadBoard}
-              onFork={(id) => {
-                setForkId(id);
-                setView("chat");
+              onDone={async (msg) => {
+                backToTabs();
+                tell(msg);
+                await Promise.all([app.reloadBoard(), collab.reload()]);
               }}
             />
           ) : (
             <>
-              <BoardTabs tab={tab} waiting={waitingOnMe(board).length} stuck={blockedTeammates(board)} onTab={setTab} />
+              <BoardTabs
+                tab={tab}
+                counts={{ tasks: taskWaits(board).length + handoffsToMe(collab.shared, me, now).length, talk: talkWaits(board).length }}
+                stuck={blockedTeammates(board)}
+                onTab={openTab}
+              />
               {/* Under the tabs, so the tabs stay put when this line comes and goes. */}
               {app.boardError && (
                 <p className="board-error" role="alert">
@@ -298,13 +337,39 @@ export function App() {
               )}
               <div role="tabpanel" id={TAB_PANEL} aria-labelledby={tabId(tab)} className="bt-panel">
                 {tab === "tasks" ? (
-                  <TaskBoard key={project.id} board={board} now={now} />
+                  <TaskBoard key={project.id} board={board} now={now} handoffs={handoffsToMe(collab.shared, me, now)} onHandoff={(it) => setPage({ kind: "handoff", task: { number: it.number, title: it.title } })} />
+                ) : tab === "talk" ? (
+                  <TalkTab
+                    board={board}
+                    collab={collab}
+                    now={now}
+                    onOpenRoom={(n) => setPage({ kind: "room", room: n })}
+                    onNewRoom={() => setPage({ kind: "room", room: "new" })}
+                    onOpenAgentMessages={() => setPage({ kind: "agent-messages" })}
+                    onOpenShared={(owner, id) => setPage({ kind: "shared-chat", owner, id })}
+                  />
                 ) : tab === "people" ? (
-                  <Teammates board={board} now={now} onInvite={() => setDialog("invite")} />
+                  <Teammates
+                    board={board}
+                    now={now}
+                    onInvite={() => setDialog("invite")}
+                    onShowTasks={() => openTab("tasks")}
+                    onOpenDecision={(id) => {
+                      setTab("decisions");
+                      setFocusDecision(id);
+                    }}
+                    onOpenRoom={(n) => setPage({ kind: "room", room: n })}
+                  />
                 ) : (
                   <div className="tb">
-                    <Decisions board={board} />
-                    <Discussions items={board.discussions} shown={new Set()} now={now} />
+                    <Decisions board={board} focus={focusDecision} />
+                    <ContextGroup
+                      key={project.id}
+                      projectId={project.id}
+                      now={now}
+                      onOpen={(file) => setPage({ kind: "context", file })}
+                      onNew={(create) => setPage({ kind: "context", create })}
+                    />
                   </div>
                 )}
                 <Problems items={board.problems} />
@@ -315,7 +380,6 @@ export function App() {
       )}
       {dialog === "invite" && project && <InviteDialog projectId={project.id} onClose={() => setDialog(null)} />}
       {dialog === "agents" && <AgentSettingsDialog onClose={() => setDialog(null)} />}
-      {dialog === "settings" && <SettingsDialog session={session} onClose={() => setDialog(null)} onSignOut={signOut} />}
     </>
   );
 }

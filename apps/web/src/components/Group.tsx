@@ -5,7 +5,7 @@ import { Glyph } from "./icons.tsx";
  * One folding group of one-line rows, the same shape as the board's groups: a small muted label,
  * the count on the right, rows underneath. An empty group is a single quiet line.
  */
-export function Group({ label, count, open = true, dim, children }: { label: string; count: number; open?: boolean; dim?: boolean; children?: ReactNode }) {
+export function Group({ label, count, open = true, dim, wait, children }: { label: string; count: number; open?: boolean; dim?: boolean; wait?: boolean; children?: ReactNode }) {
   if (count === 0) {
     return (
       <div className="tb-group tb-group-empty">
@@ -18,11 +18,11 @@ export function Group({ label, count, open = true, dim, children }: { label: str
     );
   }
   return (
-    <details className={`tb-group${dim ? " tb-done-group" : ""}`} open={open}>
+    <details className={`tb-group${dim ? " tb-done-group" : ""}${wait ? " tb-group-wait" : ""}`} open={open}>
       <summary className="tb-sum">
         <Glyph name="chevron" size={12} className="tb-chev" />
         <span className="tb-group-label">{label}</span>
-        <span className="tb-count">{count}</span>
+        <span className={`tb-count${wait ? " tb-count-strong" : ""}`}>{count}</span>
       </summary>
       <ul className="tb-rows">{children}</ul>
     </details>

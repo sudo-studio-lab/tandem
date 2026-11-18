@@ -1,5 +1,4 @@
 import { useEffect, useState, type FormEvent } from "react";
-import type { AppSession, AppSettings, NotificationKind } from "@tandem/contracts";
 import { api, projectPath } from "../api.ts";
 import { Modal, Avatar, errMsg, useCopy } from "./ui.tsx";
 import "./collaboration.css";
@@ -96,17 +95,11 @@ export function InviteDialog({ projectId, onClose }: { projectId: string; onClos
   );
 }
 
-const TOGGLES: { kind: NotificationKind; label: string }[] = [
-  { kind: "waiting", label: "有人在等我" },
-  { kind: "review", label: "有人請我審查" },
-  { kind: "task", label: "有任務指派給我" },
-];
-
 /**
  * Desktop only: the address that puts this board in an editor's built-in browser. The key in it is
  * masked on screen; copy puts the whole address on the clipboard. Replacing it ends the old one.
  */
-function SidebarLink() {
+export function SidebarLink() {
   const bridge = window.tandemDesktop;
   const [url, setUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -141,10 +134,7 @@ function SidebarLink() {
 
   const shown = url ? url.replace(/\?t=.*$/, "?t=••••••") : "";
   return (
-    <section className="sb-link" aria-labelledby="sb-link-title">
-      <h3 id="sb-link-title" className="sub">
-        放在編輯器側欄
-      </h3>
+    <section className="sb-link" aria-label="放在編輯器側欄">
       <p className="muted small">把網址貼進編輯器的內建瀏覽器。App 重開或更新後不用重貼。</p>
       <div className="sb-url">
         <code className="mono" title={url ? "按「複製網址」取得完整網址" : undefined}>
@@ -175,114 +165,5 @@ function SidebarLink() {
         </p>
       )}
     </section>
-  );
-}
-
-export function SettingsDialog({ session, onClose, onSignOut }: { session: AppSession; onClose: () => void; onSignOut: () => Promise<void> }) {
-  const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    let stop = false;
-    api<AppSettings>("GET", "/api/settings")
-      .then(async (s) => {
-        // The desktop app is the source of truth for auto-start.
-        const bridge = window.tandemDesktop;
-        if (bridge) {
-          try {
-            s = { ...s, openAtLogin: await bridge.getOpenAtLogin() };
-          } catch {
-            /* keep the server value */
-          }
-        }
-        if (!stop) setSettings(s);
-      })
-      .catch((e) => !stop && setErr(errMsg(e)));
-    return () => {
-      stop = true;
-    };
-  }, []);
-
-  async function save(next: AppSettings) {
-    const prev = settings;
-    setSettings(next);
-    setErr(null);
-    try {
-      await api("PUT", "/api/settings", next);
-    } catch (e) {
-      setSettings(prev);
-      setErr(errMsg(e));
-    }
-  }
-
-  async function toggleLogin(v: boolean) {
-    if (!settings) return;
-    try {
-      await window.tandemDesktop?.setOpenAtLogin(v);
-    } catch (e) {
-      setErr(errMsg(e));
-      return;
-    }
-    await save({ ...settings, openAtLogin: v });
-  }
-
-  async function signOut() {
-    setBusy(true);
-    try {
-      await onSignOut();
-    } catch (e) {
-      setErr(errMsg(e));
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Modal title="設定" onClose={onClose}>
-      <h3 className="sub">通知</h3>
-      {!settings ? (
-        <p className="muted">{err ? "" : "讀取中…"}</p>
-      ) : (
-        <ul className="toggles">
-          {TOGGLES.map((t) => (
-            <li key={t.kind}>
-              <label className="toggle">
-                <input
-                  type="checkbox"
-                  checked={settings.notifications[t.kind]}
-                  onChange={(e) => save({ ...settings, notifications: { ...settings.notifications, [t.kind]: e.target.checked } })}
-                />
-                <span>{t.label}</span>
-              </label>
-            </li>
-          ))}
-          {/* Only inside the desktop app: in a browser (e.g. the side panel) there is nothing to start at login. */}
-          {session.desktop && window.tandemDesktop && (
-            <li>
-              <label className="toggle">
-                <input type="checkbox" checked={settings.openAtLogin} onChange={(e) => toggleLogin(e.target.checked)} />
-                <span>
-                  開機時自動啟動
-                  <span className="muted small block">開機後 Tandem 會在背景待命，有人在等你時通知你</span>
-                </span>
-              </label>
-            </li>
-          )}
-        </ul>
-      )}
-      {err && (
-        <p className="banner banner-error" role="alert">
-          {err}
-        </p>
-      )}
-      <SidebarLink />
-      <hr />
-      <p className="muted small">
-        已登入：@{session.login} · Tandem 版本 {session.version}
-      </p>
-      <button type="button" className="btn" onClick={signOut} disabled={busy}>
-        {busy ? "登出中…" : "登出"}
-      </button>
-    </Modal>
   );
 }

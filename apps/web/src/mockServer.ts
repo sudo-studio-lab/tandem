@@ -46,7 +46,7 @@ const mockMembers=new Map<string,{login:string;role:string}[]>();
 const mockLinks=new Map<string,string>();
 const membersFor=(id:string)=>{let m=mockMembers.get(id);if(!m){m=[{login:ME,role:"admin"},{login:"theroyatlas",role:"admin"},{login:"mei-lin",role:"write"}];mockMembers.set(id,m);}return m;};
 const sharedMocks=new Map<string,{settings:{enabled:boolean;transcriptIds:string[]};chats:SharedChat[];handoffs:Handoff[]}>();
-const sharedFor=(id:string)=>{let value=sharedMocks.get(id);if(!value){value={settings:{enabled:false,transcriptIds:[]},chats:[{id:"b".repeat(64),project:id,owner:"theroyatlas",source:"codex",title:"登入流程與錯誤處理",sharedAt:new Date().toISOString(),messages:[{role:"user",text:"登入做到哪裡了？"},{role:"assistant",text:"表單和錯誤提示已完成，剩下登入過期時的重試流程。"}]}],handoffs:[]};sharedMocks.set(id,value);}return value;};
+const sharedFor=(id:string)=>{let value=sharedMocks.get(id);if(!value){value={settings:{enabled:false,transcriptIds:[]},chats:[{id:"b".repeat(64),project:id,owner:"theroyatlas",source:"codex",title:"登入流程與錯誤處理",sharedAt:new Date().toISOString(),messages:[{role:"user",text:"登入做到哪裡了？"},{role:"assistant",text:"表單和錯誤提示已完成，剩下登入過期時的重試流程。"}]}],handoffs:[{id:"h-1",project:id,task:9,from:"theroyatlas",to:ME,note:"資料表草稿在 docs/db.md，還差索引和遷移腳本。先看 #8 卡在哪一步。",at:new Date(Date.now()-5*3600_000).toISOString()}]};sharedMocks.set(id,value);}return value;};
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

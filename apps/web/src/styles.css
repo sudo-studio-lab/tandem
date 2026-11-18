@@ -560,8 +560,11 @@ label {
 @media (max-width: 640px) {
   .brand-name,
   .switcher-owner,
-  .status-ok,
   .topbar-members {
+    display: none;
+  }
+  /* All is well: just the dot, still a button that refreshes. */
+  .status-ok .status-text {
     display: none;
   }
 }
@@ -757,12 +760,6 @@ label {
 }
 .attention-go {
   color: var(--muted);
-}
-
-.ref-link {
-  white-space: nowrap;
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 0.8rem;
 }
 
 /* Compact rows (side column, waiting) */
@@ -1738,9 +1735,13 @@ dialog.modal::backdrop {
   color: var(--bad-fg);
   font-weight: 500;
 }
+/* What kind a row is. Accent only where it waits on you; elsewhere it is a quiet label. */
 .tb-kind {
-  color: var(--accent);
+  color: var(--muted);
   font-weight: 500;
+}
+.tb-group-wait .tb-kind {
+  color: var(--accent);
 }
 .tb-ic {
   width: 14px;
@@ -2148,14 +2149,14 @@ dialog.modal::backdrop {
 }
 
 /* ===========================================================================
-   Board tabs (任務／隊友／決定) and the 隊友 tab
+   Board tabs (任務／對話／決定／隊友) and the 隊友 tab
    =========================================================================== */
-/* Three equal segments under the top bar: a surface-2 track, the chosen tab
+/* Four equal segments under the top bar: a surface-2 track, the chosen tab
    raised one step (white in light mode, a lighter grey in dark mode) and in
    semibold. Same height as every other control (--ctl-h, 44px on touch). */
 .bt {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 2px;
   margin: 10px 0 2px;
   padding: 3px;
@@ -2309,10 +2310,6 @@ dialog.modal::backdrop {
   align-self: flex-start;
   margin-top: 0.3em;
 }
-.mt-ref {
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 12px;
-}
 /* The work in their hands: the same rows as 任務, inside the person's block, starting under the
    name and reaching its right edge. */
 .tb .mt-work,
@@ -2397,4 +2394,127 @@ dialog.modal::backdrop {
   background-image: linear-gradient(var(--sep), var(--sep));
   background-size: calc(100% - 14px) 1px;
   background-repeat: no-repeat;
+}
+
+/* ===========================================================================
+   Direction B: one home per kind of thing
+   =========================================================================== */
+/* A row whose title opens a page in Tandem (a room, a shared chat, a context file). */
+.tb .tk-open {
+  font: inherit;
+  border: 0;
+  padding: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .tb .tk-open:hover {
+    color: var(--accent);
+  }
+}
+/* 「開房間」「新增脈絡檔」 under a group: a quiet control, not a row. */
+.tb .tk-new {
+  margin: 6px 0 0 -4px;
+}
+/* Handing your own task on: an icon at the row's end, the row's height on touch. */
+.tb .tb-act {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-right: -8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tb .tb-act:hover {
+  background: var(--surface-2);
+  color: var(--accent);
+}
+@media (pointer: coarse) {
+  .tb .tb-act {
+    width: 44px;
+    height: 44px;
+  }
+}
+/* A handoff to you: the note the sender wrote, under the row. */
+.tb .tb-row-note {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+.tb .tb-row-note .tb-note {
+  flex: 1 0 100%;
+  box-sizing: border-box;
+  margin: -6px 0 10px;
+  padding-left: 44px;
+  font-size: 13px;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* In a person's block: their waits, in the accent colour when it is you they wait on. */
+.mt-wait-me,
+.mt-wait-me .mt-k {
+  color: var(--accent);
+}
+.tb .mt-wait-link {
+  color: inherit;
+}
+.mt-since {
+  color: var(--muted);
+}
+.mt-stuck {
+  color: var(--bad-fg);
+}
+.tb .mt-to-tasks {
+  margin-left: 8px;
+  font-size: 13px;
+}
+.tb .mt-fyi-link {
+  font-size: inherit;
+  text-align: left;
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+.tb .mt-fyi-link:hover {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+}
+.tb .mt-members {
+  margin: 12px 0 0 -4px;
+}
+/* A decision opened from elsewhere: tinted until you move on. */
+.lg-dec.is-focused > details > summary {
+  --row-bg: var(--accent-soft);
+}
+/* Pages that point to settings: one line of status and the way there. */
+.co-status-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 8px 0;
+}
+.co-status-line .tb-link {
+  font-size: 13px;
+}
+.co-more-menu .co-ext {
+  color: var(--muted);
+  transform: rotate(-45deg);
+}
+.co-handoff {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.co-handoff .co-actions {
+  justify-content: flex-end;
 }
