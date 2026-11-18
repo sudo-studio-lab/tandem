@@ -144,6 +144,8 @@ export interface RoomMessage {
   at: string;
   /** Written by the room's AI (posted by the host's app, starts with 🤖). */
   ai: boolean;
+  /** AI only: who answered, from the comment's first line, e.g. "Codex · gpt-5.1 · high". */
+  label?: string;
   /** The writer asked the AI to answer (「問 AI」). Only these wake the AI. */
   ask?: boolean;
 }

@@ -53,6 +53,12 @@ const MAX_BATCH = 40;
 /** One message's text as sent to the AI; longer ones are cut. */
 const MAX_TEXT = 4000;
 const isAiComment = (body: string) => /^\s*🤖/.test(body);
+/** "🤖 Codex · gpt-5.1 · high：\n\nanswer" → who answered, and the answer. */
+export function splitAiHeader(body: string): { label: string; text: string } {
+  const m = /^\s*🤖[ \t]*([^\n]*?)[ \t]*[：:]?[ \t]*(?:\n+|$)/.exec(body);
+  if (!m) return { label: "", text: body };
+  return { label: m[1]!.trim(), text: body.slice(m[0].length) };
+}
 const sameLogin = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 /** 「問 AI」 from the Tandem button (marker), or `/ai …` typed on GitHub. */
 export function parseAsk(body: string): { text: string; ask: boolean } {
@@ -135,7 +141,10 @@ export class RoomManager {
         .filter((c) => members.has(c.by.toLowerCase()))
         .map((c) => {
           const ai = sameLogin(c.by, d.host) && isAiComment(c.body);
-          if (ai) return { id: c.id, by: c.by, text: c.body.replace(/^\s*🤖[^\n]*\n+/, ""), url: c.url, at: c.at, ai };
+          if (ai) {
+            const { label, text } = splitAiHeader(c.body);
+            return { id: c.id, by: c.by, text, url: c.url, at: c.at, ai, ...(label ? { label } : {}) };
+          }
           const { text, ask } = parseAsk(c.body);
           return { id: c.id, by: c.by, text, url: c.url, at: c.at, ai, ...(ask ? { ask } : {}) };
         }),
@@ -205,6 +214,11 @@ export class RoomManager {
     await this.o.chats.sendToAgent(h.chatId, head + NOTES_PROMPT, (await this.o.project(projectId)).cwd);
   }
 
+  /** Who answered, written at the top of every AI comment: "Codex · gpt-5.1 · high". */
+  private aiName(chat: Chat): string {
+    return [this.o.agentLabel(chat.agent), chat.model, chat.reasoningEffort].filter(Boolean).join(" · ");
+  }
+
   /** ChatManager hook: a turn of some chat finished. */
   onTurnDone(chat: Chat, texts: string[]): void {
     if (!chat.room) return;
@@ -219,7 +233,7 @@ export class RoomManager {
         if (mode) {
           if (text) await p.gh.setRoomNotes(h.number, p.me, text);
           if (mode === "end") {
-            await p.gh.commentOnRoom(h.number, `🤖 ${this.o.agentLabel(chat.agent)}：\n\n房間已結束，筆記在最上面。`);
+            await p.gh.commentOnRoom(h.number, `🤖 ${this.aiName(chat)}：\n\n房間已結束，筆記在最上面。`);
             await p.gh.closeDiscussion(h.number, "RESOLVED");
             this.stop(h);
             await this.o.chats.addItem(h.chatId, { kind: "notice", id: randomUUID(), at: new Date().toISOString(), text: "房間已結束，筆記已存到 GitHub。" });
@@ -227,7 +241,7 @@ export class RoomManager {
           }
           await this.o.chats.addItem(h.chatId, { kind: "notice", id: randomUUID(), at: new Date().toISOString(), text: "筆記已更新。" });
         } else if (text) {
-          await p.gh.commentOnRoom(h.number, `🤖 ${this.o.agentLabel(chat.agent)}：\n\n${text}`);
+          await p.gh.commentOnRoom(h.number, `🤖 ${this.aiName(chat)}：\n\n${text}`);
         }
       } catch (e) {
         await this.o.chats

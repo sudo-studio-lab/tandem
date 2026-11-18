@@ -1948,6 +1948,24 @@ dialog.modal::backdrop {
   left: 2px;
   color: var(--muted);
 }
+.notes .notes-ol {
+  padding-left: 22px;
+}
+.notes .notes-ol::before {
+  content: attr(data-n);
+  left: 0;
+  font-variant-numeric: tabular-nums;
+}
+.notes .notes-gap {
+  margin-top: 10px;
+}
+.notes code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.88em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
 .notes .notes-code {
   margin: 6px 0;
   padding: 8px 10px;

@@ -61,23 +61,6 @@
 .rm-log {
   flex: 1;
 }
-.rm-head {
-  padding: 2px 0 8px;
-}
-.rm-sub {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted);
-}
-.rm-sub a {
-  color: var(--muted);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.rm-sub a:hover {
-  color: var(--accent);
-}
-
 /* Notes: a folded group label above the talk, same as the board's groups. */
 .rm-notes {
   margin: 0;
@@ -144,11 +127,27 @@
 }
 .rm-text {
   margin: 2px 0 0 24px;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.rm-msg.is-ai .rm-text {
-  white-space: normal;
+/* Someone posted text their AI drafted: they stay the author, the tool is a quiet note. */
+.rm-drafter {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  line-height: 20px;
+}
+/* A long message shows its first lines; 「顯示全部」 opens the rest. */
+.rm-clamp.is-clamped {
+  max-height: 240px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 64px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 64px), transparent);
+}
+.rm-more {
+  margin-top: 4px;
+  font-size: 13px;
 }
 .rm-msg.is-ai .rm-name {
   color: var(--accent);
@@ -211,9 +210,17 @@
 .rm-compose-row {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 6px 8px;
   margin-top: 6px;
+}
+.rm-compose-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 6px;
+}
+.rm-compose .btn {
+  min-height: 44px;
 }
 .rm-hint {
   margin: 4px 0 0;
@@ -221,8 +228,79 @@
   color: var(--muted);
   text-align: right;
 }
-.rm-compose .btn {
-  min-height: 44px;
+
+/* Who answers 「問 AI」: the host picks model and effort; guests see the latest answer's. */
+.rm-ai {
+  position: relative;
+  min-width: 0;
+}
+.rm-ai-btn {
+  max-width: 100%;
+  gap: 6px;
+  padding-left: 4px;
+}
+.rm-ai-btn:disabled {
+  opacity: 1;
+}
+.rm-ai-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rm-ai-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.menu.rm-ai-menu {
+  top: auto;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 220px;
+  max-height: 50dvh;
+  overflow-y: auto;
+}
+.rm-menu-h {
+  margin: 0;
+  padding: 8px 10px 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.rm-menu-h + [role="radiogroup"] .menu-item[aria-checked="true"] {
+  color: var(--accent);
+}
+.rm-ai-menu [role="radiogroup"] + .rm-menu-h {
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+/* The room's ⋯: icon-only control; ending the room sits last, set apart. */
+.rm-more-btn {
+  width: var(--ctl-h);
+  justify-content: center;
+  padding: 0;
+}
+.menu.rm-menu {
+  min-width: 200px;
+}
+.rm-menu a.menu-item {
+  text-decoration: none;
+}
+.rm-ext {
+  color: var(--muted);
+  transform: rotate(-45deg);
+}
+.rm-menu .menu-bad {
+  color: var(--bad-fg);
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 6px 6px;
+  padding-top: 10px;
 }
 /* Side-panel width: keep the hint on one line by dropping the least-needed key. */
 @media (max-width: 480px) {
@@ -231,10 +309,13 @@
   }
 }
 @media (pointer: coarse) {
-  .rm-hint-keys {
+  .rm-hint {
     display: none;
   }
-  .rm-compose-row .btn {
+  .rm-compose-actions {
+    flex: 1 1 100%;
+  }
+  .rm-compose-actions .btn {
     flex: 1;
     min-height: 44px;
   }

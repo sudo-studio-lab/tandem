@@ -51,7 +51,7 @@ interface Props {
 }
 
 /** Close a popover on outside click or Escape. */
-function useDismiss(ref: RefObject<HTMLElement | null>, open: boolean, close: () => void) {
+export function useDismiss(ref: RefObject<HTMLElement | null>, open: boolean, close: () => void) {
   useEffect(() => {
     if (!open) return;
     const away = (e: MouseEvent) => {

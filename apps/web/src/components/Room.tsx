@@ -5,18 +5,29 @@
  *
  * One column so it fits an editor side panel: the room list, or one room with a back link.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { AgentKind, Chat, ChatUpdate, Room, RoomMessage, RoomRef } from "@tandem/contracts";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { AgentKind, Chat, ChatSummary, ChatUpdate, Room, RoomMessage, RoomRef } from "@tandem/contracts";
 import { api, onAppEvent, projectPath } from "../api.ts";
 import { relTime, waitedFor } from "../time.ts";
 import { Avatar, MarkdownLite, Spinner, errMsg } from "./ui.tsx";
 import { Item, applyUpdate, useAgents, usableAgents } from "./Chat.tsx";
+import { useDismiss } from "./Header.tsx";
 import { Glyph } from "./icons.tsx";
 import { PageBar } from "./PageBar.tsx";
 import "./room.css";
 import { useDraft } from "../drafts.ts";
 
 const POLL_MS = 4000;
+const AI_NAME: Record<AgentKind, string> = { claude: "Claude", codex: "Codex", antigravity: "Antigravity", grok: "Grok", cursor: "Cursor" };
+
+/**
+ * Text an AI drafted and a person posted starts with "🤖 Codex:" (often bolded). The person stays
+ * the author; the tool becomes a small note next to their name.
+ */
+export function splitDrafter(text: string): { drafter: string; text: string } {
+  const m = /^\s*(?:\*\*)?\s*🤖\s*([^\n:：*]{1,30}?)\s*[:：]\s*(?:\*\*)?[ \t]*\n*/.exec(text);
+  return m ? { drafter: m[1]!.trim(), text: text.slice(m[0].length) } : { drafter: "", text };
+}
 
 function ErrorLine({ text, onDismiss }: { text: string; onDismiss: () => void }) {
   return (
@@ -349,46 +360,37 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
   });
   const waiting = lastAsk >= 0 && !said.slice(lastAsk + 1).some((m) => m.ai) ? said[lastAsk]! : null;
 
+  const hostActions = isHost && !room.closed;
+  const busy = noting || running;
+  // Guests learn who answers from the newest AI reply ("Codex · gpt-5.1 · high").
+  const lastLabel = room.messages.filter((m) => m.ai && m.label).at(-1)?.label;
+
   return (
     <div className="rm-room">
       <PageBar back="房間" title={room.title} onBack={onBack}>
-        {noting && <span className="rm-busy">AI 整理筆記中…</span>}
-        {isHost && !room.closed && (
-          <span className="pg-bar-end">
-            <button type="button" className="ctl" disabled={noting || running} onClick={() => void notes(false)}>
-              整理筆記
-            </button>
-            <button type="button" className="ctl ctl-bad" disabled={noting || running} onClick={() => void notes(true)}>
-              結束
-            </button>
-          </span>
-        )}
+        <span className="pg-bar-end">
+          {noting && <span className="rm-busy">AI 整理筆記中…</span>}
+          <RoomMenu
+            items={[
+              ...(hostActions ? [{ key: "notes", label: hasNotes ? "更新筆記" : "整理筆記", disabled: busy, run: () => void notes(false) }] : []),
+              { key: "github", label: "在 GitHub 打開", href: room.url },
+              ...(hostActions ? [{ key: "end", label: "結束房間", bad: true, disabled: busy, run: () => void notes(true) }] : []),
+            ]}
+          />
+        </span>
       </PageBar>
-      <header className="rm-head">
-        <p className="rm-sub">
-          <span>{isHost ? "你主持・AI 跑在你的電腦" : `@${room.host} 主持・AI 跑在主持人的電腦，回覆會晚幾秒`}</span>
-          {room.closed && <span>・已結束</span>}
-          <span>・</span>
-          <a href={room.url} target="_blank" rel="noreferrer">
-            在 GitHub 打開
-          </a>
-        </p>
-      </header>
 
-      <details className="rm-notes" open={room.closed && hasNotes}>
-        <summary className="tb-sum">
-          <Glyph name="chevron" size={12} className="tb-chev" />
-          <span className="tb-group-label">筆記</span>
-          <span className="tb-count">{hasNotes ? "" : "還沒有"}</span>
-        </summary>
-        <div className="rm-notes-body">
-          {hasNotes ? (
+      {hasNotes && (
+        <details className="rm-notes" open={room.closed}>
+          <summary className="tb-sum">
+            <Glyph name="chevron" size={12} className="tb-chev" />
+            <span className="tb-group-label">筆記</span>
+          </summary>
+          <div className="rm-notes-body">
             <MarkdownLite text={room.notes} />
-          ) : (
-            <p className="muted">{isHost ? "討論一段後按「整理筆記」，AI 會整理重點、決定和待辦。" : `@${room.host} 按「整理筆記」後會出現在這裡。`}</p>
-          )}
-        </div>
-      </details>
+          </div>
+        </details>
+      )}
 
       <div className="rm-log" ref={log} aria-live="polite">
         {loadingChat ? (
@@ -400,7 +402,7 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
             it.kind === "user" ? (
               <Said key={it.id} by={it.by ?? me} me={me} text={it.text} at={it.at} now={now} ask={!!it.ask} />
             ) : it.kind === "assistant" ? (
-              <AiSaid key={it.id} text={it.text} at={it.at} now={now} streaming={it.streaming} />
+              <AiSaid key={it.id} name={AI_NAME[chat.agent]} text={it.text} at={it.at} now={now} streaming={it.streaming} />
             ) : (
               <div key={it.id} className="rm-item">
                 <Item item={it} chatId={chat.id} onError={onError} />
@@ -450,16 +452,27 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
             }}
           />
           <div className="rm-compose-row">
-            <button type="button" className="btn btn-small" title="只給大家看（Enter）" aria-keyshortcuts="Enter" disabled={!text.trim() || !!sending} onClick={() => void send(false)}>
-              {sending === "say" ? "送出中…" : "送出"}
-            </button>
-            <button type="button" className="btn btn-small btn-primary" title="請 AI 看過討論後回答（Ctrl+Enter）" aria-keyshortcuts="Control+Enter" disabled={!text.trim() || !!sending} onClick={() => void send(true)}>
-              {sending === "ask" ? "送出中…" : "問 AI"}
-            </button>
+            {isHost && chat ? (
+              <AiPicker chat={chat} onChanged={(s) => setChat((c) => (c ? { ...c, ...s } : c))} onError={onError} />
+            ) : (
+              <span className="rm-ai-line" title="問 AI 時回答的 AI">
+                <span className="rm-ai-mark" aria-hidden="true">
+                  AI
+                </span>
+                <span className="rm-ai-text">{isHost ? "載入中…" : `@${room.host} 的 ${lastLabel ?? "AI"}`}</span>
+              </span>
+            )}
+            <span className="rm-compose-actions">
+              <button type="button" className="btn btn-small" title="只給大家看，AI 不會回（Enter）" aria-keyshortcuts="Enter" disabled={!text.trim() || !!sending} onClick={() => void send(false)}>
+                {sending === "say" ? "送出中…" : "送出"}
+              </button>
+              <button type="button" className="btn btn-small btn-primary" title="請 AI 看過討論後回答（Ctrl+Enter）" aria-keyshortcuts="Control+Enter" disabled={!text.trim() || !!sending} onClick={() => void send(true)}>
+                {sending === "ask" ? "送出中…" : "問 AI"}
+              </button>
+            </span>
           </div>
           <p className="rm-hint">
-            <span className="rm-hint-keys">Enter 送出・Ctrl+Enter 問 AI・<span className="rm-hint-shift">Shift+Enter 換行・</span></span>
-            只有「問 AI」會叫 AI 回答
+            Enter 送出（AI 不回）・Ctrl+Enter 問 AI<span className="rm-hint-shift">・Shift+Enter 換行</span>
           </p>
         </div>
       )}
@@ -467,34 +480,210 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
   );
 }
 
+type MenuEntry = { key: string; label: string; disabled?: boolean; bad?: boolean; run?: () => void; href?: string };
+
+/** The room's own ⋯: notes, GitHub, and ending the room (last, apart from the rest). */
+function RoomMenu({ items }: { items: MenuEntry[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(ref, open, close);
+  return (
+    <div className="more-menu" ref={ref}>
+      <button type="button" className="ctl rm-more-btn" aria-label="房間選項" title="房間選項" aria-haspopup="true" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <Glyph name="more" />
+      </button>
+      {open && (
+        <div className="menu menu-right card rm-menu" role="group" aria-label="房間選項">
+          {items.map((it) =>
+            it.href ? (
+              <a key={it.key} className="menu-item" href={it.href} target="_blank" rel="noreferrer" onClick={close}>
+                <span className="grow">{it.label}</span>
+                <Glyph name="arrow" size={12} className="rm-ext" />
+              </a>
+            ) : (
+              <button
+                key={it.key}
+                type="button"
+                className={`menu-item${it.bad ? " menu-bad" : ""}`}
+                disabled={it.disabled}
+                onClick={() => {
+                  close();
+                  it.run?.();
+                }}
+              >
+                <span className="grow">{it.label}</span>
+              </button>
+            ),
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Host only: which model answers 「問 AI」, and how hard it thinks. Shown next to the button so
+ * everyone knows who answers before asking; a change applies from the next question.
+ */
+function AiPicker({ chat, onChanged, onError }: { chat: Chat; onChanged: (s: ChatSummary) => void; onError: (m: string) => void }) {
+  const { agents } = useAgents();
+  const agent = agents?.find((a) => a.agent === chat.agent);
+  const model = agent?.models.find((m) => m.id === chat.model);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(ref, open, close);
+  const configure = async (modelId: string, effort?: string) => {
+    setBusy(true);
+    try {
+      onChanged(await api<ChatSummary>("PATCH", `/api/chats/${chat.id}`, { model: modelId, reasoningEffort: effort }));
+    } catch (e) {
+      onError(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const label = [AI_NAME[chat.agent], model?.label ?? (chat.model || "預設"), chat.reasoningEffort].filter(Boolean).join(" · ");
+  const efforts = model?.reasoningEfforts ?? [];
+  return (
+    <div className="rm-ai" ref={ref}>
+      <button
+        type="button"
+        className="ctl rm-ai-btn"
+        aria-haspopup="true"
+        aria-expanded={open}
+        title={chat.running ? "AI 回覆中，回完才能換" : "問 AI 時用的模型和 effort，下一次問起生效"}
+        disabled={chat.running || busy || !agent}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="rm-ai-mark" aria-hidden="true">
+          AI
+        </span>
+        <span className="rm-ai-text">{busy ? "切換中…" : label}</span>
+        <Glyph name="chevron" size={12} />
+      </button>
+      {open && agent && (
+        <div className="menu card rm-ai-menu" role="group" aria-label="問 AI 時用">
+          <p className="rm-menu-h" id="rm-ai-models">
+            模型
+          </p>
+          <div role="radiogroup" aria-labelledby="rm-ai-models">
+            {agent.models.map((m) => (
+              <button
+                key={m.id || "default"}
+                type="button"
+                role="radio"
+                aria-checked={m.id === chat.model}
+                className="menu-item"
+                onClick={() => {
+                  close();
+                  if (m.id !== chat.model) void configure(m.id, chat.reasoningEffort && m.reasoningEfforts?.includes(chat.reasoningEffort) ? chat.reasoningEffort : undefined);
+                }}
+              >
+                <span className="grow">{m.label}</span>
+                {m.id === chat.model && <Glyph name="check" size={14} />}
+              </button>
+            ))}
+          </div>
+          {efforts.length > 0 && (
+            <>
+              <p className="rm-menu-h" id="rm-ai-effort">
+                Effort
+              </p>
+              <div role="radiogroup" aria-labelledby="rm-ai-effort">
+                {["", ...efforts].map((e) => {
+                  const on = (chat.reasoningEffort ?? "") === e;
+                  return (
+                    <button
+                      key={e || "default"}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      className="menu-item"
+                      onClick={() => {
+                        close();
+                        if (!on) void configure(chat.model, e || undefined);
+                      }}
+                    >
+                      <span className="grow">{e || "預設"}</span>
+                      {on && <Glyph name="check" size={14} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Long messages show their first lines; the rest opens on request. */
+function Clamp({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [long, setLong] = useState(false);
+  const [open, setOpen] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // Only clamp when it saves real reading: well past the clamp height, not a line or two over.
+    const check = () => setLong(el.scrollHeight > 320);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <>
+      <div ref={ref} className={`rm-clamp${long && !open ? " is-clamped" : ""}`}>
+        {children}
+      </div>
+      {long && (
+        <button type="button" className="tb-link rm-more" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          {open ? "收起" : "顯示全部"}
+        </button>
+      )}
+    </>
+  );
+}
+
 function Said({ by, me, text, at, now, ask }: { by: string; me: string; text: string; at: string; now: number; ask: boolean }) {
   const mine = by.toLowerCase() === me.toLowerCase();
+  const d = splitDrafter(text);
   return (
     <div className="rm-msg">
       <div className="rm-who">
         <Avatar login={by} size={16} />
         <span className="rm-name">{mine ? "你" : `@${by}`}</span>
+        {d.drafter && <span className="rm-drafter">{d.drafter} 寫的</span>}
         <span className="rm-time">{relTime(at, now)}</span>
         {ask && <span className="rm-ask">問 AI</span>}
       </div>
-      <div className="rm-text">{text}</div>
+      <div className="rm-text">
+        <Clamp>
+          <MarkdownLite text={d.text} />
+        </Clamp>
+      </div>
     </div>
   );
 }
 
 function Message({ m, me, now }: { m: RoomMessage; me: string; now: number }) {
   if (!m.ai) return <Said by={m.by} me={me} text={m.text} at={m.at} now={now} ask={!!m.ask} />;
-  return <AiSaid text={m.text} at={m.at} now={now} />;
+  return <AiSaid name={m.label?.split(" · ")[0] || "AI"} detail={m.label} text={m.text} at={m.at} now={now} />;
 }
 
-function AiSaid({ text, at, now, streaming }: { text: string; at: string; now: number; streaming?: boolean }) {
+function AiSaid({ name, detail, text, at, now, streaming }: { name: string; detail?: string; text: string; at: string; now: number; streaming?: boolean }) {
   return (
     <div className="rm-msg is-ai">
-      <div className="rm-who">
+      <div className="rm-who" title={detail}>
         <span className="rm-ai-mark" aria-hidden="true">
           AI
         </span>
-        <span className="rm-name">AI</span>
+        <span className="rm-name">{name}</span>
         <span className="rm-time">{relTime(at, now)}</span>
       </div>
       <div className="rm-text">
