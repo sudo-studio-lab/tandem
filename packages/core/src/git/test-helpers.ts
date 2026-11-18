@@ -19,7 +19,7 @@ async function configure(dir: string, who: string): Promise<void> {
 
 /** Bare remote plus two clones (user A and B) with an initial commit on `main`. */
 export async function makeFixture(): Promise<Fixture> {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "tandem-git-")));
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "tandem-git-")));
   const remote = path.join(root, "remote.git");
   fs.mkdirSync(remote);
   await runGit(["init", "--bare", "-b", "main"], { cwd: remote });
