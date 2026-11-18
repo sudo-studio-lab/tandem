@@ -1,27 +1,26 @@
 /*
- * Agent 問答 and 對話與交接 at the board's panel scale: 13px text, small muted section labels,
+ * Agent 問答 and 對話與交接 at the board's scale: 15px text, muted 13px section labels,
  * folding sections with the same chevron, one control height. Scoped under .page so it wins
  * over the older page styles in collaboration.css without editing them.
  */
 .page .co-page {
   max-width: 760px;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.55;
   padding-bottom: 24px;
 }
 .page .co-page p {
   margin: 0 0 8px;
 }
 .page .co-page h3 {
-  margin: 14px 0 4px;
-  font-size: 11px;
+  margin: 16px 0 6px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.06em;
   color: var(--muted);
 }
 .page .co-page .row-meta,
 .page .co-page .co-readonly {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 /* Folding details inside a section (transcripts, previews): a quiet row with a small chevron. */
@@ -32,7 +31,7 @@
   gap: 6px;
   min-height: var(--ctl-h);
   padding: 4px 0;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -55,20 +54,20 @@
 }
 .page .co-page details:not(.tb-group) > summary .pill {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 
 /* Controls: one height, small text. */
 .page .co-page .btn {
   min-height: var(--ctl-h);
-  padding: 0 10px;
-  font-size: 12px;
+  padding: 0 12px;
+  font-size: 14px;
 }
 .page .co-page .input {
   min-height: var(--ctl-h);
   padding: 2px 8px;
-  font-size: 13px;
+  font-size: 15px;
 }
 .page .co-page textarea.input {
   padding: 6px 8px;
@@ -79,7 +78,7 @@
 }
 .page .co-page .co-fields label {
   gap: 4px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .page .co-page .co-actions {
@@ -89,27 +88,29 @@
 .page .co-page .co-check {
   min-height: var(--ctl-h);
   gap: 8px;
-  font-size: 13px;
+  font-size: 15px;
 }
 /* A label that stands alone above a field reads like the labels inside .co-fields. */
 .page .co-page form > label {
   display: block;
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .page .co-page .co-check input {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 
-/* Sections: the board's group label row, then the body indented to the panel gutter. */
+/* Sections: the board's group label row, then the body in one rounded block like a group's rows. */
 .page .co-page .co-sec-body {
-  padding: 2px 10px 12px;
+  padding: 12px 14px 14px;
+  background: var(--surface);
+  border-radius: var(--radius-group);
 }
 .page .co-page .co-meta {
   margin: 0 0 6px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .page .co-page .co-message header {
@@ -123,14 +124,14 @@
 /* Lists and messages. */
 .page .co-page .co-empty {
   padding-block: 4px;
-  font-size: 12px;
+  font-size: 13px;
 }
 .page .co-page .co-chat-list {
   margin: 0 0 8px;
 }
 .page .co-page .co-chat-pick {
   padding: 4px 0;
-  font-size: 13px;
+  font-size: 15px;
 }
 .page .co-page .co-chat-pick strong {
   font-weight: 500;
@@ -154,14 +155,14 @@
   background: none;
 }
 .page .co-page .co-preview {
-  font-size: 12px;
+  font-size: 13px;
 }
 .page .co-page .co-preview > div + div {
   margin-top: 10px;
 }
 .page .co-page .co-reading h3 {
   margin: 10px 0 2px;
-  font-size: 13px;
+  font-size: 15px;
   letter-spacing: 0;
   color: var(--text);
 }
@@ -173,7 +174,7 @@
   margin-top: 0;
 }
 .page .co-page .banner {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 /* Touch screens get 44px targets; narrow mouse windows keep the panel height. */
@@ -190,4 +191,14 @@
   .page .co-page .input {
     min-height: 44px;
   }
+}
+
+/* Inside a section's block the last message or chat has no rule under it. */
+.page .co-page .co-sec-body > :last-child,
+.page .co-page .co-sec-body .co-message:last-child,
+.page .co-page .co-sec-body .co-chat-list > li:last-child .co-chat-pick {
+  border-bottom: 0;
+}
+.page .co-page .co-sec-body > :last-child {
+  margin-bottom: 0;
 }

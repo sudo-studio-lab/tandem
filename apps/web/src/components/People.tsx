@@ -57,7 +57,7 @@ function Person({ m, board, items, now }: { m: BoardMember; board: ProjectBoard;
   return (
     <section className="mt" aria-labelledby={`mt-${m.login}`}>
       <div className="mt-who">
-        <Avatar login={m.login} size={22} />
+        <Avatar login={m.login} size={28} />
         <h3 id={`mt-${m.login}`} className="mt-h">
           <Ext href={`https://github.com/${m.login}`} className="mt-name">
             @{m.login}

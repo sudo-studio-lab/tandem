@@ -24,15 +24,19 @@
   --info-bg: #e6eefc;
   --info-fg: #1c4aa8;
   --focus: #2f62d8;
-  --radius: 8px;
-  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-sm: 8px;
+  --radius-group: 14px;
   --shadow: 0 1px 2px rgb(16 24 40 / 0.05), 0 1px 3px rgb(16 24 40 / 0.06);
   --shadow-lg: 0 10px 30px rgb(16 24 40 / 0.16);
   --topbar-h: 40px;
-  --ctl-h: 28px;
+  --ctl-h: 32px;
+  --row-h: 48px;
   --avatar-l: 88%;
   --avatar-fg-l: 28%;
-  font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  /* Latin in the system UI face on Windows; every Chinese character in the bundled Noto Sans TC
+     (main.tsx imports it), so no machine falls back to its own CJK UI font. */
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Noto Sans TC Variable", -apple-system, BlinkMacSystemFont, "PingFang TC", sans-serif;
   font-size: 15px;
   line-height: 1.55;
   color-scheme: light dark;
@@ -73,6 +77,14 @@
    =========================================================================== */
 * {
   box-sizing: border-box;
+}
+/* Form controls do not inherit the page font by default; without this a button falls back to the
+   system CJK face and sits next to Noto Sans TC text. */
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
 }
 body {
   margin: 0;
@@ -173,7 +185,7 @@ hr {
    =========================================================================== */
 .btn {
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 14px;
   font-weight: 500;
   padding: 6px 14px;
   border: 1px solid var(--border-strong);
@@ -206,9 +218,9 @@ hr {
   filter: brightness(1.08);
 }
 .btn-small {
-  padding: 2px 10px;
-  min-height: 30px;
-  font-size: 0.85rem;
+  padding: 2px 12px;
+  min-height: 32px;
+  font-size: 13px;
 }
 .btn-big {
   font-size: 1.05rem;
@@ -291,7 +303,7 @@ label {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.78rem;
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.6;
   padding: 0 8px;
@@ -358,11 +370,10 @@ label {
 }
 
 /* Generic surfaces */
+/* A rounded block on the page background: no frame, no shadow (DESIGN.md, groups). */
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  border-radius: var(--radius-group);
 }
 .banner {
   padding: 10px 14px;
@@ -396,13 +407,13 @@ label {
   margin: 0 auto;
   padding: 4px 10px;
   min-height: var(--topbar-h);
-  font-size: 13px;
+  font-size: 14px;
   display: flex;
   align-items: center;
   gap: 4px;
 }
 .brand {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -419,7 +430,7 @@ label {
 }
 .switcher-btn {
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -480,7 +491,7 @@ label {
 /* One quiet status: dot + words, no filled pill. Only trouble gets colour. */
 .status {
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -558,6 +569,7 @@ label {
   position: relative;
 }
 .menu {
+  border: 1px solid var(--border);
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
@@ -683,9 +695,8 @@ label {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--muted);
   margin: 0 0 10px 2px;
 }
@@ -794,8 +805,8 @@ blockquote footer {
 
 /* Record format problems */
 .problems {
-  margin-top: 24px;
-  font-size: 12px;
+  margin: 20px 4px 0;
+  font-size: 13px;
 }
 .problems > summary {
   list-style: none;
@@ -1455,21 +1466,19 @@ dialog.modal::backdrop {
    =========================================================================== */
 .page.board {
   max-width: 760px;
-  padding: 2px 10px 40px;
+  padding: 4px 14px 40px;
 }
-/* The board reads like a panel the editor already had: 13px, one line per
-   item, quiet group labels, colour only for "waiting on you" and trouble.
-   Rows run edge to edge so their hover band fills the panel. */
+/* The board (DESIGN.md, direction): 15px text, one 48px line per item, each group's rows in one
+   rounded block on the page background, colour only for "waiting on you" and trouble. */
 .tb {
-  font-size: 13px;
-  line-height: 1.45;
-  margin: 0 -10px;
+  font-size: 15px;
+  line-height: 1.5;
 }
 /* Shared control system: every control in a toolbar is var(--ctl-h) tall,
    6px corners, no border at rest; the selected state is a filled surface. */
 .ctl {
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   display: inline-flex;
   align-items: center;
@@ -1496,12 +1505,6 @@ dialog.modal::backdrop {
   :root {
     --ctl-h: 44px;
   }
-  .tb .tb-rows .tb-row {
-    min-height: 44px;
-  }
-  .tb .tb-rows .tb-title {
-    line-height: 44px;
-  }
   .tb .tb-group > .tb-sum,
   .problems > summary {
     min-height: 44px;
@@ -1527,16 +1530,15 @@ dialog.modal::backdrop {
 .tb-group {
   margin: 0;
 }
-/* Group label: small, spaced, muted. Not a bar, not a card. */
+/* Group label: a muted 13px line above its block, no letter-spacing (it spreads Chinese apart). */
 .tb .tb-sum {
   list-style: none;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 12px 10px 4px;
-  font-size: 11px;
+  padding: 18px 4px 8px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.06em;
   color: var(--muted);
   cursor: pointer;
   user-select: none;
@@ -1552,8 +1554,8 @@ dialog.modal::backdrop {
   color: var(--accent);
 }
 .tb-sum .tb-ic {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
 }
 .tb-chev {
   flex: none;
@@ -1578,22 +1580,34 @@ dialog.modal::backdrop {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
+/* A group's rows: one rounded block, a thin line between rows. */
 .tb-rows {
+  --row-base: var(--surface);
+  --sep: var(--border);
   list-style: none;
   margin: 0;
-  padding: 0 0 2px;
+  padding: 0;
+  background: var(--row-base);
+  border-radius: var(--radius-group);
+  overflow: hidden;
+}
+.tb-rows > li + li {
+  border-top: 1px solid var(--sep);
 }
 /* One line per item: number, title (cut with …, full text on hover), then who. */
 .tb .tb-row {
-  --row-bg: var(--bg);
+  --row-bg: var(--row-base);
   background: var(--row-bg);
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 28px;
-  padding: 0 10px;
+  gap: 10px;
+  min-height: var(--row-h);
+  padding: 0 14px;
 }
-.tb .tb-group-wait .tb-row,
+.tb .tb-group-wait .tb-rows {
+  --row-base: var(--accent-soft);
+  --sep: color-mix(in srgb, var(--accent-soft), var(--accent) 14%);
+}
 .tb .tb-row.is-mine {
   --row-bg: var(--accent-soft);
 }
@@ -1629,9 +1643,9 @@ dialog.modal::backdrop {
 }
 .tb-num {
   flex: none;
-  min-width: 30px;
+  min-width: 34px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 .tb .tb-title {
@@ -1639,7 +1653,7 @@ dialog.modal::backdrop {
   min-width: 0;
   align-self: stretch;
   display: block;
-  line-height: 28px;
+  line-height: var(--row-h);
   color: var(--text);
   text-decoration: none;
   white-space: nowrap;
@@ -1655,7 +1669,7 @@ dialog.modal::backdrop {
   align-items: center;
   gap: 6px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   white-space: nowrap;
 }
 .tb-meta a {
@@ -1675,7 +1689,7 @@ dialog.modal::backdrop {
   color: var(--bad-fg);
 }
 .tb-empty-note {
-  margin: 8px 10px;
+  margin: 10px 4px;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -1716,7 +1730,7 @@ dialog.modal::backdrop {
 }
 .pg-back {
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1738,7 +1752,7 @@ dialog.modal::backdrop {
 }
 .pg-title {
   margin: 0;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   line-height: 1.45;
   min-width: 0;
@@ -1789,9 +1803,9 @@ dialog.modal::backdrop {
   text-decoration-color: var(--border);
 }
 .lg-body {
-  padding: 6px 10px 14px 30px;
-  font-size: 13px;
-  line-height: 1.55;
+  padding: 6px 14px 16px 38px;
+  font-size: 14px;
+  line-height: 1.6;
 }
 .lg-body p {
   margin: 0 0 6px;
@@ -1809,7 +1823,7 @@ dialog.modal::backdrop {
 .lg-quote footer,
 .lg-foot,
 .lg-note {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .lg-foot a {
@@ -1819,10 +1833,9 @@ dialog.modal::backdrop {
   color: var(--accent);
 }
 .lg-label {
-  margin-top: 8px !important;
-  font-size: 11px;
+  margin-top: 10px !important;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.06em;
   color: var(--muted);
 }
 .pg-bar-end {
@@ -1868,8 +1881,8 @@ dialog.modal::backdrop {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 8px;
-  margin: 6px 0;
-  font-size: 12px;
+  margin: 8px 4px;
+  font-size: 13px;
   color: var(--bad-fg);
 }
 .board-error .status-dot {
@@ -1879,11 +1892,11 @@ dialog.modal::backdrop {
 /* Light Markdown (room notes, shared context) */
 .notes h4 {
   margin: 12px 0 4px;
-  font-size: 13px;
+  font-size: 15px;
 }
 .notes p {
   margin: 2px 0;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.55;
 }
 .notes .notes-li {
@@ -1916,7 +1929,7 @@ dialog.modal::backdrop {
 }
 .ctx-intro {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
 }
 .ctx-intro .btn {
@@ -1940,6 +1953,12 @@ dialog.modal::backdrop {
   text-align: left;
   cursor: pointer;
   border-radius: var(--radius);
+}
+.ctx-list {
+  overflow: hidden;
+}
+.ctx-row {
+  border-radius: 0;
 }
 .ctx-row:hover {
   background: var(--surface-2);
@@ -2056,23 +2075,23 @@ dialog.modal::backdrop {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 2px;
-  margin: 8px 0 2px;
-  padding: 2px;
-  border-radius: var(--radius);
+  margin: 10px 0 2px;
+  padding: 3px;
+  border-radius: 12px;
   background: var(--surface-2);
 }
 .bt button {
   font: inherit;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  height: var(--ctl-h);
+  gap: 6px;
+  height: max(36px, var(--ctl-h));
   padding: 0 6px;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 9px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -2095,13 +2114,13 @@ dialog.modal::backdrop {
 .bt-count {
   display: inline-grid;
   place-items: center;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
   border-radius: 999px;
   background: var(--accent);
   color: var(--accent-contrast);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -2125,13 +2144,12 @@ dialog.modal::backdrop {
   box-shadow: 0 0 0 1.5px var(--row-bg, var(--bg));
 }
 
-/* 隊友: one section per person, panel text with a thin line between people, not cards. */
+/* 隊友: one rounded block per person, the same block as a group of rows. */
 .mt {
-  padding: 10px 10px 8px;
-  border-bottom: 1px solid var(--border);
-}
-.mt:last-of-type {
-  border-bottom: 0;
+  margin-top: 12px;
+  padding: 14px 14px 10px;
+  background: var(--surface);
+  border-radius: var(--radius-group);
 }
 .mt-who {
   display: flex;
@@ -2145,7 +2163,7 @@ dialog.modal::backdrop {
   gap: 8px;
   min-width: 0;
   margin: 0;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
 }
 .tb .mt-name {
@@ -2158,14 +2176,14 @@ dialog.modal::backdrop {
 }
 .mt-me {
   flex: none;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--accent);
 }
 .mt-when {
   margin-left: auto;
   flex: none;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .mt-when.is-old {
@@ -2175,12 +2193,13 @@ dialog.modal::backdrop {
   margin: 0;
 }
 .mt-doing {
-  margin-top: 4px !important;
-  padding-left: 30px;
+  margin-top: 6px !important;
+  padding-left: 36px;
 }
 .mt-line {
-  padding-left: 30px;
-  font-size: 12px;
+  margin-top: 2px !important;
+  padding-left: 36px;
+  font-size: 13px;
   color: var(--muted);
 }
 .mt-k {
@@ -2194,8 +2213,8 @@ dialog.modal::backdrop {
 .mt-fyi {
   list-style: none;
   margin: 4px 0 0;
-  padding: 0 0 0 30px;
-  font-size: 12px;
+  padding: 0 0 0 36px;
+  font-size: 13px;
   color: var(--muted);
 }
 .mt-fyi li {
@@ -2209,26 +2228,33 @@ dialog.modal::backdrop {
 }
 .mt-ref {
   font-family: ui-monospace, Consolas, monospace;
-  font-size: 11px;
+  font-size: 12px;
 }
-/* The work in their hands: the same rows as 任務, starting under the name, reaching the right edge. */
+/* The work in their hands: the same rows as 任務, inside the person's block, starting under the
+   name and reaching its right edge. */
+.tb .mt-work,
+.tb .mt-more .tb-rows {
+  --row-h: 40px;
+  border-radius: 0;
+  background: none;
+}
 .tb .mt-work {
-  margin: 4px -10px 0 20px;
+  margin: 8px -14px 0 22px;
 }
 .mt-doc {
   vertical-align: -2px;
 }
 .mt-more {
-  margin: 2px -10px 0 20px;
+  margin: 4px -14px 0 22px;
 }
 .mt-more > summary {
   list-style: none;
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 28px;
-  padding: 0 10px;
-  font-size: 12px;
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
   color: var(--muted);
   cursor: pointer;
 }
