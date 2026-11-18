@@ -25,7 +25,7 @@ const AI_NAME: Record<AgentKind, string> = { claude: "Claude", codex: "Codex", a
  * the author; the tool becomes a small note next to their name.
  */
 export function splitDrafter(text: string): { drafter: string; text: string } {
-  const m = /^\s*(?:\*\*)?\s*🤖\s*([^\n:：*]{1,30}?)\s*[:：]\s*(?:\*\*)?[ \t]*\n*/.exec(text);
+  const m = /^\s*(?:\*\*)?\s*🤖\s*([^\n:：*]{1,30}?)\s*(?:\*\*)?\s*[:：]\s*(?:\*\*)?[ \t]*\n*/.exec(text);
   return m ? { drafter: m[1]!.trim(), text: text.slice(m[0].length) } : { drafter: "", text };
 }
 
@@ -364,6 +364,10 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
   const busy = noting || running;
   // Guests learn who answers from the newest AI reply ("Codex · gpt-5.1 · high").
   const lastLabel = room.messages.filter((m) => m.ai && m.label).at(-1)?.label;
+  // The opening message carries the agenda and the newest answer is what people read: both stay whole.
+  const shown = isHost && chat ? chat.items.map((it) => ({ id: it.id, user: it.kind === "user", ai: it.kind === "assistant" })) : room.messages.map((m) => ({ id: m.id, user: !m.ai, ai: m.ai }));
+  const firstUserId = shown.find((m) => m.user)?.id;
+  const lastAiId = shown.filter((m) => m.ai).at(-1)?.id;
 
   return (
     <div className="rm-room">
@@ -392,7 +396,7 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
         </details>
       )}
 
-      <div className="rm-log" ref={log} aria-live="polite">
+      <div className="rm-log" ref={log}>
         {loadingChat ? (
           <Spinner label="載入對話…" />
         ) : empty ? (
@@ -400,9 +404,9 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
         ) : isHost && chat ? (
           chat.items.map((it) =>
             it.kind === "user" ? (
-              <Said key={it.id} by={it.by ?? me} me={me} text={it.text} at={it.at} now={now} ask={!!it.ask} />
+              <Said key={it.id} by={it.by ?? me} me={me} text={it.text} at={it.at} now={now} ask={!!it.ask} clamp={it.id !== firstUserId} />
             ) : it.kind === "assistant" ? (
-              <AiSaid key={it.id} name={AI_NAME[chat.agent]} text={it.text} at={it.at} now={now} streaming={it.streaming} />
+              <AiSaid key={it.id} name={AI_NAME[chat.agent]} text={it.text} at={it.at} now={now} streaming={it.streaming} clamp={it.id !== lastAiId} />
             ) : (
               <div key={it.id} className="rm-item">
                 <Item item={it} chatId={chat.id} onError={onError} />
@@ -410,22 +414,24 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
             ),
           )
         ) : (
-          room.messages.map((m) => <Message key={m.id} m={m} me={me} now={now} />)
+          room.messages.map((m) => <Message key={m.id} m={m} me={me} now={now} clamp={m.id !== (m.ai ? lastAiId : firstUserId)} />)
         )}
-        {running ? (
-          <p className="rm-running">AI 回覆中…</p>
-        ) : (
-          waiting &&
-          !room.closed && (
-            <p className="rm-waiting">
-              {isHost ? "AI 等一下就會回答" : `等 @${room.host} 的 AI 回覆・${waitedFor(waiting.at, now)}（主持人的 Tandem 要開著）`}
-            </p>
-          )
-        )}
+        <div role="status">
+          {running ? (
+            <p className="rm-running">AI 回覆中…</p>
+          ) : (
+            waiting &&
+            !room.closed && (
+              <p className="rm-waiting">
+                {isHost ? "AI 等一下就會回答" : `等 @${room.host} 的 AI 回覆・${waitedFor(waiting.at, now)}（主持人的 Tandem 要開著）`}
+              </p>
+            )
+          )}
+        </div>
       </div>
 
       {room.closed ? (
-        <p className="rm-closed">房間已經結束，筆記在上面。</p>
+        <p className="rm-closed">{hasNotes ? "房間已經結束，筆記在上面。" : "房間已經結束。"}</p>
       ) : (
         <div className="rm-compose">
           {sendError && (
@@ -445,7 +451,8 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
             placeholder="跟大家說…"
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) {
+              // On touch keyboards Enter is a new line; the two buttons send.
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229 && !matchMedia("(pointer: coarse)").matches) {
                 e.preventDefault();
                 void send(e.ctrlKey || e.metaKey);
               }
@@ -482,19 +489,36 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
 
 type MenuEntry = { key: string; label: string; disabled?: boolean; bad?: boolean; run?: () => void; href?: string };
 
-/** The room's own ⋯: notes, GitHub, and ending the room (last, apart from the rest). */
-function RoomMenu({ items }: { items: MenuEntry[] }) {
+/**
+ * A small popover next to a button (disclosure pattern). Opening moves focus into it; closing from
+ * inside (Escape, a choice) hands focus back to the button.
+ */
+function usePopover() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
+  const button = useRef<HTMLButtonElement>(null);
+  const close = useCallback(() => {
+    const inside = !!ref.current?.contains(document.activeElement);
+    setOpen(false);
+    if (inside) button.current?.focus();
+  }, []);
   useDismiss(ref, open, close);
+  useEffect(() => {
+    if (open) ref.current?.querySelector<HTMLElement>(".rm-pop button:not(:disabled), .rm-pop a")?.focus();
+  }, [open]);
+  return { open, setOpen, close, ref, button };
+}
+
+/** The room's own ⋯: notes, GitHub, and ending the room (last, apart from the rest). */
+function RoomMenu({ items }: { items: MenuEntry[] }) {
+  const { open, setOpen, close, ref, button } = usePopover();
   return (
     <div className="more-menu" ref={ref}>
-      <button type="button" className="ctl rm-more-btn" aria-label="房間選項" title="房間選項" aria-haspopup="true" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+      <button ref={button} type="button" className="ctl rm-more-btn" aria-label="房間選項" title="房間選項" aria-expanded={open} aria-controls="rm-menu" onClick={() => setOpen((v) => !v)}>
         <Glyph name="more" />
       </button>
       {open && (
-        <div className="menu menu-right card rm-menu" role="group" aria-label="房間選項">
+        <div id="rm-menu" className="menu menu-right card rm-menu rm-pop">
           {items.map((it) =>
             it.href ? (
               <a key={it.key} className="menu-item" href={it.href} target="_blank" rel="noreferrer" onClick={close}>
@@ -523,19 +547,18 @@ function RoomMenu({ items }: { items: MenuEntry[] }) {
 }
 
 /**
- * Host only: which model answers 「問 AI」, and how hard it thinks. Shown next to the button so
- * everyone knows who answers before asking; a change applies from the next question.
+ * Host only: which model answers 「問 AI」 and how hard it thinks. Sits next to the button so
+ * everyone knows who answers before asking; a change applies from the next question. The popover
+ * stays open so model and effort can both be set in one go.
  */
 function AiPicker({ chat, onChanged, onError }: { chat: Chat; onChanged: (s: ChatSummary) => void; onError: (m: string) => void }) {
   const { agents } = useAgents();
   const agent = agents?.find((a) => a.agent === chat.agent);
   const model = agent?.models.find((m) => m.id === chat.model);
-  const [open, setOpen] = useState(false);
+  const { open, setOpen, ref, button } = usePopover();
   const [busy, setBusy] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
-  useDismiss(ref, open, close);
   const configure = async (modelId: string, effort?: string) => {
+    if (busy) return;
     setBusy(true);
     try {
       onChanged(await api<ChatSummary>("PATCH", `/api/chats/${chat.id}`, { model: modelId, reasoningEffort: effort }));
@@ -545,17 +568,20 @@ function AiPicker({ chat, onChanged, onError }: { chat: Chat; onChanged: (s: Cha
       setBusy(false);
     }
   };
-  const label = [AI_NAME[chat.agent], model?.label ?? (chat.model || "預設"), chat.reasoningEffort].filter(Boolean).join(" · ");
   const efforts = model?.reasoningEfforts ?? [];
+  const modelName = !chat.model ? "預設模型" : (model?.label ?? chat.model);
+  const label = [AI_NAME[chat.agent], modelName, efforts.length ? (chat.reasoningEffort ?? "預設 effort") : null].filter(Boolean).join(" · ");
+  const locked = chat.running || busy || !agent;
   return (
     <div className="rm-ai" ref={ref}>
       <button
+        ref={button}
         type="button"
         className="ctl rm-ai-btn"
-        aria-haspopup="true"
         aria-expanded={open}
+        aria-controls="rm-ai-menu"
         title={chat.running ? "AI 回覆中，回完才能換" : "問 AI 時用的模型和 effort，下一次問起生效"}
-        disabled={chat.running || busy || !agent}
+        disabled={locked}
         onClick={() => setOpen((v) => !v)}
       >
         <span className="rm-ai-mark" aria-hidden="true">
@@ -565,55 +591,45 @@ function AiPicker({ chat, onChanged, onError }: { chat: Chat; onChanged: (s: Cha
         <Glyph name="chevron" size={12} />
       </button>
       {open && agent && (
-        <div className="menu card rm-ai-menu" role="group" aria-label="問 AI 時用">
+        <div id="rm-ai-menu" className="menu card rm-ai-menu rm-pop">
           <p className="rm-menu-h" id="rm-ai-models">
             模型
           </p>
-          <div role="radiogroup" aria-labelledby="rm-ai-models">
-            {agent.models.map((m) => (
-              <button
-                key={m.id || "default"}
-                type="button"
-                role="radio"
-                aria-checked={m.id === chat.model}
-                className="menu-item"
-                onClick={() => {
-                  close();
-                  if (m.id !== chat.model) void configure(m.id, chat.reasoningEffort && m.reasoningEfforts?.includes(chat.reasoningEffort) ? chat.reasoningEffort : undefined);
-                }}
-              >
-                <span className="grow">{m.label}</span>
-                {m.id === chat.model && <Glyph name="check" size={14} />}
-              </button>
-            ))}
+          <div role="group" aria-labelledby="rm-ai-models">
+            {agent.models.map((m) => {
+              const on = m.id === chat.model;
+              return (
+                <button
+                  key={m.id || "default"}
+                  type="button"
+                  aria-pressed={on}
+                  className="menu-item"
+                  onClick={() => {
+                    if (!on) void configure(m.id, chat.reasoningEffort && m.reasoningEfforts?.includes(chat.reasoningEffort) ? chat.reasoningEffort : undefined);
+                  }}
+                >
+                  <span className="grow">{m.id ? m.label : "預設模型"}</span>
+                  {on && <Glyph name="check" size={14} />}
+                </button>
+              );
+            })}
           </div>
-          {efforts.length > 0 && (
-            <>
-              <p className="rm-menu-h" id="rm-ai-effort">
-                Effort
-              </p>
-              <div role="radiogroup" aria-labelledby="rm-ai-effort">
-                {["", ...efforts].map((e) => {
-                  const on = (chat.reasoningEffort ?? "") === e;
-                  return (
-                    <button
-                      key={e || "default"}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      className="menu-item"
-                      onClick={() => {
-                        close();
-                        if (!on) void configure(chat.model, e || undefined);
-                      }}
-                    >
-                      <span className="grow">{e || "預設"}</span>
-                      {on && <Glyph name="check" size={14} />}
-                    </button>
-                  );
-                })}
-              </div>
-            </>
+          <p className="rm-menu-h" id="rm-ai-effort">
+            Effort
+          </p>
+          {efforts.length > 0 ? (
+            <div className="rm-seg" role="group" aria-labelledby="rm-ai-effort">
+              {["", ...efforts].map((e) => {
+                const on = (chat.reasoningEffort ?? "") === e;
+                return (
+                  <button key={e || "default"} type="button" aria-pressed={on} onClick={() => !on && void configure(chat.model, e || undefined)}>
+                    {e || "預設"}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="rm-menu-note">這個模型不能調 effort</p>
           )}
         </div>
       )}
@@ -622,26 +638,27 @@ function AiPicker({ chat, onChanged, onError }: { chat: Chat; onChanged: (s: Cha
 }
 
 /** Long messages show their first lines; the rest opens on request. */
-function Clamp({ children }: { children: ReactNode }) {
+function Clamp({ children, on = true }: { children: ReactNode; on?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [long, setLong] = useState(false);
   const [open, setOpen] = useState(false);
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || !on) return;
     // Only clamp when it saves real reading: well past the clamp height, not a line or two over.
     const check = () => setLong(el.scrollHeight > 320);
     check();
     const ro = new ResizeObserver(check);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [on]);
+  const clamped = on && long && !open;
   return (
     <>
-      <div ref={ref} className={`rm-clamp${long && !open ? " is-clamped" : ""}`}>
+      <div ref={ref} className={`rm-clamp${clamped ? " is-clamped" : ""}`}>
         {children}
       </div>
-      {long && (
+      {on && long && (
         <button type="button" className="tb-link rm-more" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
           {open ? "收起" : "顯示全部"}
         </button>
@@ -650,7 +667,7 @@ function Clamp({ children }: { children: ReactNode }) {
   );
 }
 
-function Said({ by, me, text, at, now, ask }: { by: string; me: string; text: string; at: string; now: number; ask: boolean }) {
+function Said({ by, me, text, at, now, ask, clamp }: { by: string; me: string; text: string; at: string; now: number; ask: boolean; clamp: boolean }) {
   const mine = by.toLowerCase() === me.toLowerCase();
   const d = splitDrafter(text);
   return (
@@ -663,7 +680,7 @@ function Said({ by, me, text, at, now, ask }: { by: string; me: string; text: st
         {ask && <span className="rm-ask">問 AI</span>}
       </div>
       <div className="rm-text">
-        <Clamp>
+        <Clamp on={clamp}>
           <MarkdownLite text={d.text} />
         </Clamp>
       </div>
@@ -671,12 +688,12 @@ function Said({ by, me, text, at, now, ask }: { by: string; me: string; text: st
   );
 }
 
-function Message({ m, me, now }: { m: RoomMessage; me: string; now: number }) {
-  if (!m.ai) return <Said by={m.by} me={me} text={m.text} at={m.at} now={now} ask={!!m.ask} />;
-  return <AiSaid name={m.label?.split(" · ")[0] || "AI"} detail={m.label} text={m.text} at={m.at} now={now} />;
+function Message({ m, me, now, clamp }: { m: RoomMessage; me: string; now: number; clamp: boolean }) {
+  if (!m.ai) return <Said by={m.by} me={me} text={m.text} at={m.at} now={now} ask={!!m.ask} clamp={clamp} />;
+  return <AiSaid name={m.label?.split(" · ")[0] || "AI"} detail={m.label} text={m.text} at={m.at} now={now} clamp={clamp} />;
 }
 
-function AiSaid({ name, detail, text, at, now, streaming }: { name: string; detail?: string; text: string; at: string; now: number; streaming?: boolean }) {
+function AiSaid({ name, detail, text, at, now, streaming, clamp }: { name: string; detail?: string; text: string; at: string; now: number; streaming?: boolean; clamp: boolean }) {
   return (
     <div className="rm-msg is-ai">
       <div className="rm-who" title={detail}>
@@ -687,8 +704,10 @@ function AiSaid({ name, detail, text, at, now, streaming }: { name: string; deta
         <span className="rm-time">{relTime(at, now)}</span>
       </div>
       <div className="rm-text">
-        <MarkdownLite text={text} />
-        {streaming && <span className="caret" aria-hidden="true" />}
+        <Clamp on={clamp && !streaming}>
+          <MarkdownLite text={text} />
+          {streaming && <span className="caret" aria-hidden="true" />}
+        </Clamp>
       </div>
     </div>
   );

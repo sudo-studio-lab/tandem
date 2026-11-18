@@ -58,8 +58,12 @@
   flex-direction: column;
   min-height: calc(100dvh - var(--topbar-h) - 3px);
 }
+/* Short talk sits next to the composer instead of floating at the top of an empty panel. */
 .rm-log {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 /* Notes: a folded group label above the talk, same as the board's groups. */
 .rm-notes {
@@ -145,7 +149,7 @@
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 64px), transparent);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 64px), transparent);
 }
-.rm-more {
+.rm .rm-more {
   margin-top: 4px;
   font-size: 13px;
 }
@@ -200,9 +204,11 @@
   background: var(--bg);
   border-top: 1px solid var(--border);
 }
+/* Grows with what is typed, up to a limit; no drag handle to fiddle with. */
 .rm-compose textarea {
   width: 100%;
-  resize: vertical;
+  resize: none;
+  field-sizing: content;
   min-height: 52px;
   max-height: 40dvh;
   font-size: 15px;
@@ -240,12 +246,18 @@
   padding-left: 4px;
 }
 .rm-ai-btn:disabled {
-  opacity: 1;
+  opacity: 0.55;
+  cursor: default;
+}
+.rm-ai-btn:disabled:hover {
+  background: transparent;
+  color: var(--muted);
 }
 .rm-ai-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .rm-ai-line {
   display: inline-flex;
@@ -255,11 +267,16 @@
   font-size: 13px;
   color: var(--muted);
 }
+/* Guests only read who answers; a grey mark so it doesn't look like a control. */
+.rm-ai-line .rm-ai-mark {
+  background: var(--surface-2);
+  color: var(--muted);
+}
 .menu.rm-ai-menu {
   top: auto;
   bottom: calc(100% + 6px);
   left: 0;
-  min-width: 220px;
+  min-width: 280px;
   max-height: 50dvh;
   overflow-y: auto;
 }
@@ -270,13 +287,52 @@
   font-weight: 600;
   color: var(--muted);
 }
-.rm-menu-h + [role="radiogroup"] .menu-item[aria-checked="true"] {
+.rm-pop .menu-item {
+  min-height: var(--ctl-h);
+}
+.rm-ai-menu .menu-item[aria-pressed="true"] {
   color: var(--accent);
 }
-.rm-ai-menu [role="radiogroup"] + .rm-menu-h {
+.rm-ai-menu [role="group"] + .rm-menu-h {
   margin-top: 4px;
   border-top: 1px solid var(--border);
   padding-top: 10px;
+}
+/* Effort: one row of choices, the current one tinted. */
+.rm-seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 4px 6px 6px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.rm-seg button {
+  font: inherit;
+  font-size: 12px;
+  flex: 1 1 auto;
+  min-height: calc(var(--ctl-h) - 4px);
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.rm-seg button:hover {
+  color: var(--text);
+}
+.rm-seg button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.rm-menu-note {
+  margin: 0;
+  padding: 4px 10px 8px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 /* The room's ⋯: icon-only control; ending the room sits last, set apart. */

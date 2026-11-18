@@ -96,8 +96,10 @@ const agents: AgentStatus[] = [
     auth: "subscription",
     plan: "pro",
     models: [
-      { id: "", label: "預設", isDefault: true },
-      { id: "sonnet", label: "Sonnet" },
+      { id: "", label: "預設", isDefault: true, reasoningEfforts: ["low", "medium", "high", "xhigh", "max"] },
+      { id: "opus", label: "Opus", reasoningEfforts: ["low", "medium", "high", "xhigh", "max"] },
+      { id: "sonnet", label: "Sonnet", reasoningEfforts: ["low", "medium", "high", "xhigh", "max"] },
+      { id: "haiku", label: "Haiku" },
     ],
     installUrl: "https://code.claude.com/docs/en/setup",
     supportsImages: true,
