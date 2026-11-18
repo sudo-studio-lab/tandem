@@ -1,4 +1,5 @@
 import type { Problem } from "@tandem/contracts";
+import { Glyph } from "./icons.tsx";
 
 /** Record format warnings: a small collapsed note at the bottom of the board. */
 export function Problems({ items }: { items: Problem[] }) {
@@ -7,8 +8,9 @@ export function Problems({ items }: { items: Problem[] }) {
   return (
     <details className={`problems${errors ? " has-errors" : ""}`}>
       <summary>
-        <span aria-hidden="true">⚠ </span>
-        {items.length} 個紀錄格式問題{errors ? `（${errors} 個錯誤）` : ""}      </summary>
+        <Glyph name="chevron" size={12} className="problems-chev" />
+        {items.length} 個紀錄格式問題{errors ? `（${errors} 個錯誤）` : ""}
+      </summary>
       <ul className="rows card">
         {items.map((p, i) => (
           <li key={i}>

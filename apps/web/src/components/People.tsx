@@ -1,4 +1,5 @@
 import type { ActivityItem, ActivityKind, BoardMember, ProjectBoard } from "@tandem/contracts";
+import { Glyph } from "./icons.tsx";
 import { Ext } from "./Ext.tsx";
 import { Avatar } from "./ui.tsx";
 import { relTime } from "../time.ts";
@@ -106,7 +107,7 @@ export function PersonCard({ m, board, now }: { m: BoardMember; board: ProjectBo
             <ul className="fyi">
               {s.fyi.map((f, i) => (
                 <li key={i}>
-                  <span aria-hidden="true">📌 </span>
+                  <Glyph name="pin" size={14} className="fyi-ic" />
                   <span className="sr-only">要大家知道：</span>
                   {f.text}
                   {decisionLink(f.ref)}
@@ -126,17 +127,13 @@ export function PersonCard({ m, board, now }: { m: BoardMember; board: ProjectBo
               <ul className="mini-list">
                 {s?.deliverables.map((d) => (
                   <li key={d.url}>
-                    <span className="mini-icon" aria-hidden="true">
-                      📄
-                    </span>
+                    <Glyph name="doc" size={14} className="mini-icon" />
                     <Ext href={d.url}>{d.title}</Ext>
                   </li>
                 ))}
                 {prs.map((p) => (
                   <li key={`pr${p.number}`}>
-                    <span className="mini-icon" aria-hidden="true">
-                      ⇄
-                    </span>
+                    <Glyph name="pr" size={14} className="mini-icon" />
                     <span className="grow">
                       <Ext href={p.url}>
                         #{p.number} {p.title}
@@ -162,9 +159,7 @@ export function PersonCard({ m, board, now }: { m: BoardMember; board: ProjectBo
               <ul className="mini-list">
                 {m.openTasks.map((t) => (
                   <li key={t.number}>
-                    <span className="mini-icon" aria-hidden="true">
-                      ☐
-                    </span>
+                    <Glyph name="task" size={14} className="mini-icon" />
                     <span className="grow">
                       <Ext href={t.url}>
                         #{t.number} {t.title}

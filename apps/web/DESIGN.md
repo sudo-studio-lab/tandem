@@ -2,15 +2,15 @@
 name: Tandem
 description: 現有協作工作介面的視覺規範，從 prototype 實作擷取
 colors:
-  background: "#f3f4f7"
+  background: "#f7f7f8"
   surface: "#ffffff"
-  surface-secondary: "#f7f8fa"
-  text: "#1a2130"
-  muted: "#667085"
-  border: "#e2e5ea"
-  border-strong: "#cfd4dc"
-  primary: "#2259d6"
-  primary-soft: "#e8efff"
+  surface-secondary: "#efeff1"
+  text: "#1d1f24"
+  muted: "#5f636b"
+  border: "#e3e3e7"
+  border-strong: "#cdcdd3"
+  primary: "#2f62d8"
+  primary-soft: "#e9effc"
   primary-contrast: "#ffffff"
   success-background: "#e3f5ea"
   success-text: "#166534"
@@ -34,9 +34,18 @@ typography:
   caption:
     fontFamily: 'system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif'
     fontSize: "0.85rem"
+  panel:
+    fontFamily: 'system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif'
+    fontSize: "13px"
+    lineHeight: 1.45
+  group-label:
+    fontFamily: 'system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif'
+    fontSize: "11px"
+    fontWeight: 600
+    letterSpacing: "0.06em"
 rounded:
-  surface: "12px"
-  small: "8px"
+  surface: "8px"
+  small: "6px"
   editor: "10px"
   pill: "999px"
 spacing:
@@ -83,24 +92,26 @@ components:
 
 介面以完成協作任務為目的：文字、訊息和操作為主，藍色表示主要操作與目前選擇。使用者本次沒有新增風格偏好，功能擴充沿用現有系統；三版參考圖比較新增控制項的安排，不改品牌。
 
+**方向：像編輯器原本就有的面板**（2026-11-18 從三版中選定第 1 版）。Tandem 主要放在編輯器側欄，邊寫程式邊看；所以看板要安靜、資訊密、不搶寫程式的注意力。中性灰底、13px、一件事一行，顏色只留給「等你」和出問題。新的頁面先照這個方向，不另立風格。
+
 **Key Characteristics:**
-- 灰白表面、語意色彩及系統中文字體。
+- 中性灰表面（不帶藍）、語意色彩及系統中文字體；深淺色跟著系統。
 - 模型、草稿、待處理訊息及輸入操作集中於既有對話面板。
 - 桌面並排、窄螢幕換行與單欄，圖片保留實際內容。
 
 ## Colors
 
-淺色模式採灰白底、深色文字與藍色操作色，值以 frontmatter 與 `src/styles.css` 為準。成功、警告與錯誤各有專用的背景和文字色。
+淺色模式採中性淺灰底、深色文字與藍色操作色，值以 frontmatter 與 `src/styles.css` 為準。成功、警告與錯誤各有專用的背景和文字色。
 
-現有深色模式依 `prefers-color-scheme: dark` 切換：背景 `#0f1318`、表面 `#181d25`、次表面 `#1e242e`、文字 `#e6eaf0`、次文字 `#97a3b6`、操作色 `#7aa7ff`。新增功能沿用語意變數，不寫死淺色值。
+深色模式依 `prefers-color-scheme: dark` 切換：背景 `#18191c`、表面 `#1e1f23`、次表面 `#26272b`、框線 `#2c2d32`、文字 `#d6d8dd`、次文字 `#8f939b`、操作色 `#6f9bff`、錯誤字 `#f08a7e`。灰色不帶藍，才像編輯器本身的面板。新增功能沿用語意變數，不寫死淺色值。次文字對背景至少 4.5:1。
 
 ## Typography
 
-沿用系統 sans-serif 字體堆疊，中文以裝置上的繁中字體呈現。基準與控制項、次要資訊尺寸見 frontmatter；頁面標題為 1.4rem，對話正文行高為 1.6。次要資訊使用較小字級與次文字色；指令和原始工具輸出使用 `ui-monospace, Consolas, monospace`。未建立新展示字體或 Google Fonts 配對。
+沿用系統 sans-serif 字體堆疊，中文以裝置上的繁中字體呈現。頂部列和看板用面板字級 13px（`panel`），分組標題用 11px、0.06em 字距、次文字色（`group-label`），編號和計數用等寬數字；長文和表單頁維持 15px 基準。基準與控制項、次要資訊尺寸見 frontmatter；頁面標題為 1.4rem，對話正文行高為 1.6。次要資訊使用較小字級與次文字色；指令和原始工具輸出使用 `ui-monospace, Consolas, monospace`。未建立新展示字體或 Google Fonts 配對。
 
 ## Layout
 
-頂部只佔一行（48px）：產品標記、專案切換、一個安靜的狀態、成員頭像、⋯ 與設定；只有一個畫面時不顯示導覽。640px 以下藏起產品名稱、owner、正常狀態和頂部成員頭像（看板自己的工具列已有成員，成員與邀請留在 ⋯ 選單）。內容最大寬度為 1240px。桌面對話採 250px 左側清單與可伸縮右側對話區，欄距 16px；對話內由標題、可捲動訊息與底部輸入區組成。
+頂部只佔一行（40px，背景和頁面同色、底下一條細線）：產品標記、專案切換、一個安靜的狀態、成員頭像、⋯ 與設定；只有一個畫面時不顯示導覽。640px 以下藏起產品名稱、owner、正常狀態和頂部成員頭像（看板自己的工具列已有成員，成員與邀請留在 ⋯ 選單）。內容最大寬度為 1240px。桌面對話採 250px 左側清單與可伸縮右側對話區，欄距 16px；對話內由標題、可捲動訊息與底部輸入區組成。
 
 輸入區採 A 的分組順序：模型／effort 與草稿狀態、待處理訊息、附件與文字編輯區、加入圖片與送出操作。桌面編輯區內縮圖和文字並排；輸入區最多佔對話高度 55%，內容過多時可捲動。
 
@@ -116,11 +127,14 @@ components:
 
 ## Components
 
-- 工具列控制項：同一套高度 `--ctl-h`（滑鼠 32px，觸控裝置 44px）、8px 圓角、同一種細框。分段切換（`.seg`）、一般控制（`.ctl`）、成員頭像與圖示按鈕都對齊這個高度；不用系統下拉選單。選取狀態是唯一用到強調色的地方。
+- 工具列控制項：同一套高度 `--ctl-h`（滑鼠 28px，觸控裝置 44px）、6px 圓角、平常沒有框也沒有底色；滑過和選取時才出現次表面底色。分段切換（`.seg`）、一般控制（`.ctl`）、成員頭像與圖示按鈕都對齊這個高度；不用系統下拉選單。
 - 狀態：頂部只有一個「點＋字」的狀態，不用實心膠囊。正常時是灰點；同步中是藍點；離線或連不上本機 Tandem 是警告色；失敗或衝突是錯誤色。連不上本機時以它為準，不同時顯示「已同步」。
 - 色彩用量：藍色是唯一強調色，用在選取、主要連結、「等你」和已開 PR；黃色、綠色、紅色只留給真的需要注意的狀態（例如被卡住、同步失敗）。完成用灰色。
 - 圖示：統一用 `components/icons.tsx` 和任務板內的 16px 線條 SVG（1.5px 線寬、圓角端點），不用 Unicode 符號當圖示。
-- 任務板分組：沒有項目的分組收成一行灰字、不能展開；「等你」的列和其他列用同一個兩行結構（圖示、編號、標題；下一行是說明）。
+- 任務板分組：分組標題是一行小字（折疊箭頭、圖示、名稱、右邊計數），不是色塊或卡片。沒有項目的分組收成一行灰字、不能展開。
+- 任務板列：一件事一行，至少 28px 高（觸控 44px）：編號、標題（太長用 … 截斷，滑過看完整內容和說明）、右邊是「卡住」「草稿」、相關 PR 和負責人的 16px 頭像。「等你」的列用淡藍底，右邊寫要你做什麼、誰在等、等多久。列從面板左緣延伸到右緣，滑過時整條變次表面色。每組裡卡住的排最前面，分組計數前寫「N 卡住」（錯誤色）。整條列的高度都能點。看板全空時留一行「還沒有任務。新增任務」。
+- 成員狀態：在看板裡點成員頭像，狀態排在「等你」下面，用面板文字呈現（22px 頭像、13px 字、底下一條細線），不是卡片；釘選事項用線條圖示，不用 emoji。
+- 看板載入錯誤：看板已經顯示時，錯誤是一行「紅點＋文字＋再試一次」，跟頂部狀態同一種寫法，不用色塊橫幅。
 - 按鈕：主要操作為藍色，次要為有框表面，安靜操作為透明底與次文字色；停止使用既有危險操作樣式。一般高度至少 34px，輸入區操作與圖片操作至少 44px；disabled 降低不透明度至 0.55。
 - 欄位：模型與 effort 使用既有有框 select，模型切換或工作中停用。一般鍵盤焦點為 3px 外框、2px 位移；編輯區聚焦改由整組 2px 外框、1px 位移標示，不重複描繪 textarea 外框。
 - 導覽：三個分頁保留次表面容器與選取表面的低陰影；760px 以下整列等分。未新增全站入口。
@@ -135,5 +149,6 @@ components:
 - Do 沿用現有色彩變數、元件與導覽，讓新功能容易找到。
 - Do 對 loading、running、queued、failed 與 disabled 提供可辨識狀態。
 - Do 保留繁中可讀性、鍵盤操作與手機上的觸控目標。
-- Don't 因這次對話功能擴充更換全站配色、字體、品牌或導覽結構。
+- Don't 用卡片、色塊或粗框包分組；層次靠字級、字重和留白。
+- Don't 在看板列上加第二行說明；細節放在滑過的提示和連結的頁面。
 - Don't 以圖片取代實際介面的文字、按鈕或輸入欄位。
