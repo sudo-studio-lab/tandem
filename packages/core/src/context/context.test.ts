@@ -182,6 +182,28 @@ describe("context on the git data store", () => {
     expect(Buffer.from(img!.content, "base64").equals(PNG)).toBe(true);
   });
 
+  it("never shows a git author name as a login; knows its own commits by email", async () => {
+    // Commits made outside `tandem` carry no login line, only the git author (here "User A").
+    fs.mkdirSync(path.join(fx.a, "tandem/context"), { recursive: true });
+    fs.writeFileSync(path.join(fx.a, "tandem/context/plain.md"), "by hand\n");
+    await runGit(["add", "."], { cwd: fx.a });
+    await runGit(["commit", "-m", "move data"], { cwd: fx.a });
+    fs.writeFileSync(path.join(fx.a, "tandem/context/noreply.md"), "web edit\n");
+    await runGit(["add", "."], { cwd: fx.a });
+    await runGit(["-c", "user.email=123+carol@users.noreply.github.com", "commit", "-m", "Update noreply.md"], { cwd: fx.a });
+    await runGit(["push", "origin", "main"], { cwd: fx.a });
+
+    const byPath = async (dir: string, self?: { login: string; email: string }) => {
+      if (dir === fx.b) await runGit(["fetch", "origin"], { cwd: fx.b });
+      else await runGit(["fetch", "origin"], { cwd: fx.a });
+      return Object.fromEntries((await listContext(openGitDataStore(dir), self)).map((f) => [f.path, f.by ?? null]));
+    };
+    // A teammate sees no name rather than "User A"; a noreply address gives the login.
+    expect(await byPath(fx.b, { login: "bob", email: "b@example.com" })).toEqual({ "noreply.md": "carol", "plain.md": null });
+    // On A's computer the same commit is A's own, so it is not reported as someone else's change.
+    expect(await byPath(fx.a, { login: "alice", email: "A@example.com" })).toEqual({ "noreply.md": "carol", "plain.md": "alice" });
+  });
+
   it("a write based on an old version is refused even when the check only happens at push time", async () => {
     const a = openGitDataStore(fx.a);
     const b = openGitDataStore(fx.b);

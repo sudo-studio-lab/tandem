@@ -29,6 +29,8 @@ export interface TreeEntry {
 export interface PathChange {
   message: string;
   authorName: string;
+  /** Git author email; a GitHub noreply address carries the login. */
+  authorEmail: string;
   at: string;
   pending?: boolean;
 }

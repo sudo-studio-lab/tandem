@@ -44,22 +44,39 @@ export function contextAuthor(message: string, rel: string): string | undefined 
   return undefined;
 }
 
-function who(h: PathChange | undefined, rel: string): { by?: string; at?: string } {
+/** Who this computer writes records as: its GitHub login and the git email its commits carry. */
+export interface ContextSelf {
+  login: string;
+  email: string;
+}
+
+/** Login from a GitHub noreply address (`123+login@…` or `login@users.noreply.github.com`). */
+export function noreplyLogin(email: string): string | undefined {
+  return /^(?:\d+\+)?([A-Za-z0-9-]{1,39})@users\.noreply\.github\.com$/i.exec(email.trim())?.[1];
+}
+
+/**
+ * Who changed a context file, as a GitHub login. The login line in the commit message wins; then a
+ * noreply address; then "me" when the commit carries this computer's git email. A plain git author
+ * name is never shown, because it is not a login and would read as a different person.
+ */
+function who(h: PathChange | undefined, rel: string, self?: ContextSelf): { by?: string; at?: string } {
   if (!h) return {};
-  const by = contextAuthor(h.message, rel) ?? (h.authorName || undefined);
+  const mine = !!self && !!h.authorEmail && h.authorEmail.toLowerCase() === self.email.toLowerCase();
+  const by = contextAuthor(h.message, rel) ?? noreplyLogin(h.authorEmail) ?? (mine ? self.login : undefined);
   return { ...(by ? { by } : {}), ...(h.at ? { at: h.at } : {}) };
 }
 
 /** Last known change per context path (relative), including deleted ones. */
-export async function contextHistory(store: DataStore): Promise<Map<string, { by?: string; at?: string }>> {
+export async function contextHistory(store: DataStore, self?: ContextSelf): Promise<Map<string, { by?: string; at?: string }>> {
   const hist = await store.history(CONTEXT_DIR);
   const out = new Map<string, { by?: string; at?: string }>();
-  for (const [p, h] of hist) out.set(relOf(p), who(h, relOf(p)));
+  for (const [p, h] of hist) out.set(relOf(p), who(h, relOf(p), self));
   return out;
 }
 
 /** Every allowed file in the shared context; notes.md first. */
-export async function listContext(store: DataStore): Promise<ContextFileInfo[]> {
+export async function listContext(store: DataStore, self?: ContextSelf): Promise<ContextFileInfo[]> {
   const [entries, hist] = await Promise.all([store.tree(CONTEXT_DIR), store.history(CONTEXT_DIR)]);
   const files: ContextFileInfo[] = [];
   for (const e of entries) {
@@ -72,7 +89,7 @@ export async function listContext(store: DataStore): Promise<ContextFileInfo[]> 
       mime: k.mime,
       size: e.size,
       version: e.version,
-      ...who(hist.get(e.path), rel),
+      ...who(hist.get(e.path), rel, self),
       ...(e.pending ? { pending: true } : {}),
     });
   }

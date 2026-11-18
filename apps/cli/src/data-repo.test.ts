@@ -52,7 +52,7 @@ async function context(gh: Partial<Context["gh"]> = {}, dataGh?: Partial<Context
 }
 
 beforeEach(async () => {
-  root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "tandem-datarepo-")));
+  root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "tandem-datarepo-")));
   baseDir = path.join(root, "app-data");
   codeRemote = await bare("code");
   work = path.join(root, "work");

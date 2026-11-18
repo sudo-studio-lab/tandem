@@ -86,14 +86,14 @@ const sameLogin = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
 /** Context files someone else changed, given repo-relative paths that changed (newest first). */
 export async function contextChangesFor(
-  ctx: Pick<Context, "store" | "me">,
+  ctx: Pick<Context, "store" | "me" | "self">,
   changedPaths: string[],
   files: ContextFileInfo[],
 ): Promise<BriefContextChange[]> {
   const prefix = `${CONTEXT_DIR}/`;
   const rels = [...new Set(changedPaths.filter((p) => p.startsWith(prefix)).map((p) => p.slice(prefix.length)))];
   if (!rels.length) return [];
-  const hist = await contextHistory(ctx.store);
+  const hist = await contextHistory(ctx.store, ctx.self);
   const present = new Set(files.map((f) => f.path));
   return rels
     .map((path) => ({ path, by: hist.get(path)?.by, deleted: !present.has(path) }))
@@ -110,7 +110,7 @@ export async function buildBrief(
     gatherLocal(ctx),
     changesSince(ctx.dataRoot, since.commit, [PRODUCT.dataDir]),
     ctx.store.snapshot(),
-    listContext(ctx.store).catch(() => [] as ContextFileInfo[]),
+    listContext(ctx.store, ctx.self).catch(() => [] as ContextFileInfo[]),
     notesHead(ctx.store).catch(() => undefined),
   ]);
   const contextChanges = await contextChangesFor(

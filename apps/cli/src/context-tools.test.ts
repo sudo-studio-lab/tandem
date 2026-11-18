@@ -57,7 +57,7 @@ async function mcp(ctx: Context) {
 }
 
 beforeEach(async () => {
-  root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "tandem-context-")));
+  root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "tandem-context-")));
   codeRemote = await bare("code");
   dataRemote = await bare("data");
   work = path.join(root, "work");

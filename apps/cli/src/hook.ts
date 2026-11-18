@@ -49,10 +49,10 @@ async function liveDecisions(ctx: Awaited<ReturnType<typeof openContext>>, s: De
       me: ctx.me,
       sync: () => withTimeout(syncData(ctx.dataRoot, { gitEnv: ctx.gitEnv }).catch(() => undefined), 3_000, undefined),
       more: async () => {
-        const files = await listContext(ctx.store);
+        const files = await listContext(ctx.store, ctx.self);
         const known = new Set(files.map((f) => f.path));
         const deletedSome = Object.keys(s.contextSeen ?? {}).some((p) => !known.has(p));
-        const contextNote=newContextNote(s, files, ctx.me, deletedSome ? await contextHistory(ctx.store) : undefined);
+        const contextNote=newContextNote(s, files, ctx.me, deletedSome ? await contextHistory(ctx.store, ctx.self) : undefined);
         const messageNote=ctx.dataRepo.separate?await agentMessagesNote(ctx.store,`${ctx.remote.owner}/${ctx.remote.name}`.toLowerCase(),ctx.me,s):null;
         return [contextNote,messageNote].filter(Boolean).join("\n\n")||null;
       },

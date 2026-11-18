@@ -62,6 +62,8 @@ export interface Context {
   gitEnv: Record<string, string>;
   /** Records live on the remote default branch. */
   store: DataStore;
+  /** This computer's login and the git email its record commits carry (to tell "mine" from a teammate's). */
+  self?: { login: string; email: string };
 }
 
 /** A different repo is not necessarily private. GitHub must confirm visibility before sharing. */
@@ -118,7 +120,8 @@ export async function assembleContext(
   const { repoRoot, remote, me, state, token } = base;
   const gitEnv = opts.gitEnv ?? gitAuthEnv(token);
   const data = await resolveDataLocation(repoRoot, remote, { ...opts.data, gitEnv });
-  const store = openGitDataStore(data.root, { gitEnv, author: await authorFor(repoRoot, me) });
+  const author = await authorFor(repoRoot, me);
+  const store = openGitDataStore(data.root, { gitEnv, author });
   const dataGh = data.separate
     ? createGitHubClient({ token, owner: data.repo.owner, repo: data.repo.name, cache: stateEtagCache(state) })
     : undefined;
@@ -130,6 +133,7 @@ export async function assembleContext(
     saveState: () => writeLocalState(repoRoot, state),
     gitEnv,
     store,
+    self: { login: me, email: author.email },
   };
 }
 

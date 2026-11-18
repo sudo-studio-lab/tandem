@@ -717,7 +717,10 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
   }));
 
   // Shared context (tandem/context/ in the data repo). Paths are relative to that folder.
-  app.get("/api/projects/:id/context", handle(async (c) => c.json(await listContext((await projectRt(c)).ctx.store))));
+  app.get("/api/projects/:id/context", handle(async (c) => {
+    const { ctx } = await projectRt(c);
+    return c.json(await listContext(ctx.store, ctx.self));
+  }));
   app.get(
     "/api/projects/:id/context/file",
     handle(async (c) => {
