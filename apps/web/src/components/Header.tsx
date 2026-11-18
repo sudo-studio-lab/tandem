@@ -4,6 +4,7 @@ import { api, projectPath } from "../api.ts";
 import { relTime } from "../time.ts";
 import { Avatar, errMsg } from "./ui.tsx";
 import { Glyph } from "./icons.tsx";
+import { HOME } from "./PageBar.tsx";
 
 const AGENT_NAME: Record<AgentKind, string> = { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity", grok: "Grok", cursor: "Cursor" };
 
@@ -17,7 +18,7 @@ export type View = "board" | "chat" | "room";
 const SHOW_CHAT = false;
 
 export const TABS: { id: View; label: string }[] = [
-  { id: "board", label: "看板" },
+  { id: "board", label: HOME },
   ...(SHOW_CHAT ? [{ id: "chat" as const, label: "跟 AI 對話" }] : []),
 ];
 
@@ -277,7 +278,7 @@ export function Header(p: Props) {
             })),
           { key: "members", label: "成員與邀請", run: p.onInvite },
           { key: "folder", label: "打開專案資料夾", disabled: opening === "folder", run: () => void run("folder", projectPath(id, "/open-folder")) },
-          { key: "refresh", label: "重新整理看板", disabled: p.refreshing, run: p.onRefresh },
+          { key: "refresh", label: `重新整理${HOME}`, disabled: p.refreshing, run: p.onRefresh },
         ]
       : [];
 

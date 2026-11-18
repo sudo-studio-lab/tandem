@@ -6,14 +6,8 @@
 .page.board.rm {
   padding-bottom: 0;
 }
-.rm-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: calc(var(--ctl-h) + 12px);
-}
 /* Inside a room the back link and host actions stay reachable while the talk scrolls. */
-.rm-room > .rm-bar {
+.rm-room > .pg-bar {
   position: sticky;
   top: var(--topbar-h);
   z-index: 3;
@@ -24,36 +18,6 @@
 .rm-busy {
   font-size: 12px;
   color: var(--accent);
-}
-.rm-bar-end {
-  margin-left: auto;
-  display: inline-flex;
-  gap: 4px;
-}
-.rm-back {
-  font: inherit;
-  font-size: 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: var(--ctl-h);
-  padding: 0 6px 0 2px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--muted);
-  cursor: pointer;
-}
-.rm-back:hover {
-  background: var(--surface-2);
-  color: var(--text);
-}
-.rm-back-ic {
-  transform: rotate(90deg);
-}
-.rm-heading {
-  font-size: 13px;
-  font-weight: 600;
 }
 .ctl:disabled {
   opacity: 0.55;
@@ -273,8 +237,7 @@
     flex: 1;
     min-height: 44px;
   }
-  .rm .rm-notes > .tb-sum,
-  .rm-back {
+  .rm .rm-notes > .tb-sum {
     min-height: 44px;
   }
 }

@@ -4,6 +4,7 @@ import { api, projectPath } from "../api.ts";
 import { errMsg, Spinner, useCopy } from "./ui.tsx";
 import { relTime } from "../time.ts";
 import { TranscriptChoices } from "./AgentMessages.tsx";
+import { PageBar } from "./PageBar.tsx";
 import "./collaboration.css";
 
 interface Data{settings:SharedChatSettings;chats:SharedChat[];handoffs:Handoff[]}
@@ -21,8 +22,8 @@ export function SharedChatsPage({board,now,onBack,onFork,onChanged}:{board:Proje
   const chat=data?.chats.find(c=>`${c.owner}/${c.id}`===reading);
   const fork=async()=>{if(!chat)return;setBusy(true);try{const r=await api<{id:string}>("POST",projectPath(id,"/shared-chats/fork"),{owner:chat.owner,id:chat.id,provider,model});onFork(r.id);}catch(e){setError(errMsg(e));}finally{setBusy(false);}};
   const handoff=async(e:FormEvent)=>{e.preventDefault();if(!confirm(`把任務 #${task} 改指派給 @${to}，並送出這份交接筆記？`))return;setBusy(true);try{const r=await api<{write:{result:string}}>("POST",projectPath(id,"/handoffs"),{task:Number(task),to,note,confirm:true});setNote("");setNotice(r.write.result==="pushed"?"已完成交接，接手人的開工報告會看到筆記。":"任務已改指派，交接筆記等待同步。");await load();await onChanged();}catch(e){setError(errMsg(e));}finally{setBusy(false);}};
-  return <section className="co-page" aria-labelledby="co-shared-title"><p className="tb-back"><button type="button" className="tb-link" onClick={onBack}>回任務</button></p>
-    <header className="co-heading"><h2 id="co-shared-title">對話與交接</h2><p className="muted">分享自己選定的專案對話，或把目前的工作清楚交給隊友。</p></header>
+  return <section className="co-page" aria-labelledby="co-shared-title"><PageBar title="對話與交接" titleId="co-shared-title" onBack={onBack} />
+    <p className="muted co-lead">分享自己選定的專案對話，或把目前的工作清楚交給隊友。</p>
     {error&&<p className="banner banner-error" role="alert">{error} <button type="button" className="btn btn-small" onClick={()=>void load()}>重新載入</button></p>}
     {notice&&<p role="status" className="banner">{notice}</p>}
     {!data&&!error&&<Spinner label="載入分享中…"/>}

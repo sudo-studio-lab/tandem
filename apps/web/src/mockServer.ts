@@ -21,7 +21,6 @@ import type {
   ProjectRef,
   ProjectStep,
   RepoChoice,
-  TaskSummary,
   SharedChat,
   Handoff,
 } from "@tandem/contracts";
@@ -271,13 +270,7 @@ function runProgress(fullName: string, withAccept: boolean) {
   return { opId };
 }
 
-// --- tasks made on the board (kept per project for this page load) ------------
-const madeTasks = new Map<string, TaskSummary[]>();
-function boardFor(id: string) {
-  const b = mockProjectBoard(id, login ?? ME);
-  const extra = madeTasks.get(id) ?? [];
-  return { ...b, tasks: [...extra, ...b.tasks] };
-}
+const boardFor = (id: string) => mockProjectBoard(id, login ?? ME);
 
 // --- shared context (脈絡) ----------------------------------------------------
 // Saving "specs/conflict-demo.md" the first time pretends a teammate changed it just before.
@@ -565,25 +558,6 @@ export async function handle(method: string, path: string, body: unknown): Promi
     if(tail==="/agent-messages/settings"&&method==="PUT"){Object.assign(messageSettings,body);return {settings:messageSettings,write:{result:"pushed"}};}
     if(tail==="/local-transcripts"&&method==="GET") return [{id:"a".repeat(64),source:"codex",title:"登入流程的專案討論",updatedAt:new Date().toISOString(),messages:[{role:"user",text:"請整理登入的待辦。"},{role:"assistant",text:"還需要確認登入過期與重新驗證的流程。"}]}];
     if(tail.startsWith("/agent-messages/")&&method==="POST"){const parts=tail.split("/");const m=agentQuestions.find(m=>m.request.id===parts[2]);if(m){if(parts[3]==="stop")m.stopped=true;if(parts[3]==="archive")m.archived=true;}return {ok:true};}
-    if (method === "POST" && tail === "/tasks") {
-      const t = body as { title?: unknown; body?: unknown; assign?: unknown };
-      const title = typeof t.title === "string" ? t.title.trim() : "";
-      if (!title) throw new ApiError("請輸入任務標題", "usage");
-      if (title.length > 256) throw new ApiError("標題最多 256 個字", "usage");
-      if (title.includes("fail")) throw new ApiError("範例：建立任務失敗，請再試一次", "github");
-      const assign = (Array.isArray(t.assign) ? t.assign : []).map((x) => String(x).replace(/^@/, ""));
-      const bad = assign.find((l) => !/^[A-Za-z0-9-]{1,39}$/.test(l));
-      if (bad !== undefined) throw new ApiError(`「${bad}」不是正確的 GitHub 帳號`, "usage");
-      await sleep(500);
-      const list = madeTasks.get(id) ?? [];
-      const number = 40 + list.length;
-      const now = new Date().toISOString();
-      const url = `https://github.com/${proj.owner}/${proj.name}/issues/${number}`;
-      list.unshift({ number, title, url, state: "open", assignees: [...new Set(assign)], labels: ["tandem:task"], author: login ?? ME, blockedBy: [], createdAt: now, updatedAt: now });
-      madeTasks.set(id, list);
-      emit({ type: "board", data: boardFor(id) });
-      return { number, url };
-    }
     if (method === "POST" && tail === "/sync") {
       emit({ type: "sync", data: { projectId: id, state: "syncing" } });
       setTimeout(() => emit({ type: "sync", data: { projectId: id, state: "idle", lastSyncAt: new Date().toISOString() } }), 1200);

@@ -3,6 +3,7 @@ import type { AgentMember, AgentMessage, AgentMessageSettings, AgentStatus, Proj
 import { api, projectPath } from "../api.ts";
 import { Spinner, errMsg } from "./ui.tsx";
 import { relTime } from "../time.ts";
+import { PageBar } from "./PageBar.tsx";
 import "./collaboration.css";
 
 interface Data { settings: AgentMessageSettings; members: AgentMember[]; messages: AgentMessage[] }
@@ -25,8 +26,8 @@ export function AgentMessagesPage({projectId,me,now,onBack}:{projectId:string;me
   const action=async(id:string,what:"stop"|"archive")=>{setBusy(true);try{await api("POST",projectPath(projectId,`/agent-messages/${id}/${what}`));await load();}catch(e){setError(errMsg(e));}finally{setBusy(false);}};
   const models=agents.find(a=>a.agent===settings?.provider)?.models??[];
   return <section className="co-page" aria-labelledby="co-agent-title">
-    <p className="tb-back"><button type="button" className="tb-link" onClick={onBack}>回任務</button></p>
-    <header className="co-heading"><h2 id="co-agent-title">Agent 問答</h2><p className="muted">隊友的 agent 可以問專案問題；你的 agent 只回答，不能替你動手。</p></header>
+    <PageBar title="Agent 問答" titleId="co-agent-title" onBack={onBack} />
+    <p className="muted co-lead">隊友的 agent 可以問專案問題；你的 agent 只回答，不能替你動手。</p>
     {error&&<p className="banner banner-error" role="alert">{error} <button type="button" className="btn btn-small" onClick={()=>void load()}>重新載入</button></p>}
     {!data&&!error&&<Spinner label="載入問答中…"/>}
     {settings&&<details className="co-settings" open={!data?.settings.enabled}>

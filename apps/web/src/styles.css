@@ -682,20 +682,6 @@ label {
 /* ===========================================================================
    Board
    =========================================================================== */
-.board-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-  gap: 24px;
-  align-items: start;
-  margin-top: 8px;
-}
-.board-main,
-.board-side {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  min-width: 0;
-}
 .panel-block {
   min-width: 0;
 }
@@ -1662,11 +1648,6 @@ dialog.modal::backdrop {
 /* ===========================================================================
    Responsive
    =========================================================================== */
-@media (max-width: 900px) {
-  .board-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 @media (max-width: 760px) {
   .chat-page {
     grid-template-columns: 1fr;
@@ -1723,12 +1704,6 @@ dialog.modal::backdrop {
   gap: 6px 8px;
   padding: 6px 10px;
 }
-.tb-bar-end {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-}
 /* Shared control system: every control in a toolbar is var(--ctl-h) tall,
    6px corners, no border at rest; the selected state is a filled surface. */
 .ctl {
@@ -1774,9 +1749,6 @@ dialog.modal::backdrop {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-}
-.seg-icons button {
-  padding: 0 6px;
 }
 .seg button:hover {
   color: var(--text);
@@ -1857,29 +1829,13 @@ dialog.modal::backdrop {
     min-height: 44px;
   }
   .tb-new .btn,
-  .tb-new .co-assign {
+  .pg-back {
     min-height: 44px;
   }
 }
 @media (max-width: 480px) {
   .tb-from {
     display: none;
-  }
-}
-/* Below 760px the board view is one column anyway, so the switch has nothing to switch. */
-@media (max-width: 760px) {
-  .tb-bar .seg-icons {
-    display: none;
-  }
-}
-@media (max-width: 420px) {
-  .tb-bar .ctl .ctl-label {
-    display: none;
-  }
-  .tb-bar .ctl {
-    padding: 0;
-    width: var(--ctl-h);
-    justify-content: center;
   }
 }
 .tb-picked {
@@ -2060,6 +2016,51 @@ dialog.modal::backdrop {
   margin: 0;
   font-size: 0.88rem;
 }
+/* Page bar: every page reached from the board starts with "‹ 看板" and its title on one row
+   (PageBar.tsx). Same height as a toolbar row; the title is panel size, not a big heading. */
+.pg-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: calc(var(--ctl-h) + 12px);
+}
+.pg-back {
+  font: inherit;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--ctl-h);
+  padding: 0 6px 0 2px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  flex: none;
+}
+.pg-back:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.pg-back-ic {
+  transform: rotate(90deg);
+}
+.pg-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pg-bar-end {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 4px;
+}
 .tb-new {
   display: flex;
   flex-direction: column;
@@ -2077,17 +2078,6 @@ dialog.modal::backdrop {
 .tb-new textarea.input {
   resize: vertical;
   min-height: 60px;
-}
-.tb-new-assign {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-.tb-new-label {
-  font-size: 12px;
-  color: var(--muted);
-  margin-right: 2px;
 }
 .tb-new .field-error {
   margin: 0;
@@ -2192,25 +2182,6 @@ dialog.modal::backdrop {
 }
 .board-error .status-dot {
   background: var(--bad-fg);
-}
-
-/* Board view (wide screens): three columns of the same one-line rows. */
-.tb-layout-board {
-  max-width: 1160px;
-}
-.page.board:has(.tb-layout-board) {
-  max-width: 1160px;
-}
-.tb-layout-board .tb-groups {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0 16px;
-  align-items: start;
-}
-@media (max-width: 760px) {
-  .tb-layout-board .tb-groups {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* Light Markdown (room notes, shared context) */

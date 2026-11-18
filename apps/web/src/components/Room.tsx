@@ -12,19 +12,11 @@ import { relTime, waitedFor } from "../time.ts";
 import { Avatar, MarkdownLite, Spinner, errMsg } from "./ui.tsx";
 import { Item, applyUpdate, useAgents, usableAgents } from "./Chat.tsx";
 import { Glyph } from "./icons.tsx";
+import { PageBar } from "./PageBar.tsx";
 import "./room.css";
 import { useDraft } from "../drafts.ts";
 
 const POLL_MS = 4000;
-
-function Back({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button type="button" className="rm-back" onClick={onClick}>
-      <Glyph name="chevron" size={12} className="rm-back-ic" />
-      {label}
-    </button>
-  );
-}
 
 function ErrorLine({ text, onDismiss }: { text: string; onDismiss: () => void }) {
   return (
@@ -87,14 +79,12 @@ export function RoomView({ projectId, me, now, onOpenSettings, onBack }: { proje
 
   return (
     <main className="page board rm">
-      <div className="rm-bar">
-        <Back label="看板" onClick={onBack} />
-        <h2 className="rm-heading">房間</h2>
-        <button type="button" className="ctl rm-bar-end" aria-expanded={creating} onClick={() => setCreating((c) => !c)}>
+      <PageBar title="房間" onBack={onBack}>
+        <button type="button" className="ctl pg-bar-end" aria-expanded={creating} onClick={() => setCreating((c) => !c)}>
           <Glyph name="plus" />
           <span>開房間</span>
         </button>
-      </div>
+      </PageBar>
       {error && <ErrorLine text={error} onDismiss={() => setError(null)} />}
       {creating && (
         <NewRoom
@@ -361,11 +351,10 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
 
   return (
     <div className="rm-room">
-      <div className="rm-bar">
-        <Back label="房間" onClick={onBack} />
+      <PageBar back="房間" onBack={onBack}>
         {noting && <span className="rm-busy">AI 整理筆記中…</span>}
         {isHost && !room.closed && (
-          <span className="rm-bar-end">
+          <span className="pg-bar-end">
             <button type="button" className="ctl" disabled={noting || running} onClick={() => void notes(false)}>
               整理筆記
             </button>
@@ -374,7 +363,7 @@ function RoomPane({ projectId, number, me, now, onError, onChanged, onBack }: { 
             </button>
           </span>
         )}
-      </div>
+      </PageBar>
       <header className="rm-head">
         <h2 className="rm-title">{room.title}</h2>
         <p className="rm-sub">

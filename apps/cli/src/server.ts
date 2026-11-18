@@ -68,7 +68,6 @@ import { createHandoff, listHandoffs } from "./handoffs.ts";
 import { openContext, requirePrivateDataRepo, type Context } from "./context.ts";
 import { buildBoard, gatherGitHub, type GitHubData } from "./gather.ts";
 import { inviteLogin } from "./commands.ts";
-import { createTask, parseTaskInput } from "./tasks.ts";
 import { info } from "./io.ts";
 import { rememberProject, startProject, joinProject } from "./setup.ts";
 import { ADAPTERS, agentStatuses } from "./agents/index.ts";
@@ -647,17 +646,6 @@ export async function startServer(opts: ServerOptions = {}): Promise<AppServer> 
       }
       const rt = await projectRt(c);
       return c.json(await inviteLogin(rt.ctx, b.login.replace(/^@/, "")));
-    }),
-  );
-  app.post(
-    "/api/projects/:id/tasks",
-    handle(async (c) => {
-      const input = parseTaskInput(await body<unknown>(c));
-      const rt = await projectRt(c);
-      const r = await createTask(rt.ctx, input);
-      // Refresh so the new task is on the board (and pushed to open windows) before we answer.
-      await rebuild(rt, true).catch(() => undefined);
-      return c.json({ number: r.number, url: r.url });
     }),
   );
   app.get("/api/projects/:id/members",handle(async(c)=>c.json(await projectMembers((await projectRt(c)).ctx))));
